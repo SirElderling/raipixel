@@ -15,8 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 source = (ROOT / 'src/deflate/encode.rs').read_text()
 traced = source.replace('    dictionary: Vec<u32>,','    dictionary: Vec<u32>,\n    trace: Vec<(u16,u16)>,',1)
 traced = traced.replace('            dictionary,','            dictionary,\n            trace: Vec::new(),',1)
-traced = traced.replace('        let saved = (self.bits, self.count);\\n        self.output.clear();',
-                        '        let saved = (self.bits, self.count);\\n        self.output.clear();\\n        self.trace.clear();',1)
+traced = traced.replace('        let saved = (self.bits, self.count);\n        self.output.clear();',
+                        '        let saved = (self.bits, self.count);\n        self.output.clear();\n        self.trace.clear();',1)
 # The sampled stored path never creates Huffman tokens. Mark that decision
 # explicitly so replay validates the real stored bytes rather than fabricating
 # an empty fixed-Huffman block.
