@@ -31,12 +31,28 @@ struct Bits<'a, 'w> {
 }
 impl Bits<'_, '_> {
     fn fill(&mut self, count: u32) -> Result<(), Error> {
-        while self.count < count && self.pos < self.data.len() {
-            self.work.charge(1)?;
-            self.buffer |= u64::from(self.data[self.pos]) << self.count;
-            self.count += 8;
-            self.pos += 1;
+        if self.count >= count {
+            return Ok(());
         }
+        // Every caller requests at most 16 bits (the stored-block length).
+        // Charge exactly the bytes consumed, never speculative lookahead: the
+        // work budget and consumed-input count are observable codec behavior.
+        let needed = (count - self.count).div_ceil(8) as usize;
+        let take = needed.min(self.data.len() - self.pos);
+        self.work.charge(take as u64)?;
+        if take == 2 {
+            let value = u16::from_le_bytes([self.data[self.pos], self.data[self.pos + 1]]);
+            self.buffer |= u64::from(value) << self.count;
+        } else if take == 1 {
+            self.buffer |= u64::from(self.data[self.pos]) << self.count;
+        } else if take > 2 {
+            // Retain correct behavior if a future caller asks for more bits.
+            for (index, &byte) in self.data[self.pos..self.pos + take].iter().enumerate() {
+                self.buffer |= u64::from(byte) << (self.count + 8 * index as u32);
+            }
+        }
+        self.pos += take;
+        self.count += (take as u32) * 8;
         Ok(())
     }
     fn read(&mut self, count: u32) -> Result<u32, Error> {
@@ -394,6 +410,55 @@ pub(crate) fn inflate(input: &[u8], expected: usize, work: &mut Work) -> Result<
 mod tests {
     use super::*;
     use crate::json::{self, Value};
+    #[test]
+    fn bounded_bit_refill_matches_scalar_and_preserves_charges() {
+        let data = [0x96, 0x5d, 0xe3, 0x0a, 0xf0];
+        for end in 0..=data.len() {
+            for width in 0..=16 {
+                for already in 0..=7u32 {
+                    let mut work = Work::default();
+                    let mut bits = Bits {
+                        data: &data[..end],
+                        pos: 0,
+                        buffer: 0,
+                        count: 0,
+                        work: &mut work,
+                    };
+                    if already != 0 {
+                        bits.fill(already).unwrap();
+                        if bits.count >= already {
+                            bits.consume(already);
+                        }
+                    }
+                    let before = bits.work.remaining();
+                    let pos = bits.pos;
+                    let buffered = bits.buffer;
+                    let buffered_bits = bits.count;
+                    bits.fill(width).unwrap();
+                    let consumed = ((width.saturating_sub(buffered_bits)).div_ceil(8) as usize)
+                        .min(end - pos);
+                    let mut expected = buffered;
+                    for (offset, &byte) in data[pos..pos + consumed].iter().enumerate() {
+                        expected |= u64::from(byte) << (buffered_bits + offset as u32 * 8);
+                    }
+                    assert_eq!(bits.buffer, expected);
+                    assert_eq!(bits.count, buffered_bits + consumed as u32 * 8);
+                    assert_eq!(bits.pos, pos + consumed);
+                    assert_eq!(bits.work.remaining(), before - consumed as u64);
+                }
+            }
+        }
+        let mut work = Work::new(1).unwrap();
+        let mut bits = Bits {
+            data: &data,
+            pos: 0,
+            buffer: 0,
+            count: 0,
+            work: &mut work,
+        };
+        assert!(bits.fill(16).is_err());
+        assert_eq!(bits.work.remaining(), 1);
+    }
     #[test]
     fn independent_stored_fixed_dynamic_and_overlapping_streams() {
         let Value::Array(cases) = json::parse(
