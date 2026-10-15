@@ -188,17 +188,19 @@ impl Encoder {
     // doing that expensive full parse. Require multiple actual three-byte
     // matches to reject the fast path; a single hash collision is insufficient.
     // This is a compression policy heuristic, not a correctness requirement.
-    fn probably_stored(&mut self, data: &[u8]) -> bool {
-        if data.len() < 16_384 {
-            return false;
-        }
+    fn probably_stored(data: &[u8]) -> bool {
+        // Keep the 1 Ki-slot sample table independent of the actual matcher.
+        // No extra full dictionary reset on compressible input, and no reset
+        // at all when we immediately emit a stored block.
+        let mut sampled = [u32::MAX; 1024];
         let mut matches = 0;
         for window in 0..8 {
             let offset = window * (data.len() - 258) / 7;
             for pos in offset..offset + 256 {
                 let (slot, prefix) = hash(data, pos);
-                let entry = self.dictionary[slot];
-                self.dictionary[slot] = (prefix << 16) | pos as u32;
+                let slot = slot & (sampled.len() - 1);
+                let entry = sampled[slot];
+                sampled[slot] = (prefix << 16) | pos as u32;
                 let prior = (entry & 65_535) as usize;
                 if entry >> 16 == prefix
                     && prior < pos
@@ -232,13 +234,10 @@ impl Encoder {
         debug_assert!(data.len() <= BLOCK);
         let saved = (self.bits, self.count);
         self.output.clear();
-        self.dictionary.fill(u32::MAX);
-        if self.probably_stored(data) {
+        if data.len() >= 16_384 && Self::probably_stored(data) {
             self.store(data, last);
             return &self.output;
         }
-        // A sample may have updated dictionary slots, but the full matcher's
-        // choices must start with the same empty dictionary as before.
         self.dictionary.fill(u32::MAX);
         self.put(u32::from(last) | 2, 3); // BTYPE=01, least-significant bit first.
         let mut pos = 0;
@@ -473,8 +472,7 @@ mod tests {
             *byte = (state >> 16) as u8;
         }
         let mut encoder = Encoder::new(BLOCK).unwrap();
-        encoder.dictionary.fill(u32::MAX);
-        assert!(encoder.probably_stored(&noise));
+        assert!(Encoder::probably_stored(&noise));
         let stored = encoder.block(&noise, true);
         assert_eq!(stored.len(), BLOCK + 5);
         assert_eq!(stored[0], 1);
@@ -484,8 +482,7 @@ mod tests {
         let mut tail = noise;
         tail[BLOCK - 4096..].fill(7);
         let mut encoder = Encoder::new(BLOCK).unwrap();
-        encoder.dictionary.fill(u32::MAX);
-        assert!(!encoder.probably_stored(&tail));
+        assert!(!Encoder::probably_stored(&tail));
         assert!(encoder.block(&tail, true).len() < BLOCK + 5);
 
         // Every block must reset the sampled dictionary; preserved prior bits
