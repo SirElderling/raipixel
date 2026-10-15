@@ -127,6 +127,35 @@ mod tests {
         }
     }
     #[test]
+    fn crc_matches_polynomial_across_bulk_boundaries_and_fragmentation() {
+        let mut seed = 17u32;
+        let data: Vec<u8> = (0..65_537)
+            .map(|_| {
+                seed ^= seed << 13;
+                seed ^= seed >> 17;
+                seed ^= seed << 5;
+                seed as u8
+            })
+            .collect();
+        for len in (0..=129).chain([255, 256, 257, 4096, 65_535, 65_536, 65_537]) {
+            let mut expected = u32::MAX;
+            for &byte in &data[..len] {
+                expected ^= u32::from(byte);
+                for _ in 0..8 {
+                    expected = (expected >> 1) ^ if expected & 1 != 0 { 0xedb8_8320 } else { 0 };
+                }
+            }
+            for split in 0..=len.min(65) {
+                assert_eq!(
+                    crc32(&[&data[..split], &[], &data[split..len]]),
+                    !expected,
+                    "length {len}, split {split}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn adler_preserves_each_byte_weight_in_a_full_group() {
         // The defining recurrence gives byte i weight (length - i) in B.
         // A single nonzero sample isolates that coefficient independently.

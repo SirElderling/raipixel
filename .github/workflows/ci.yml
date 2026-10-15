@@ -54,6 +54,14 @@ jobs:
           cargo +stable run --release --locked --offline --example png_bench -- --export png-stage-inputs
           cargo +stable run --release --locked --offline --example png_stages -- png-stage-inputs/sheet-1024-compressed.png
           cargo +stable run --release --locked --offline --example png_stages -- png-stage-inputs/texture-1024-compressed.png
+      - name: Profile actual decoder stages (informational)
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: python tools/png_decode_stages.py png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png
+      - name: Screen safe CRC slicing widths (informational)
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: python tools/png_crc_trial.py
       - name: Profile actual writer stages (informational)
         env:
           RUSTUP_TOOLCHAIN: stable
