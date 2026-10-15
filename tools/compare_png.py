@@ -23,6 +23,8 @@ parser.add_argument('--memory', action='store_true', help='Measure fresh-process
 args = parser.parse_args()
 baseline = json.loads((ROOT / 'benchmarks/png/baseline.json').read_text())
 expected_hashes = {row['name']: row['sha256']['ours'] for row in baseline['measurements']}
+compressed_baseline = json.loads((ROOT / 'benchmarks/png/compressed.json').read_text())
+expected_compressed_hashes = {row['name']: row['sha256']['compressed'] for row in compressed_baseline['measurements']}
 with tempfile.TemporaryDirectory(prefix='raipixel-png-compare-') as temporary:
     work = Path(temporary)
     (work / 'src').mkdir()
@@ -82,8 +84,10 @@ with tempfile.TemporaryDirectory(prefix='raipixel-png-compare-') as temporary:
                 decoded.load()
                 assert decoded.convert('RGBA').tobytes() == image.tobytes(), (name, mode)
         result['ours_byte_identical_to_baseline'] = result['sha256']['ours'] == expected_hashes[name]
+        result['compressed_byte_identical_to_baseline'] = result['sha256']['compressed'] == expected_compressed_hashes[name]
         if not args.allow_encoded_changes:
             assert result['ours_byte_identical_to_baseline'], name
+            assert result['compressed_byte_identical_to_baseline'], name
         measurements.append(result)
         print(json.dumps(result), flush=True)
     noise = Image.frombytes('RGBA', (257, 257), random.Random(17).randbytes(257 * 257 * 4))

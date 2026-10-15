@@ -71,3 +71,43 @@ structures and the vector/VLIW techniques remain reviewed, not implemented.
 
 Original implementation and tests remain subject to the mandatory
 [research attribution requirements](../../docs/design/01-research.md#research-attribution-requirements).
+
+## Adler32: grouping the defining recurrence
+
+The checksum contract is credited to Mark Adler and the zlib format work of
+Jean-Loup Gailly and Mark Adler, documented by L. Peter Deutsch and Jean-Loup
+Gailly in [RFC 1950, ZLIB Compressed Data Format Specification version 3.3,
+1996, sections 2.2 and 6](https://www.rfc-editor.org/rfc/rfc1950.txt).
+`checksum::Adler::update` independently regroups the specification's two sums;
+no third-party checksum implementation is used.
+
+For 128 bytes, let `S[j] = sum(x[8*k+j])` for `k=0..15`, and
+`P[j] = sum((15-k)*x[8*k+j])`. The defining recurrence gives:
+
+```text
+A' = A + sum(S[j])
+B' = B + 128*A + sum(8*P[j] + (8-j)*S[j])
+```
+
+This follows directly from each byte's weight:
+`128-(8*k+j) = 8*(15-k)+(8-j)`. The implementation packs the four even and
+four odd byte positions into two u64 words with 16-bit lanes. Each sum lane is
+at most `16*255 = 4080`; each prior-sum lane is at most
+`(0+...+15)*255 = 30600`. Therefore ordinary word additions cannot carry
+between lanes. Explicit little-endian loads preserve byte positions on every
+host. There are no architecture intrinsics, unsafe blocks or heap allocations.
+
+Full A/B values remain in u64 and are reduced modulo 65,521 after at most
+65,535 bytes; even all-255 input stays below 2^40 in B. The remaining bytes use
+the defining scalar recurrence. Tests isolate every one of the 128 byte
+weights, compare with scalar calculations, use full all-255 blocks and exercise
+fragmented updates across the batch boundary. These tests were pushed before
+the production regrouping.
+
+This optimization changes neither PNG serialization nor the work-limit policy.
+Both stored and compressed benchmark output hashes are checked against their
+respective earlier records. The earlier weighted eight-byte loop and an
+exploratory multiplication-based packed sum were measured before selecting the
+128-byte grouping; the latter was simpler but materially slower in the probe.
+The existing reviewed-only Huffman/vector papers remain reviewed-only; this
+checksum regrouping is derived from the checksum recurrence above.

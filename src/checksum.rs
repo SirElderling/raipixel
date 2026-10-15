@@ -63,12 +63,30 @@ impl Adler {
     pub(crate) fn update(&mut self, data: &[u8]) {
         // u64 accumulation permits whole stored blocks between reductions.
         for block in data.chunks(65_535) {
-            let (bulk, tail) = block.as_chunks::<8>();
-            for bytes in bulk {
-                let [x0, x1, x2, x3, x4, x5, x6, x7] = bytes.map(u64::from);
-                self.b +=
-                    8 * self.a + 8 * x0 + 7 * x1 + 6 * x2 + 5 * x3 + 4 * x4 + 3 * x5 + 2 * x6 + x7;
-                self.a += x0 + x1 + x2 + x3 + x4 + x5 + x6 + x7;
+            let (bulk, tail) = block.as_chunks::<128>();
+            // Four 16-bit lanes in each word hold the even/odd byte sums.
+            // Sixteen words give lane sums <= 16*255 = 4080 and prior sums
+            // <= (0+...+15)*255 = 30600, so additions cannot carry across lanes.
+            // For byte lane j, the batch contributes 8*prior + (8-j)*sum to B.
+            // The derivation and source acknowledgment are in the algorithm notes.
+            for group in bulk {
+                let (mut even, mut odd, mut prior_even, mut prior_odd) = (0u64, 0u64, 0u64, 0u64);
+                for bytes in group.as_chunks::<8>().0 {
+                    let word = u64::from_le_bytes(*bytes);
+                    prior_even += even;
+                    prior_odd += odd;
+                    even += word & 0x00ff_00ff_00ff_00ff;
+                    odd += (word >> 8) & 0x00ff_00ff_00ff_00ff;
+                }
+                self.b += 128 * self.a;
+                for i in 0..4 {
+                    let shift = i * 16;
+                    let e = (even >> shift) & 65535;
+                    let o = (odd >> shift) & 65535;
+                    let p = ((prior_even >> shift) & 65535) + ((prior_odd >> shift) & 65535);
+                    self.b += 8 * p + (8 - 2 * i) * e + (7 - 2 * i) * o;
+                    self.a += e + o;
+                }
             }
             for &byte in tail {
                 self.a += u64::from(byte);
