@@ -254,13 +254,41 @@ hash and all independent sample checks pass. No new allocation or format
 capability was introduced by either optimization.
 
 
-## Next candidate, not yet adopted
+## Full-codec timings and adopted encoder adjustments
 
-[The candidate decision record](candidates/README.md) ranks run-first matching
-and direct distance-code mapping, supplies individual/combined reviewable
-patches, and records isolated Linux tests plus repeated full-writer timings.
-The combined trial reduces repeated 1024 sheet encoding from 2.24–2.34 to
-1.66–1.67 ms with identical PNG bytes. Production source remains at the current
-matcher; native full-writer comparison and a permanent mapping-domain test are
-the next adoption gates. Candidate timings must not be presented as shipped
-implementation performance.
+The [repeatable timing protocol](timing.md) and `tools/png_timings.py` now run
+paired full-codec measurements in native Linux/macOS/Windows CI. They use the
+same driver against both source revisions, calibrated batches, rotating order,
+ABBA process order, raw samples and exact SHA256 output comparisons. No benchmark
+framework or root Cargo dependencies were added. The [control](timing-control.json)
+records noise with unchanged behavior rather than assuming every delta is real.
+
+Run-first maximal matches and direct DEFLATE code mapping are now implemented.
+The permanent tests check every valid distance and the original bit sequence at
+every length, distance-range endpoint and pending-bit offset (59 total tests).
+[Initial native results](native-run-first-linux.json) exposed an 8.2% Linux noise
+regression despite 28% faster sheet encoding; the corresponding
+[macOS](native-run-first-macos.json) and [Windows](native-run-first-windows.json)
+records are retained. The follow-up gives the no-run case a direct hash-match
+branch, avoiding the run-selection comparisons for literal-heavy input.
+
+The [final local paired run](timing-matcher.json) against the pre-change baseline
+measures generated sheet encoding 1.922 → 1.343 ms (30% less time), texture
+2.128 → 1.791 ms (16%), and noise 2.324 → 2.272 ms (2%, within observed drift).
+Small icons remain close to noise. Both writers preserve exact suite bytes.
+These generated sheet/icon pixels differ from the original reference corpus;
+compare matching cases within a report.
+
+The independent [reference comparison](run-matcher.json) still verifies all
+14 original writer hashes, independently decodes both modes for the 31 profile
+fixtures, and verifies multi-block noise. On its original 1024 sheet, our
+compressed writer takes **1.597 ms versus png 0.18.1 Fast's 0.816 ms**, about
+**1.96× slower**, with 52,549 versus 53,405 bytes. Decoding is 1.625/0.842 ms,
+about 1.93× slower. Balanced output remains substantially smaller (11,233 bytes)
+and slower to produce (9.316 ms). The implementation has not reached general
+feature, speed or size parity. No reference implementation code was used.
+
+The subsequent [bit-packing experiment](timing-packing-rejected.json) was rejected:
+its apparent full-writer gain coincided with unchanged decode speeding up;
+alternating isolated DEFLATE measurements showed essentially no gain. See the
+[candidate record](candidates/README.md) for reasoning and the rejected result.

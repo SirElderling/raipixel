@@ -38,6 +38,11 @@ metadata = dict(baseline=baseline, current=current,
                 minimum_batch_ms=args.batch_ms,
                 operation_order=['decode_input', 'decode_stored', 'encode_stored', 'encode_compressed'],
                 process_order=['baseline', 'current', 'current', 'baseline'])
+metadata['driver_sha256'] = hashlib.sha256((ROOT / 'examples/png_bench.rs').read_bytes()).hexdigest()
+metadata['library_sources_sha256'] = {
+    str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
+    for p in sorted([ROOT / 'Cargo.toml', ROOT / 'Cargo.lock', *ROOT.glob('src/**/*.rs')])
+}
 records = []
 with tempfile.TemporaryDirectory(prefix='raipixel-timings-') as temporary:
     temporary = Path(temporary)

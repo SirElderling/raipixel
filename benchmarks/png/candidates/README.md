@@ -128,3 +128,25 @@ or format. A test first compares emitted bytes **and pending bits** against the
 original four-call sequence for every length, both endpoints of every distance
 range and all eight pending-bit offsets. Native results and independent crate
 comparison remain required before reporting a cross-platform improvement.
+
+
+## Follow-up decision
+
+The bit-packing trial is **rejected**. Its [paired report](../timing-packing-rejected.json)
+shows sheet writing 1.573 → 1.388 ms, but unchanged input decode also falls
+1.152 → 1.052 ms. Nine alternating isolated DEFLATE batches (50 fresh encoders
+per batch) give sheet medians 0.921/0.934 ms and texture 1.117/1.107 ms for
+original/packed updates. That does not establish an improvement; retain the
+simpler existing bit writer. The permanent reference-bit test remains useful.
+
+The initial native run-first trial confirmed sheet improvements on all three
+systems but exposed noise regression on Linux (8.2%) and Windows (4.1%). The
+follow-up explicitly handles `repeated == 0` with the hash candidate, avoiding
+run-selection comparisons for that common literal-heavy case. For positive
+runs, retain the maximal-run early exit and original distance-one tie-break.
+This also makes the validity of `pos-1` explicit: a positive run requires a
+preceding byte. No dictionary update, match choice or encoded byte changes.
+An alternating stage probe reduced noise 2.331 → 2.143 ms while sheet/texture
+remained within about 1%; the final whole-codec record is
+[here](../timing-matcher.json). This branch adjustment is adopted and measured
+again in native CI. Source/compiler/workload details accompany the reports.

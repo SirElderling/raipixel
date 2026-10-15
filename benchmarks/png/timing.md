@@ -37,6 +37,6 @@ implementation source is inspected or copied.
 
 The paired tool requires a baseline supporting the current public codec API.
 It records the resolved commits, working-tree state, Rust version/LLVM/target,
-OS/architecture, flags and CI run ID. A nonempty working-tree field identifies a
+OS/architecture, flags, driver/library SHA256 fingerprints and CI run ID. A nonempty working-tree field identifies a
 local experiment; published measurements must name the tested source change.
 No performance thresholds are enforced across heterogeneous machines.

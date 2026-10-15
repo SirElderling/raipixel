@@ -121,3 +121,17 @@ not adopt another paper's parsing/matching algorithm. The fill follows the same
 history/window, exact output-length, allocation-capacity and work-budget checks
 as the general copy path. The length-258 fixture spells out the fixed codes
 independently and is checked by standard zlib before the Rust optimization.
+
+
+## Byte-preserving encoder search/code adjustments
+
+Run-first maximal matching, direct distance-code arithmetic and the length-258
+shortcut in `src/deflate/encode.rs` were independently derived from our original
+matcher and L. Peter Deutsch's RFC 1951 (1996), sections 3.2.5–3.2.6, linked
+above. The no-run branch keeps literal-heavy inputs out of run selection.
+These are adaptations of our implementation around the standard's defining
+ranges, not a new paper algorithm or code from the comparison crate. The
+existing bounded-window conceptual credit to Bille, Cording, Fischer and Gørtz
+continues to apply. A code/extra-bit packing experiment was measured and rejected;
+no additional literature algorithm was adopted. See the candidate and timing
+records for our measurements, independently of any published performance claims.

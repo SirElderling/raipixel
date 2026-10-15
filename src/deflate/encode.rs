@@ -126,11 +126,13 @@ impl Encoder {
             };
             // The old tie-break already preferred distance one. A maximal run
             // cannot lose; retain the dictionary update for subsequent tokens.
-            let (prior, length) = if repeated == maximum {
+            let (prior, length) = if repeated == 0 {
+                (stored, match_length(data, stored, pos, maximum))
+            } else if repeated == maximum {
                 (pos - 1, repeated)
             } else {
                 let matched = match_length(data, stored, pos, maximum);
-                if repeated >= 3 && repeated >= matched {
+                if repeated >= matched {
                     (pos - 1, repeated)
                 } else {
                     (stored, matched)
