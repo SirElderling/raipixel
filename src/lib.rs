@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Deterministic raster primitives. The planned agent interface is not implemented yet.
+//! Deterministic raster primitives and bounded JSON. The agent interface is not implemented yet.
 
 mod error;
 pub mod json;

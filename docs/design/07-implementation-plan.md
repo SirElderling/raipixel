@@ -1,6 +1,6 @@
 # 7. Capability-driven implementation roadmap
 
-No application implementation is included. Deliver accepted workflows, not a broad feature-count commitment. Unsupported operations/fields report E_CAPABILITY with the actual supported set. Foundation is a usable static slice; **the first useful toolkit requires Foundation plus Core and scenarios A–E**, including animation. Advanced work is selected one workflow at a time.
+S1 implementation has started; see [implementation status](../implementation.md) for delivered library functions. No milestone is accepted until its workflow gates pass. Deliver accepted workflows, not a broad feature-count commitment. Unsupported operations/fields report E_CAPABILITY with the actual supported set. Foundation is a usable static slice; **the first useful toolkit requires Foundation plus Core and scenarios A–E**, including animation. Advanced work is selected one workflow at a time.
 
 | Slice | End-to-end usable result | Dependencies and acceptance gate |
 |---|---|---|
