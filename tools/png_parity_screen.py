@@ -17,14 +17,15 @@ ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--cpu')
 parser.add_argument('--features')
+parser.add_argument('--codegen-units', type=int, default=16)
 parser.add_argument('inputs', nargs='+', type=Path)
 args = parser.parse_args()
-flags = ['--edition=2024', '-O']
+flags = ['--edition=2024', '-O', '-C', 'codegen-units=' + str(args.codegen_units)]
 if args.cpu:
     flags += ['-C', 'target-cpu=' + args.cpu]
 if args.features:
     flags += ['-C', 'target-feature=' + args.features]
-source = (ROOT / 'src/deflate/encode.rs').read_text()
+source = (ROOT / 'src/deflate/encode.rs').read_text(encoding='utf-8')
 narrow = source
 for before, after in [
     ('positions: Vec<u32>', 'positions: Vec<u16>'),
@@ -58,7 +59,7 @@ def specialize_run(text):
 
 sources = dict(current=source, narrow=narrow, run=specialize_run(source),
                narrow_run=specialize_run(narrow))
-constants = (ROOT / 'src/deflate.rs').read_text()
+constants = (ROOT / 'src/deflate.rs').read_text(encoding='utf-8')
 constants = constants[constants.index('const LENGTH_BASE:'):constants.index('/// Decode one zlib stream')]
 with tempfile.TemporaryDirectory(prefix='raipixel-parity-screen-') as temporary:
     temporary = Path(temporary)
@@ -78,7 +79,7 @@ with tempfile.TemporaryDirectory(prefix='raipixel-parity-screen-') as temporary:
     driver = '#![forbid(unsafe_code)]\n#![allow(dead_code)]\n'
     driver += '#[path=' + json.dumps(str(ROOT / 'src/error.rs')) + ']mod error;pub use error::{Error,Resource};\n' + constants
     for name, text in sources.items():
-        (temporary / (name + '.rs')).write_text(text)
+        (temporary / (name + '.rs')).write_text(text, encoding='utf-8')
         driver += 'mod ' + name + ';\n'
         driver += 'fn encode_' + name + '(data:&[u8])->Vec<u8>{let mut e=' + name + '::Encoder::new(data.len().min(65535)).unwrap();let mut out=Vec::new();let n=data.len().div_ceil(65535);for(i,b)in data.chunks(65535).enumerate(){out.extend_from_slice(e.block(b,i+1==n));}out}\n'
     driver += '''
@@ -94,7 +95,7 @@ fn main(){for path in std::env::args().skip(1){
     println!("{{\\"encoded_bytes\\":{},\\"iterations\\":{counts:?},\\"samples_us\\":{samples:?}}}",expected.len());
 }}
 '''
-    (temporary / 'main.rs').write_text(driver)
+    (temporary / 'main.rs').write_text(driver, encoding='utf-8')
     reports = {}
     for name, path in [('dictionary_run', temporary / 'main.rs'),
                        ('adler_lanes', ROOT / 'tools/png_adler_lanes_trial.rs')]:

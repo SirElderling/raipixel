@@ -200,3 +200,12 @@ Two/four interleaved prefix streams were also screened. Once direct reduction
 was added, the serial prefix version was within a few percent of the two-stream
 version locally, so the retained code keeps the simpler original prefix loop.
 Raw performance records distinguish prototypes from retained implementation.
+
+## Parity review prototypes
+
+The new safe column-Adler, u16 dictionary and constant-run diagnostic prototypes
+are described and attributed in the [parity review](candidates/parity-review.md).
+Their algebra follows our existing independent RFC 1950 grouping; they preserve
+the RFC 1951 match limits. No new paper algorithm, external implementation,
+production SIMD/unsafe/assembly code or codec feature is adopted. The record
+distinguishes generic native CI from CPU-specific code-generation diagnostics.

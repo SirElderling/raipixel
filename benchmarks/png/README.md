@@ -1,5 +1,10 @@
 # PNG comparison measurements
 
+[Latest parity review](candidates/parity-review.md) assesses the remaining gap,
+safe SIMD/code-generation screens, dictionary/run candidates and the case for
+targeted intrinsics versus assembly. No production change or parity claim is
+made by those new stage experiments.
+
 `baseline.json` records raipixel at commit 044f5e5 against the public API of
 `png` 0.18.1 with default Cargo features. No reference implementation source
 was inspected or copied. The reference was compiled in a separate temporary
