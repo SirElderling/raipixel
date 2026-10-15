@@ -347,3 +347,35 @@ texture. Native CI finds only small large-input gains and consistent tiny-icon
 regressions on Linux and Windows. The candidate is rejected and the previous
 two-loop layout restored. The [decision record](candidates/row-fusion-adler.md)
 retains all platforms, controls and checksum screening trials.
+
+## Two interleaved packed Adler streams
+
+This trial revisits interleaving after the earlier direct-reduction screen
+found little benefit. Loop spelling and the resulting complete codec must be
+measured again; this is not a claim of a newly discovered checksum algorithm.
+`src/checksum.rs::Adler::update` uses two fixed streams of eight words, preserving
+the existing 128-byte grouping and scalar remainder. For stream `t=0,1`, byte
+lane `j=0..7`, word `k=0..7`, let `S[t,j]=sum(x[16*k+8*t+j])` and
+`P[t,j]=sum((7-k)*x[16*k+8*t+j])`. Its byte weight is:
+
+```text
+128-(16*k+8*t+j) = 16*(7-k) + 8*(1-t) + (8-j)
+A' = A + sum(S[t,j])
+B' = B + 128*A + sum(16*P[t,j] + (8*(1-t)+8-j)*S[t,j])
+```
+
+Each stream retains four packed even/odd 16-bit fields. Each sum field is at
+most `8*255=2040`, each prior field `28*255=7140`, with combined even/odd fields
+at most 4080 and 14280 respectively. The existing multiply reduction and
+32-bit prior-pair reduction therefore remain valid with tighter bounds.
+Both streams contribute using the incoming A before either sum updates it.
+The same 65,535-byte modulo interval keeps A/B within the prior u64 bounds.
+Explicit little-endian loads, fragmented updates, work charges, allocations
+and serialized output stay unchanged. No target intrinsics or unsafe code.
+
+The defining checksum is credited to Mark Adler, Gailly and Deutsch's RFC 1950
+as above. Stream regrouping and this safe Rust implementation are independently
+derived. Existing tests for every isolated byte weight, full all-255 blocks,
+patterned scalar checks and fragmented updates passed before this refactor and
+after it. Complete-codec hashes, public-API reference comparisons and native
+three-platform CI determine whether this candidate should be retained.

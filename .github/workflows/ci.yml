@@ -48,11 +48,11 @@ jobs:
       - name: Paired full-codec timings and exact output comparison (informational)
         env:
           RUSTUP_TOOLCHAIN: stable
-        run: python tools/png_timings.py --baseline a599c199198d4b91c5a31d48071b10357d1e1be7 --batch-ms 100 --output png-timings.json
+        run: python tools/png_timings.py --baseline 9122259844497a57149dbe6ba7fa0ef708398c46 --batch-ms 100 --output png-timings.json
       - name: Compare original mixed-filter corpus, samples, flags and work (informational)
         env:
           RUSTUP_TOOLCHAIN: stable
-        run: python tools/png_timings.py --baseline a599c199198d4b91c5a31d48071b10357d1e1be7 --corpus benchmarks/png/original-inputs.json --batch-ms 100 --output png-original-timings.json
+        run: python tools/png_timings.py --baseline 9122259844497a57149dbe6ba7fa0ef708398c46 --corpus benchmarks/png/original-inputs.json --batch-ms 100 --output png-original-timings.json
       - name: Restore recorded original PNG inputs
         run: python -c "import json;from pathlib import Path;p=Path('png-original-inputs');p.mkdir(exist_ok=True);[(p / (c['name'] + '.png')).write_bytes(bytes.fromhex(c['png_hex'])) for c in json.loads(Path('benchmarks/png/original-inputs.json').read_text())['cases']]"
       - name: Codec stage probes (informational)

@@ -108,35 +108,41 @@ impl Adler {
         // u64 accumulation permits whole stored blocks between reductions.
         for block in data.chunks(65_535) {
             let (bulk, tail) = block.as_chunks::<128>();
-            // Four 16-bit lanes in each word hold the even/odd byte sums.
-            // Sixteen words give lane sums <= 16*255 = 4080 and prior sums
-            // <= (0+...+15)*255 = 30600, so additions cannot carry across lanes.
-            // For byte lane j, the batch contributes 8*prior + (8-j)*sum to B.
-            // The derivation and source acknowledgment are in the algorithm notes.
+            // Two interleaved streams each accumulate eight eight-byte words.
+            // Packed 16-bit sum/prior fields cannot carry (<= 2040/7140).
+            // A byte at 16*k + 8*stream + j has weight
+            // 16*(7-k) + 8*(1-stream) + (8-j) in B.
+            // Derivation and Adler/RFC 1950 credit: algorithm-notes.md.
             for group in bulk {
-                let (mut even, mut odd, mut prior_even, mut prior_odd) = (0u64, 0u64, 0u64, 0u64);
-                for bytes in group.as_chunks::<8>().0 {
-                    let word = u64::from_le_bytes(*bytes);
-                    prior_even += even;
-                    prior_odd += odd;
-                    even += word & 0x00ff_00ff_00ff_00ff;
-                    odd += (word >> 8) & 0x00ff_00ff_00ff_00ff;
+                let (mut even, mut odd, mut prior_even, mut prior_odd) =
+                    ([0u64; 2], [0u64; 2], [0u64; 2], [0u64; 2]);
+                for bytes in group.as_chunks::<16>().0 {
+                    for (stream, word) in bytes.as_chunks::<8>().0.iter().enumerate() {
+                        let word = u64::from_le_bytes(*word);
+                        prior_even[stream] += even[stream];
+                        prior_odd[stream] += odd[stream];
+                        even[stream] += word & 0x00ff_00ff_00ff_00ff;
+                        odd[stream] += (word >> 8) & 0x00ff_00ff_00ff_00ff;
+                    }
                 }
-                // Four sum lanes total at most 32640; prefix sums cannot carry between
-                // fields in the wrapping multiply. Prior totals need 32-bit fields.
-                let sums = even + odd;
-                let sum_total = sums.wrapping_mul(0x0001_0001_0001_0001) >> 48;
-                let odd_total = odd.wrapping_mul(0x0001_0001_0001_0001) >> 48;
-                let prior = prior_even + prior_odd;
-                let pairs =
-                    (prior & 0x0000_ffff_0000_ffff) + ((prior >> 16) & 0x0000_ffff_0000_ffff);
-                let prior_total = (pairs & 0xffff_ffff) + (pairs >> 32);
-                let weighted = 4 * (sums & 65535)
-                    + 3 * ((sums >> 16) & 65535)
-                    + 2 * ((sums >> 32) & 65535)
-                    + (sums >> 48);
-                self.b += 128 * self.a + 8 * prior_total + 2 * weighted - odd_total;
-                self.a += sum_total;
+                self.b += 128 * self.a;
+                for stream in 0..2 {
+                    let sums = even[stream] + odd[stream];
+                    // Four sum fields total <= 16320, so no prefix carries.
+                    let sum_total = sums.wrapping_mul(0x0001_0001_0001_0001) >> 48;
+                    let odd_total = odd[stream].wrapping_mul(0x0001_0001_0001_0001) >> 48;
+                    let prior = prior_even[stream] + prior_odd[stream];
+                    let pairs =
+                        (prior & 0x0000_ffff_0000_ffff) + ((prior >> 16) & 0x0000_ffff_0000_ffff);
+                    let prior_total = (pairs & 0xffff_ffff) + (pairs >> 32);
+                    let weighted = 4 * (sums & 65535)
+                        + 3 * ((sums >> 16) & 65535)
+                        + 2 * ((sums >> 32) & 65535)
+                        + (sums >> 48);
+                    self.b += 16 * prior_total + 8 * (1 - stream) as u64 * sum_total + 2 * weighted
+                        - odd_total;
+                    self.a += sum_total;
+                }
             }
             for &byte in tail {
                 self.a += u64::from(byte);
