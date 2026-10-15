@@ -306,6 +306,7 @@ pub fn decode(input: &[u8], limits: Limits, work: &mut Work) -> Result<Decoded, 
     }
     let inflated = crate::deflate::inflate(&compressed, expected, work)?;
     let trailing_idat_bytes = compressed.len() - inflated.consumed;
+    drop(compressed); // Release joined IDAT storage before allocating the RGBA image.
     let image = reconstruct(
         inflated.data,
         &header,
