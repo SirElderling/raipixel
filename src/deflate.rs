@@ -73,10 +73,21 @@ impl Bits<'_, '_> {
     }
 }
 
+// Each decoded symbol fits nine bits (maximum literal symbol 285), and
+// RFC 1951 limits Huffman code lengths to fifteen bits. Packing both into
+// u16 halves the lookup table footprint without changing the code tree.
 #[derive(Clone, Copy, Default)]
-struct Entry {
-    symbol: u16,
-    bits: u8,
+struct Entry(u16);
+impl Entry {
+    const fn new(symbol: u16, bits: u8) -> Self {
+        Self(symbol | ((bits as u16) << 9))
+    }
+    fn symbol(self) -> u16 {
+        self.0 & 511
+    }
+    fn bits(self) -> u32 {
+        u32::from(self.0 >> 9)
+    }
 }
 #[derive(Clone, Copy)]
 enum Alphabet {
@@ -143,10 +154,7 @@ impl Huffman {
             next[len as usize] += 1;
             let reversed = (code.reverse_bits() >> (16 - len)) as usize;
             for index in (reversed..size).step_by(1usize << len) {
-                entries[index] = Entry {
-                    symbol: symbol as u16,
-                    bits: len,
-                };
+                entries[index] = Entry::new(symbol as u16, len);
             }
         }
         Ok(Self {
@@ -160,19 +168,20 @@ impl Huffman {
         }
         bits.fill(self.width)?;
         let entry = self.entries[(bits.buffer & ((1 << self.width) - 1)) as usize];
-        if entry.bits == 0 || u32::from(entry.bits) > bits.count {
+        let width = entry.bits();
+        if width == 0 || width > bits.count {
             return Err(Error::Data);
         }
         bits.work.charge(1)?;
-        bits.consume(u32::from(entry.bits));
-        Ok(entry.symbol)
+        bits.consume(width);
+        Ok(entry.symbol())
     }
 }
 
 // The fixed alphabets are defined by RFC 1951. Construct their lookup tables
 // once at compile time, avoiding per-block allocation and reconstruction.
 const fn fixed_literals() -> [Entry; 512] {
-    let mut entries = [Entry { symbol: 0, bits: 0 }; 512];
+    let mut entries = [Entry::new(0, 0); 512];
     let mut symbol = 0u16;
     while symbol < 288 {
         let (code, bits) = if symbol < 144 {
@@ -186,7 +195,7 @@ const fn fixed_literals() -> [Entry; 512] {
         };
         let mut index = (code.reverse_bits() >> (16 - bits)) as usize;
         while index < 512 {
-            entries[index] = Entry { symbol, bits };
+            entries[index] = Entry::new(symbol, bits);
             index += 1usize << bits;
         }
         symbol += 1;
@@ -194,10 +203,10 @@ const fn fixed_literals() -> [Entry; 512] {
     entries
 }
 const fn fixed_distances() -> [Entry; 32] {
-    let mut entries = [Entry { symbol: 0, bits: 5 }; 32];
+    let mut entries = [Entry::new(0, 5); 32];
     let mut symbol = 0u16;
     while symbol < 32 {
-        entries[(symbol.reverse_bits() >> 11) as usize].symbol = symbol;
+        entries[(symbol.reverse_bits() >> 11) as usize] = Entry::new(symbol, 5);
         symbol += 1;
     }
     entries
@@ -410,6 +419,18 @@ pub(crate) fn inflate(input: &[u8], expected: usize, work: &mut Work) -> Result<
 mod tests {
     use super::*;
     use crate::json::{self, Value};
+    #[test]
+    fn packed_huffman_entries_cover_the_full_symbol_and_bit_domains() {
+        assert_eq!(std::mem::size_of::<Entry>(), 2);
+        for symbol in 0..=285u16 {
+            for count in 1..=15 {
+                let entry = Entry::new(symbol, count);
+                assert_eq!(entry.symbol(), symbol);
+                assert_eq!(entry.bits(), u32::from(count));
+            }
+        }
+        assert_eq!(Entry::default().bits(), 0);
+    }
     #[test]
     fn bounded_bit_refill_matches_scalar_and_preserves_charges() {
         let data = [0x96, 0x5d, 0xe3, 0x0a, 0xf0];
