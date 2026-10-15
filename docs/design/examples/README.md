@@ -1,242 +1,222 @@
-# Ten proposed agent workflows
+# Proposed agent workflows
 
-All syntax follows [interface v1](../06-agent-interface.md). These are documentation examples, not executed application tests. Save fenced `raipixel` recipes as the named .rai files when implementation exists. Command blocks show actual proposed CLI. Directories are immutable snapshots. Input PNGs must satisfy the stated size/alpha contract; artistic quality and supplied views/poses remain external responsibilities.
+These are documentation contracts, **not executed application tests**. Save each JSON job/query under the stated filename. All operations/fields follow the [interface](../06-agent-interface.md) and [schema](../command-schema.json). Foundation examples use the initial static loop; Core examples require later capabilities. All input artwork prerequisites are explicit. Each output directory must be absent.
 
-## 1. Create a 32×32 fantasy sword
+## 1. Original artwork from an empty canvas — Foundation
 
-`sword.rai` needs no source art. Separate blade/hilt cels preserve targeted editability. This deliberately simple sword demonstrates controllable structure, not a promised final artistic result.
+Save as `sword.json`. A compact 12×12 sword uses separate blade/hilt layers and a five-color palette. This supplies actual geometry and shading decisions without source artwork; it is not a prompt-to-image model.
 
-```text
-raipixel 1
-palette name=rpg colors=[#252B37,#6A798F,#C7D5DD,#7D452E,#D8A74E]
-style name=icon size=[32,32] palette=rpg alpha=binary nonempty=true
-asset name=sword size=[32,32] palette=rpg style=icon pivot=[16,28]
-layer asset=sword name=blade
-layer asset=sword name=hilt
-frame asset=sword name=base duration=100
-cel target=sword/blade/base
-cel target=sword/hilt/base
-draw target=sword/blade/base shape=polygon points=[[16,2],[19,7],[18,22],[14,22],[13,7]] color=#252B37
-draw target=sword/blade/base shape=polygon points=[[16,4],[17,8],[17,21],[15,21],[15,8]] color=#6A798F
-draw target=sword/blade/base shape=line points=[[16,5],[16,20]] color=#C7D5DD
-draw target=sword/hilt/base shape=rect rect=[10,21,13,3] color=#D8A74E
-draw target=sword/hilt/base shape=rect rect=[15,24,3,5] color=#7D452E
-preset name=preview kind=frame target=sword/base scale=8
-preset name=game kind=sheet targets=[sword/base] columns=1 padding=1 extrude=1
+```json
+{"interface":1,"semantics":"1.0","ops":[
+  {"op":"palette.set","name":"metal","entries":[{"name":"edge","rgb":"#252B37"},{"name":"steel","rgb":"#6A798F"},{"name":"light","rgb":"#C7D5DD"},{"name":"gold","rgb":"#D8A74E"},{"name":"wood","rgb":"#7D452E"}]},
+  {"op":"asset.create","name":"sword","size":[12,12],"pivot":[6,11],"palette":"metal"},
+  {"op":"layer.create","asset":"sword","name":"blade"},
+  {"op":"layer.create","asset":"sword","name":"hilt"},
+  {"op":"frame.create","asset":"sword","name":"base"},
+  {"op":"cel.create","target":"sword/blade/base"},
+  {"op":"cel.create","target":"sword/hilt/base"},
+  {"op":"grid","targets":["sword/blade/base"],"at":[4,0],"rows":["..O..",".OLO.",".OSO.",".OSO.",".OSO.",".OSO.",".OOO."],"symbols":{".":"#00000000","O":"@metal/edge","S":"@metal/steel","L":"@metal/light"}},
+  {"op":"draw","targets":["sword/hilt/base"],"shape":"rect","rect":[2,7,9,1],"color":"@metal/gold"},
+  {"op":"draw","targets":["sword/hilt/base"],"shape":"rect","rect":[5,8,3,3],"color":"@metal/wood"},
+  {"op":"draw","targets":["sword/hilt/base"],"shape":"rect","rect":[4,11,5,1],"color":"@metal/gold"}
+],"checks":["structure","palette","alpha","bounds"],"exports":[{"name":"preview","kind":"frame","targets":["sword/base"],"scale":16},{"name":"game","kind":"frame","targets":["sword/base"]}]}
 ```
 
 ```sh
-raipixel run sword.rai --out sword-v1 --export preview
-raipixel inspect sword-v1 --asset sword --frame base
-raipixel validate sword-v1 --asset sword
-raipixel export sword-v1 --preset game --out sword-game
+raipixel run sword.json --out sword-v1
+raipixel inspect sword-v1
+raipixel validate sword-v1
 ```
 
-Acceptance: dimensions32, five visible palette colors or fewer, binary alpha, two independently editable cels; image/JSON present; pivot [16,28].
+Review `sword-v1/artifacts/preview/image.png` externally. Pass: recognizable sword reviewed separately, 12×12 game PNG, two editable cels, palette-valid binary alpha, pivot [6,11]. Reopening and editing uses example2.
 
-## 2. Recolor an existing character
+## 2. Inspect, then change one part — Foundation
 
-Prerequisite: `hero-v1` contains hero/body/walk0 and hero/body/walk1. Exact RGB mappings preserve per-pixel alpha; no generation.
+Save query as `blade-query.json`, run it, then save job as `recolor.json`. The known steel area uses x=6,y=2..5. Only those selected samples are eligible to change.
 
-```text
-raipixel 1
-replace target=hero/body/walk0 colors=[[#7D452E,#34546E],[#D8A74E,#82AAC3]] preserve-alpha=true
-replace target=hero/body/walk1 colors=[[#7D452E,#34546E],[#D8A74E,#82AAC3]] preserve-alpha=true
-palette name=blue colors=[#252B37,#34546E,#82AAC3,#C7D5DD]
-asset-set name=hero clear=[style] palette=blue
+```json
+{"target":"sword/blade/base","region":[4,0,5,7],"pixels":true,"symbols":true}
 ```
 
 ```sh
-raipixel run recolor.rai --project hero-v1 --out hero-blue
-raipixel validate hero-blue --asset hero --checks structure,palette,alpha
+raipixel inspect sword-v1 --query blade-query.json
 ```
 
-The supplied palette must include all remaining visible body/equipment colors; otherwise validation fails and the agent adds the intended colors or explicitly quantizes relevant cels. Clearing the old style does not silently retain its previous palette policy. Acceptance: only matched RGBs change; alpha/timing/anchors untouched.
-
-## 3. Modify one layer of a sprite
-
-Prerequisite hero-v1 has hero/armor/walk0. Patch a twelve-pixel armor panel and export the already persisted preview preset if present.
-
-```sh
-raipixel op hero-v1 draw target=hero/armor/walk0 shape=rect 'rect=[14,12,4,3]' color=#C7D5DD --out hero-armor-v2
-raipixel inspect hero-armor-v2 --asset hero --frame walk0 --layer armor --region 14,12,4,3 --pixels
-```
-
-Acceptance: body pixels, all other frames, layer order, timing and anchors unchanged. A flattened PNG needs a supplied armor mask or separated source first; naming a region does not infer armor.
-
-## 4. Create a walking animation from supplied poses
-
-Inputs: 32×32 `inputs/body.png`, and four 32×32 registered `inputs/legs0.png`..`legs3.png`, transparent where absent. The leg poses must depict a believable cycle. Static body plus alternate legs is a supported assembly, not universal character animation.
-
-```text
-raipixel 1
-asset name=hero size=[32,32] pivot=[16,31]
-layer asset=hero name=legs
-layer asset=hero name=body
-frame asset=hero name=walk0 duration=120
-import target=hero/legs/walk0 file="inputs/legs0.png"
-import target=hero/body/walk0 file="inputs/body.png"
-anchor target=hero/walk0 name=foot at=[16,31]
-frame asset=hero name=walk1 source=walk0 duration=120
-import target=hero/legs/walk1 file="inputs/legs1.png" replace=true
-frame asset=hero name=walk2 source=walk0 duration=120
-import target=hero/legs/walk2 file="inputs/legs2.png" replace=true
-frame asset=hero name=walk3 source=walk0 duration=120
-import target=hero/legs/walk3 file="inputs/legs3.png" replace=true
-clip asset=hero name=walk-south frames=[walk0,walk1,walk2,walk3] direction=south playback=forward repeat=0
-style name=character size=[32,32] alpha=binary anchors=[foot] nonempty=true
-asset-set name=hero style=character
-preset name=walk-contact kind=contact targets=[hero/walk0,hero/walk1,hero/walk2,hero/walk3] columns=4 scale=4 clips=[hero/walk-south]
-preset name=game kind=sheet targets=[hero/walk0,hero/walk1,hero/walk2,hero/walk3] columns=4 padding=1 clips=[hero/walk-south] components=true
+```json
+{"interface":1,"semantics":"1.0","ops":[{"op":"palette.map","targets":["sword/blade/base"],"region":[6,2,1,4],"pairs":[["#6A798F","#C7D5DD"]]}],"exports":[{"name":"preview","kind":"frame","targets":["sword/base"],"scale":16}]}
 ```
 
 ```sh
-raipixel run walk.rai --out hero-walk --export walk-contact
-raipixel validate hero-walk --asset hero --checks structure,animation,registration,alpha
+raipixel run recolor.json --project sword-v1 --out sword-v2
 ```
 
-Acceptance: four 120ms frames, copied constant foot anchor, unchanged body surfaces, clip cycle metadata; agent visually checks poses. Attacking/casting/death use the same frame model with separately supplied action artwork.
+Pass: exactly four steel samples change; hilt, other blade samples, palette, duration and pivot remain identical. Source sword-v1 is unchanged. This is the revision/inspection part of scenario A.
 
-## 5. Assemble eight directional character views
+## 3. Import and correct a real PNG — Foundation
 
-Inputs `views/0-body.png`..`views/7-body.png` and corresponding equipment PNGs are actual separately drawn/generated 32×32 registered views. Index mapping:0 south,1 southwest,2 west,3 northwest,4 north,5 northeast,6 east,7 southeast. d0..d7 are explicit descriptive direction IDs; export consumers use this mapping. No transformation guesses hidden anatomy/equipment.
+`inputs/icon.png` must be a real externally produced 16×16 supported static PNG, with a known incorrect pixel at [7,5]. Save as `correct.json`. Choose replacement through visual/source review; the engine does not infer the defect.
 
-```text
-raipixel 1
-palette name=common file="inputs/character.pal"
-asset name=hero size=[32,32] palette=common pivot=[16,31]
-layer asset=hero name=body
-layer asset=hero name=equipment
-repeat count=8 var=i
-  frame asset=hero name=view-${i} duration=100
-  import target=hero/body/view-${i} file="views/${i}-body.png"
-  import target=hero/equipment/view-${i} file="views/${i}-equipment.png"
-  quantize target=hero/body/view-${i} palette=common alpha=binary threshold=128
-  quantize target=hero/equipment/view-${i} palette=common alpha=binary threshold=128
-  anchor target=hero/view-${i} name=foot at=[16,31]
-  clip asset=hero name=idle-d${i} frames=[view-${i}] direction=d${i}
-end
-preset name=directions kind=contact targets=[hero/view-0,hero/view-1,hero/view-2,hero/view-3,hero/view-4,hero/view-5,hero/view-6,hero/view-7] columns=4 scale=4
+```json
+{"interface":1,"semantics":"1.0","ops":[
+  {"op":"asset.create","name":"icon","size":[16,16]},
+  {"op":"layer.create","asset":"icon","name":"source"},
+  {"op":"frame.create","asset":"icon","name":"base"},
+  {"op":"png.import","target":"icon/source/base","file":"inputs/icon.png"},
+  {"op":"draw","targets":["icon/source/base"],"shape":"pixel","at":[7,5],"color":"#C7D5DD"}
+],"exports":[{"name":"corrected","kind":"frame","targets":["icon/base"]}]}
 ```
 
 ```sh
-raipixel run directions.rai --out hero-directions --export directions
+raipixel run correct.json --out icon-corrected
 ```
 
-Acceptance: eight supplied views retained, one palette and footline, no inferred back views. View coherence still requires visual/artistic approval.
+Pass: independently decoded exported RGBA equals decoded input at every other position, including hidden RGB; only the declared correction differs. Ancillary/profile/source-file bytes are not the preservation target. To inspect before choosing the correction, first run only the four import operations into a new snapshot, inspect/export it, then run a separate draw job against that snapshot.
 
-## 6. Create a terrain tileset and transition
+## 4. Explicit cleanup and palette extraction — Foundation
 
-No source images required. Borders are intentionally authored; texture is confined to the interior. A simple transition is constructed from half grass/half dirt, not a general terrain generator.
+Prerequisite icon-corrected. Save as `cleanup.json`. The top four rows are a known key-colored border; avoid whole-image removal of similarly colored details.
 
-```text
-raipixel 1
-palette name=terrain colors=[#4B6B32,#628742,#7D583B,#98704C]
-asset name=ground size=[16,16] palette=terrain
-layer asset=ground name=base
-frame asset=ground name=grass
-cel target=ground/base/grass
-draw target=ground/base/grass shape=rect rect=[0,0,16,16] color=#4B6B32
-texture target=ground/base/grass seed=42 colors=[#628742] density=150 region=[1,1,14,14]
-frame asset=ground name=dirt
-cel target=ground/base/dirt
-draw target=ground/base/dirt shape=rect rect=[0,0,16,16] color=#7D583B
-texture target=ground/base/dirt seed=11 colors=[#98704C] density=200 region=[1,1,14,14]
-frame asset=ground name=grass-dirt source=grass
-draw target=ground/base/grass-dirt shape=rect rect=[8,0,8,16] color=#7D583B
-tileset asset=ground size=[16,16] edge-width=1 strip-equality=true
-tile target=ground/grass edges=[grass,grass,grass,grass]
-tile target=ground/dirt edges=[dirt,dirt,dirt,dirt]
-tile target=ground/grass-dirt edges=[mixed,dirt,mixed,grass]
-map name=sample asset=ground size=[3,1] cells=[[grass,grass-dirt,dirt]]
-preset name=seams kind=seam target=ground/grass
-preset name=terrain-game kind=sheet targets=[ground/grass,ground/grass-dirt,ground/dirt] columns=3 padding=1 extrude=1
-preset name=map-preview kind=map target=sample scale=4
+```json
+{"interface":1,"semantics":"1.0","ops":[
+  {"op":"alpha","targets":["icon/source/base"],"kind":"key","color":"#FF00FF","match":"rgb","region":[0,0,16,4]},
+  {"op":"palette.extract","source":"icon/source/base","name":"observed","max_colors":256}
+],"exports":[{"name":"cleaned","kind":"frame","targets":["icon/base"],"scale":4}]}
 ```
 
 ```sh
-raipixel run terrain.rai --out terrain-v1 --export seams --export map-preview
-raipixel validate terrain-v1 --checks structure,edges,palette
-raipixel export terrain-v1 --preset terrain-game --out terrain-game
+raipixel run cleanup.json --project icon-corrected --out icon-clean
 ```
 
-Acceptance: declared grass/dirt/mixed strips compatible, sample adjacency correct, no out-of-palette colors. Smooth transitions and irregular terrain need separately authored tiles/masks. No automatic Wang-set completion.
+Pass: only matching alpha in the region changes; hidden RGB is retained; extraction reports exact visible colors. More than 256 colors fails with actionable counts and no publication; inspect the histogram and choose an explicit Core quantization strategy. Extraction does not silently assign a palette or recolor artwork.
 
-## 7. Produce twenty controlled weapon variations
+## 5. Reusable masked edits — Core
 
-Prerequisite sword-v1 from example1. Seeds change blade texture while keeping outline/hilt silhouette and palette. Variation quality/uniqueness is inspected externally.
+Prerequisite sword-v1. Save as `masked.json`. A hidden mask layer avoids showing the selection image in the final render.
 
-```text
-raipixel 1
-repeat count=20 var=i
-  asset-copy source=sword name=weapon-${i}
-  texture target=weapon-${i}/blade/base seed=${i} colors=[#6A798F,#C7D5DD] density=150 region=[15,8,2,12]
-end
-preset name=collection kind=sheet targets=[weapon-0/base,weapon-1/base,weapon-2/base,weapon-3/base,weapon-4/base,weapon-5/base,weapon-6/base,weapon-7/base,weapon-8/base,weapon-9/base,weapon-10/base,weapon-11/base,weapon-12/base,weapon-13/base,weapon-14/base,weapon-15/base,weapon-16/base,weapon-17/base,weapon-18/base,weapon-19/base] columns=5 padding=1
+```json
+{"interface":1,"semantics":"1.0","ops":[
+  {"op":"layer.create","asset":"sword","name":"selection","visible":false},
+  {"op":"mask.create","source":"sword/blade/base","target":"sword/selection/base","kind":"color","color":"#6A798F","match":"rgb"},
+  {"op":"draw","targets":["sword/blade/base"],"shape":"rect","rect":[0,0,12,12],"color":"@metal/light","mask":"sword/selection/base"}
+],"exports":[{"name":"result","kind":"frame","targets":["sword/base"]}]}
 ```
 
 ```sh
-raipixel run variants.rai --project sword-v1 --out weapon-family --export collection
+raipixel run masked.json --project sword-v1 --out sword-masked
 ```
 
-Acceptance:20 separately editable assets, deterministic seeds0..19, original sword unchanged; all declared style checks pass. Shape variants require explicit draw/transform inputs; random seeds cannot guarantee20 distinct designs.
+Pass: steel-colored blade pixels change; outline, hilt, and all unselected samples/state remain equal. Masks are explicitly constructed predicates, not semantic segmentation.
 
-## 8. Import existing artwork and correct its palette
+## 6. Assemble and edit an animation — Core
 
-Input `inputs/generated.png` is supported PNG at 32×32; `inputs/game.pal` is an explicit desired RGB palette. If the generator used a known 4× pixel grid, use a separate import of 128×128 then `transform op=reduce grid=[4,4] phase=[0,0]` before validating; grid estimation is external.
+Save as `motion.json`. This original two-frame glint animation reuses the authored sword; it demonstrates component editing, not an inferred walk cycle.
 
-```text
-raipixel 1
-palette name=game file="inputs/game.pal"
-asset name=imported size=[32,32] palette=game
-layer asset=imported name=source
-frame asset=imported name=base
-import target=imported/source/base file="inputs/generated.png"
-quantize target=imported/source/base palette=game dither=none alpha=binary threshold=128
-preset name=corrected kind=frame target=imported/base scale=4
-```
-
-```sh
-raipixel run cleanup.rai --out corrected-v1 --export corrected
-raipixel inspect corrected-v1 --asset imported --frame base
-raipixel validate corrected-v1 --asset imported --checks dimensions,palette,alpha,bounds
-```
-
-Correct a known flat background with explicit `alpha mode=key color=#FF00FF match=rgb`, or import a supplied region mask. Acceptance: exact dimensions/allowed colors/binary alpha, meaningful source silhouette requires visual review. Quantization is deterministic cleanup, not detail invention.
-
-## 9. Inspect and validate animation
-
-Prerequisite hero-walk from example4. Persist a diff/onion preset through a recipe; inspection artifacts observe final state and preserve original cels.
-
-```text
-raipixel 1
-preset name=frame-diff kind=diff targets=[hero/walk0,hero/walk1] scale=4
-preset name=neighbors kind=onion asset=hero frames=[walk0,walk1,walk2] scale=4
+```json
+{"interface":1,"semantics":"1.0","ops":[
+  {"op":"frame.create","asset":"sword","name":"glint","source":"base","duration_ms":80},
+  {"op":"frame.set","target":"sword/base","duration_ms":160},
+  {"op":"draw","targets":["sword/blade/glint"],"shape":"line","points":[[6,2],[6,5]],"color":"@metal/light"},
+  {"op":"anchor.set","targets":["sword/base","sword/glint"],"name":"grip","at":[6,9]},
+  {"op":"clip.set","asset":"sword","name":"shine","frames":["base","glint"],"playback":"forward","repeat":0},
+  {"op":"palette.map","targets":["sword/hilt/base","sword/hilt/glint"],"pairs":[["#7D452E","#6A798F"]]}
+],"checks":["structure","animation","registration","palette","bounds"],"exports":[
+  {"name":"contact","kind":"contact","targets":["sword/base","sword/glint"],"columns":2,"scale":8},
+  {"name":"game","kind":"sheet","targets":["sword/base","sword/glint"],"columns":2,"padding":1,"extrude":1,"clips":["sword/shine"],"components":true}
+]}
 ```
 
 ```sh
-raipixel run inspect-walk.rai --project hero-walk --out hero-inspected --export frame-diff --export neighbors
-raipixel inspect hero-inspected --asset hero --frame walk1
-raipixel validate hero-inspected --asset hero --checks structure,animation,registration,alpha,bounds
+raipixel run motion.json --project sword-v1 --out sword-motion
+raipixel validate sword-motion
 ```
 
-Acceptance: durations/clips/anchors report correctly; known pixel changes match diff stats; no subjective “good walk” score. Intermediate iteration uses a new snapshot boundary.
+Pass: two frames at160/80ms; blade edit affects only glint; the named hilt changes across both frames while blades/timing/anchors are preserved by that final map. Sheet is28×14, rects [1,1,12,12] and [15,1,12,12], clip indices [0,1], grip [6,9]. A character walk uses the same model but needs authored/supplied leg/body poses; a sword glint does not prove anatomy generation.
 
-## 10. Export game-ready spritesheet with metadata
+## 7. Import supplied animation poses — Core
+
+`inputs/walk.png` is a 68×34 PNG: two32×32 cells, each with one-pixel border, no extrusion, provided coherent poses. Save as `walk.json`.
+
+```json
+{"interface":1,"semantics":"1.0","ops":[
+  {"op":"asset.create","name":"hero","size":[32,32],"pivot":[16,31]},
+  {"op":"layer.create","asset":"hero","name":"body"},
+  {"op":"sheet.import","asset":"hero","layer":"body","file":"inputs/walk.png","size":[32,32],"names":["walk0","walk1"],"durations_ms":[120,120],"columns":2,"padding":1},
+  {"op":"anchor.set","targets":["hero/walk0","hero/walk1"],"name":"foot","at":[16,31]},
+  {"op":"clip.set","asset":"hero","name":"walk-south","frames":["walk0","walk1"],"direction":"south"}
+],"exports":[{"name":"frames","kind":"frames","targets":["hero/walk0","hero/walk1"],"clips":["hero/walk-south"]}]}
+```
 
 ```sh
-raipixel export hero-walk --preset game --out hero-game --dry-run
-raipixel export hero-walk --preset game --out hero-game
+raipixel run walk.json --out hero-walk
 ```
 
-Expected sheet:4×(32+2)=136 pixels wide,34 high, content rects at (1,1),(35,1),(69,1),(103,1), all32×32. Clip sequence indices0..3, durations120ms, untrimmed32×32 canvases, pivot [16,31], logical/scaled anchors and component offsets in metadata. Component PNGs preserve layered edit data for consumers; the native snapshot remains the source of truth. Acceptance: consumer draws every frame at a fixed footline and timing using JSON, with no identity inferred from filenames.
+Pass: exact source-cell samples, frame names/timing and foot registration; no inferred directions. Two poses are a minimal assembly fixture, not a claim of a production-quality walk.
 
-## Reuse across independently authored projects
+## 8. Native component transfer and explicit attachment — Core
 
-Additional selected operation, not a runtime plugin:
+Save as `attach.json`. Uses independently produced sword-v1 and hero-walk; attach at a supplied placement in a separate layer. For this fixture at [18,18] keeps the12×12 cel inside the32×32 canvas. Artistic placement/occlusion needs visual approval.
+
+```json
+{"interface":1,"semantics":"1.0","ops":[
+  {"op":"component.transfer","project":"sword-v1","source":"sword","name":"held"},
+  {"op":"layer.create","asset":"hero","name":"equipment"},
+  {"op":"cel.create","target":"hero/equipment/walk0"},
+  {"op":"cel.create","target":"hero/equipment/walk1"},
+  {"op":"stamp","targets":["hero/equipment/walk0","hero/equipment/walk1"],"source":"held/blade/base","at":[18,18]},
+  {"op":"stamp","targets":["hero/equipment/walk0","hero/equipment/walk1"],"source":"held/hilt/base","at":[18,18]}
+],"exports":[{"name":"equipped","kind":"sheet","targets":["hero/walk0","hero/walk1"],"columns":2,"clips":["hero/walk-south"]}]}
+```
 
 ```sh
-raipixel op hero-walk import-asset project="sword-v1" source=sword name=held-sword --out hero-with-weapon
+raipixel run attach.json --project hero-walk --out hero-equipped
 ```
 
-Imports complete sword layers/frames and needed palette/style values, rejecting unequal name collisions. It does not attach the sword automatically. Use stamp with supplied frame-specific placement, occlusion masks and pre-drawn angled poses where quarter turns are insufficient. The source snapshot stays unchanged.
+Pass: hero body samples/timing/foot anchors unchanged, imported source intact, equipment separate/editable. Different hand positions require explicit per-frame placements; angled poses beyond exact transforms require authored artwork.
+
+## 9. Controlled variants and seeded procedural detail — Core
+
+Save as `variants.json`; prerequisite sword-v1. A larger family is the same explicit clone/map/noise pattern, with all operations in one invocation; no language loop is needed.
+
+```json
+{"interface":1,"semantics":"1.0","ops":[
+  {"op":"asset.clone","source":"sword","name":"relic"},
+  {"op":"noise","targets":["relic/blade/base"],"seed":"0000000000000000","colors":["@metal/light"],"density":300,"region":[6,2,1,4]},
+  {"op":"asset.clone","source":"sword","name":"silver"},
+  {"op":"palette.map","targets":["silver/hilt/base"],"pairs":[["#D8A74E","#C7D5DD"]]}
+],"exports":[{"name":"family","kind":"sheet","targets":["sword/base","relic/base","silver/base"],"columns":3,"padding":1}]}
+```
+
+```sh
+raipixel run variants.json --project sword-v1 --out sword-family
+```
+
+Pass: same input/seed yields identical state/pixels; unrelated hilt/blade regions preserved per variant; no promise of perceptually distinct random results. Intentional palette/shape changes provide distinguishable variants when randomness alone does not.
+
+## 10. Compare revisions, inspect motion, and export again — Foundation/Core
+
+Save query as `compare.json`; this is a stored-cel sample comparison, not an artistic verdict.
+
+```json
+{"target":"sword/blade/base","region":[0,0,12,12],"against":{"project":"sword-v1","target":"sword/blade/base"}}
+```
+
+```sh
+raipixel inspect sword-v2 --query compare.json
+```
+
+Expected changed sample count4. Save the following Core export request as `previews.json`.
+
+```json
+{"interface":1,"semantics":"1.0","exports":[
+  {"name":"diff","kind":"diff","targets":["sword/base","sword/glint"],"scale":8},
+  {"name":"onion","kind":"onion","targets":["sword/base","sword/glint","sword/base"],"scale":8},
+  {"name":"game","kind":"sheet","targets":["sword/base","sword/glint"],"columns":2,"padding":1,"extrude":1,"scale":2,"clips":["sword/shine"],"components":true}
+]}
+```
+
+```sh
+raipixel export sword-motion previews.json --out motion-export --dry-run
+raipixel export sword-motion previews.json --out motion-export
+```
+
+Pass: dry-run creates nothing; real export is56×28 with content rects [2,2,24,24] and [30,2,24,24], pivot [12,22], grip [12,18], logical values retained. Independent consumer reads metadata, not filenames. Core reproduces examples from the same inputs into fresh destinations; byte comparisons exclude only absolute destination strings in process reports.

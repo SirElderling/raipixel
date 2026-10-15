@@ -1,26 +1,22 @@
-# Design baseline
+# raipixel design
 
-Prepared 2026-10-14. Product: **raipixel**. Proposed contract versions: recipe 1, snapshot 1, JSON schema 1, engine semantics 1.0. This is a documentation-only design proposal; the commands shown are proposed interfaces, not installed software.
+Baseline revised 2026-10-15. **Proposed contracts, not implemented functionality.** Interface version 1, project format 1, export schema 1, engine semantics `1.0`. In this specification MUST/MUST NOT are requirements; SHOULD is a default requiring a documented reason to depart; research, judgments, estimates, and future candidates are labeled separately.
 
-## Read in this order
+| Document | Responsibility |
+|---|---|
+| [Research](01-research.md) | Verified capability categories, evidence limitations, standards and format evaluation |
+| [Vision and scope](02-vision-scope.md) | Product promise, priorities, exclusions and admission criteria |
+| [Domain](03-domain-model.md) | Normative state, identity, coordinates, preservation and limits |
+| [Architecture](04-architecture.md) | Normative module boundaries, codecs, rendering and storage design |
+| [Functional specification](05-functional-specification.md) | Normative behavior and reclassification of every F01–F25 requirement |
+| [Agent interface](06-agent-interface.md) | Normative commands, JSON requests/results and persistence/export schemas |
+| [Roadmap](07-implementation-plan.md) | Capability dependencies and end-to-end acceptance gates |
+| [Decisions](08-decisions.md) | ADRs, alternatives and consequences |
+| [Risks](09-risks.md) | Residual uncertainty and required evidence |
+| [Recommendation](10-recommended-design.md) | Significant changes, removed complexity and open questions |
 
-1. [Capability research and user needs](01-research.md)
-2. [Product vision and scope](02-vision-scope.md)
-3. [Technical domain model](03-domain-model.md)
-4. [Architecture](04-architecture.md)
-5. [Functional specification](05-functional-specification.md)
-6. [Agent interface specification](06-agent-interface.md)
-7. [Implementation plan](07-implementation-plan.md)
-8. [Architectural decision records](08-decisions.md)
-9. [Risk assessment](09-risks.md)
-10. [Final recommended design](10-recommended-design.md)
+Supporting contracts: [usage examples](examples/README.md), [acceptance and comparative validation](acceptance-scenarios.md), [four-perspective adversarial review](review/README.md), and [command JSON Schema](command-schema.json).
 
-Supporting material: [ten interface examples](examples/README.md), [scenario acceptance catalogue](acceptance-scenarios.md), and [independent adversarial review](review/README.md).
+Domain owns state invariants; architecture owns codec/render/publication policy; functional specification owns algorithms and prioritization; interface owns wire shapes and field defaults. The JSON Schema checks structural command syntax; cross-field, reference, and pixel semantics remain normative in the prose. Resolve contradictions before implementing the affected behavior.
 
-## Authority and interpretation
-
-Documents 3, 5 and 6 are normative. Document 3 owns state invariants; 5 owns algorithm and feature behavior; 6 owns syntax, serialization and process behavior. Other documents explain decisions and implementation order. If an apparent contradiction cannot be resolved through that ownership, stop the affected implementation and correct the specification in a separate commit; do not silently choose a meaning.
-
-**Qualitative research** means relevant capabilities and firsthand reports were assessed; source identifiers are intentionally omitted, so individual observations cannot be verified from these documents. **User report** means a first-person report, not a controlled experiment. **Judgment** means a design choice. **Estimate** means an unmeasured planning range. A historical report may motivate a workflow test but cannot establish a current external product defect.
-
-The full selected release is milestones M1–M6; M1 is an early usable slice, not the promised complete suite. No implementation may weaken the dependency constraint to shorten the plan. No feature is implicitly included merely because it exists elsewhere.
+**Foundation** completes the first static creation/import loop. **Core** completes useful structured production, animation and reuse. **Advanced** is valuable later scope. **Deferred** needs evidence or disproportionate engineering. **Excluded** is outside the product. The first useful toolkit comprises the Foundation and Core gates A–E, not every feature in this design. No dated release, LOC quota or executable-size promise is made.

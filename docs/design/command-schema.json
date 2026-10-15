@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "raipixel proposed job interface 1",
+  "description": "Documentation contract only. Structural validation; cross-field/reference/pixel rules in 06-agent-interface.md. Foundation/Core field availability is reported by each future binary.",
+  "type": "object",
+  "properties": {
+    "interface": {
+      "const": 1
+    },
+    "semantics": {
+      "const": "1.0"
+    },
+    "ops": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/operation"
+      },
+      "minItems": 0,
+      "maxItems": 100000
+    },
+    "checks": {
+      "$ref": "#/$defs/checks"
+    },
+    "exports": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/export"
+      },
+      "minItems": 0,
+      "maxItems": 4096
+    }
+  },
+  "required": [
+    "interface",
+    "semantics",
+    "ops"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "name": {"type":"string","pattern":"^[A-Za-z][A-Za-z0-9_-]{0,63}$"},
+    "ref2": {"type":"string","pattern":"^[A-Za-z][A-Za-z0-9_-]{0,63}/[A-Za-z][A-Za-z0-9_-]{0,63}$"},
+    "cel": {"type":"string","pattern":"^[A-Za-z][A-Za-z0-9_-]{0,63}/[A-Za-z][A-Za-z0-9_-]{0,63}/[A-Za-z][A-Za-z0-9_-]{0,63}$"},
+    "color": {"type":"string","pattern":"^(#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?|@[A-Za-z][A-Za-z0-9_-]{0,63}/[A-Za-z][A-Za-z0-9_-]{0,63})$"},
+    "rgb": {"type":"string","pattern":"^#[0-9A-Fa-f]{6}$"},
+    "literal": {"type":"string","pattern":"^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"},
+    "point": {"type":"array","items":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"minItems":2,"maxItems":2},
+    "size": {"type":"array","items":{"type":"integer","minimum":1,"maximum":4096},"minItems":2,"maxItems":2},
+    "rect": {"type":"array","prefixItems":[{"type":"integer","minimum":-2147483648,"maximum":2147483647},{"type":"integer","minimum":-2147483648,"maximum":2147483647},{"type":"integer","minimum":1,"maximum":4096},{"type":"integer","minimum":1,"maximum":4096}],"items":false,"minItems":4,"maxItems":4},
+    "targets": {"type":"array","items":{"$ref":"#/$defs/cel"},"minItems":1,"maxItems":4096,"uniqueItems":true},
+    "frameTargets": {"type":"array","items":{"$ref":"#/$defs/ref2"},"minItems":1,"maxItems":4096},
+    "entry": {"type":"object","properties":{"name":{"$ref":"#/$defs/name"},"rgb":{"$ref":"#/$defs/rgb"}},"required":["name","rgb"],"additionalProperties":false},
+    "check": {"enum":["structure","dimensions","palette","alpha","bounds","animation","registration","metadata"]},
+    "checks": {"type":"array","items":{"$ref":"#/$defs/check"},"minItems":0,"maxItems":8,"uniqueItems":true},
+    "singleChar": {"type":"string","pattern":"^[ -~]$"},
+    "op_asset_create": {"type":"object","properties":{"op":{"const":"asset.create"},"name":{"$ref":"#/$defs/name"},"size":{"$ref":"#/$defs/size"},"pivot":{"$ref":"#/$defs/point"},"palette":{"anyOf":[{"$ref":"#/$defs/name"},{"type":"null"}]},"style":{"anyOf":[{"$ref":"#/$defs/name"},{"type":"null"}]}},"required":["op","name","size"],"additionalProperties":false,"x-priority":"Foundation"},
+    "op_asset_clone": {"type":"object","properties":{"op":{"const":"asset.clone"},"source":{"$ref":"#/$defs/name"},"name":{"$ref":"#/$defs/name"}},"required":["op","source","name"],"additionalProperties":false,"x-priority":"Core"},
+    "op_asset_set": {"type":"object","properties":{"op":{"const":"asset.set"},"asset":{"$ref":"#/$defs/name"},"pivot":{"$ref":"#/$defs/point"},"palette":{"anyOf":[{"$ref":"#/$defs/name"},{"type":"null"}]},"style":{"anyOf":[{"$ref":"#/$defs/name"},{"type":"null"}]}},"required":["op","asset"],"additionalProperties":false,"x-priority":"Foundation/Core"},
+    "op_layer_create": {"type":"object","properties":{"op":{"const":"layer.create"},"asset":{"$ref":"#/$defs/name"},"name":{"$ref":"#/$defs/name"},"visible":{"type":"boolean"},"opacity":{"type":"integer","minimum":0,"maximum":255}},"required":["op","asset","name"],"additionalProperties":false,"x-priority":"Foundation"},
+    "op_layer_set": {"type":"object","properties":{"op":{"const":"layer.set"},"target":{"$ref":"#/$defs/ref2"},"visible":{"type":"boolean"},"opacity":{"type":"integer","minimum":0,"maximum":255},"order":{"type":"integer","minimum":0,"maximum":255}},"required":["op","target"],"additionalProperties":false,"x-priority":"Foundation/Core"},
+    "op_frame_create": {"type":"object","properties":{"op":{"const":"frame.create"},"asset":{"$ref":"#/$defs/name"},"name":{"$ref":"#/$defs/name"},"duration_ms":{"type":"integer","minimum":1,"maximum":60000},"source":{"$ref":"#/$defs/name"}},"required":["op","asset","name"],"additionalProperties":false,"x-priority":"Foundation/Core"},
+    "op_frame_set": {"type":"object","properties":{"op":{"const":"frame.set"},"target":{"$ref":"#/$defs/ref2"},"duration_ms":{"type":"integer","minimum":1,"maximum":60000},"order":{"type":"integer","minimum":0,"maximum":4095}},"required":["op","target"],"additionalProperties":false,"x-priority":"Core"},
+    "op_cel_create": {"type":"object","properties":{"op":{"const":"cel.create"},"target":{"$ref":"#/$defs/cel"},"size":{"$ref":"#/$defs/size"},"offset":{"$ref":"#/$defs/point"},"source":{"$ref":"#/$defs/cel"},"replace":{"type":"boolean"}},"required":["op","target"],"additionalProperties":false,"x-priority":"Foundation"},
+    "op_cel_offset": {"type":"object","properties":{"op":{"const":"cel.offset"},"targets":{"$ref":"#/$defs/targets"},"at":{"$ref":"#/$defs/point"}},"required":["op","targets","at"],"additionalProperties":false,"x-priority":"Foundation"},
+    "op_png_import": {"type":"object","properties":{"op":{"const":"png.import"},"target":{"$ref":"#/$defs/cel"},"file":{"type":"string","maxLength":65536},"offset":{"$ref":"#/$defs/point"},"replace":{"type":"boolean"}},"required":["op","target","file"],"additionalProperties":false,"x-priority":"Foundation"},
+    "op_grid": {"type":"object","properties":{"op":{"const":"grid"},"targets":{"$ref":"#/$defs/targets"},"region":{"$ref":"#/$defs/rect"},"mask":{"$ref":"#/$defs/cel"},"clip":{"type":"boolean"},"at":{"$ref":"#/$defs/point"},"rows":{"type":"array","items":{"type":"string","pattern":"^[ -~]+$","maxLength":4096},"minItems":1,"maxItems":4096},"symbols":{"type":"object","propertyNames":{"$ref":"#/$defs/singleChar"},"additionalProperties":{"$ref":"#/$defs/color"},"maxProperties":95},"skip":{"$ref":"#/$defs/singleChar"},"mode":{"enum":["copy","over"]}},"required":["op","targets","rows","symbols"],"additionalProperties":false,"x-priority":"Foundation"},
+    "op_draw": {"type":"object","properties":{"op":{"const":"draw"},"targets":{"$ref":"#/$defs/targets"},"region":{"$ref":"#/$defs/rect"},"mask":{"$ref":"#/$defs/cel"},"clip":{"type":"boolean"},"shape":{"enum":["pixel","line","rect","ellipse","polygon"]},"color":{"$ref":"#/$defs/color"},"at":{"$ref":"#/$defs/point"},"points":{"type":"array","items":{"$ref":"#/$defs/point"},"minItems":2,"maxItems":4096},"rect":{"$ref":"#/$defs/rect"},"filled":{"type":"boolean"},"mode":{"enum":["copy","over"]}},"required":["op","targets","shape","color"],"additionalProperties":false,"x-priority":"Foundation/Core"},
+    "op_fill": {"type":"object","properties":{"op":{"const":"fill"},"targets":{"$ref":"#/$defs/targets"},"region":{"$ref":"#/$defs/rect"},"mask":{"$ref":"#/$defs/cel"},"clip":{"type":"boolean"},"at":{"$ref":"#/$defs/point"},"color":{"$ref":"#/$defs/color"},"mode":{"enum":["copy","over"]}},"required":["op","targets","at","color"],"additionalProperties":false,"x-priority":"Foundation"},
+    "op_stamp": {"type":"object","properties":{"op":{"const":"stamp"},"targets":{"$ref":"#/$defs/targets"},"region":{"$ref":"#/$defs/rect"},"mask":{"$ref":"#/$defs/cel"},"clip":{"type":"boolean"},"source":{"$ref":"#/$defs/cel"},"at":{"$ref":"#/$defs/point"},"rect":{"$ref":"#/$defs/rect"},"mode":{"enum":["copy","over"]}},"required":["op","targets","source"],"additionalProperties":false,"x-priority":"Foundation/Core"},
+    "op_transform": {"type":"object","properties":{"op":{"const":"transform"},"targets":{"$ref":"#/$defs/targets"},"kind":{"enum":["flip-x","flip-y","rotate-90","rotate-180","rotate-270","scale","reduce","crop"]},"factor":{"type":"integer","minimum":1,"maximum":16},"grid":{"$ref":"#/$defs/size"},"phase":{"$ref":"#/$defs/point"},"rect":{"$ref":"#/$defs/rect"}},"required":["op","targets","kind"],"additionalProperties":false,"x-priority":"Core"},
+    "op_palette_set": {"type":"object","properties":{"op":{"const":"palette.set"},"name":{"$ref":"#/$defs/name"},"entries":{"type":"array","items":{"$ref":"#/$defs/entry"},"minItems":1,"maxItems":256},"replace":{"type":"boolean"}},"required":["op","name","entries"],"additionalProperties":false,"x-priority":"Foundation"},
+    "op_palette_extract": {"type":"object","properties":{"op":{"const":"palette.extract"},"source":{"$ref":"#/$defs/cel"},"name":{"$ref":"#/$defs/name"},"max_colors":{"type":"integer","minimum":1,"maximum":256}},"required":["op","source","name"],"additionalProperties":false,"x-priority":"Foundation"},
+    "op_palette_map": {"type":"object","properties":{"op":{"const":"palette.map"},"targets":{"$ref":"#/$defs/targets"},"region":{"$ref":"#/$defs/rect"},"mask":{"$ref":"#/$defs/cel"},"clip":{"type":"boolean"},"pairs":{"type":"array","items":{"type":"array","items":{"$ref":"#/$defs/literal"},"minItems":2,"maxItems":2},"minItems":1,"maxItems":256},"preserve_alpha":{"type":"boolean"}},"required":["op","targets","pairs"],"additionalProperties":false,"x-priority":"Foundation/Core"},
+    "op_palette_quantize": {"type":"object","properties":{"op":{"const":"palette.quantize"},"targets":{"$ref":"#/$defs/targets"},"region":{"$ref":"#/$defs/rect"},"mask":{"$ref":"#/$defs/cel"},"clip":{"type":"boolean"},"palette":{"$ref":"#/$defs/name"},"dither":{"enum":["none"]}},"required":["op","targets","palette"],"additionalProperties":false,"x-priority":"Core"},
+    "op_alpha": {"type":"object","properties":{"op":{"const":"alpha"},"targets":{"$ref":"#/$defs/targets"},"region":{"$ref":"#/$defs/rect"},"mask":{"$ref":"#/$defs/cel"},"clip":{"type":"boolean"},"kind":{"enum":["key","threshold"]},"threshold":{"type":"integer","minimum":0,"maximum":255},"color":{"$ref":"#/$defs/color"},"match":{"enum":["rgb","rgba"]}},"required":["op","targets","kind"],"additionalProperties":false,"x-priority":"Foundation/Core"},
+    "op_mask_create": {"type":"object","properties":{"op":{"const":"mask.create"},"source":{"$ref":"#/$defs/cel"},"target":{"$ref":"#/$defs/cel"},"kind":{"enum":["alpha","color"]},"threshold":{"type":"integer","minimum":1,"maximum":255},"color":{"$ref":"#/$defs/color"},"match":{"enum":["rgb","rgba"]},"replace":{"type":"boolean"}},"required":["op","source","target"],"additionalProperties":false,"x-priority":"Core"},
+    "op_noise": {"type":"object","properties":{"op":{"const":"noise"},"targets":{"$ref":"#/$defs/targets"},"region":{"$ref":"#/$defs/rect"},"mask":{"$ref":"#/$defs/cel"},"clip":{"type":"boolean"},"seed":{"type":"string","pattern":"^[0-9A-Fa-f]{16}$"},"colors":{"type":"array","items":{"$ref":"#/$defs/color"},"minItems":1,"maxItems":256},"density":{"type":"integer","minimum":0,"maximum":1000}},"required":["op","targets","seed","colors","density"],"additionalProperties":false,"x-priority":"Core"},
+    "op_anchor_set": {"type":"object","properties":{"op":{"const":"anchor.set"},"targets":{"type":"array","items":{"$ref":"#/$defs/ref2"},"minItems":1,"maxItems":4096,"uniqueItems":true},"name":{"$ref":"#/$defs/name"},"at":{"$ref":"#/$defs/point"}},"required":["op","targets","name","at"],"additionalProperties":false,"x-priority":"Core"},
+    "op_clip_set": {"type":"object","properties":{"op":{"const":"clip.set"},"asset":{"$ref":"#/$defs/name"},"name":{"$ref":"#/$defs/name"},"frames":{"type":"array","items":{"$ref":"#/$defs/name"},"minItems":1,"maxItems":16384},"direction":{"$ref":"#/$defs/name"},"playback":{"enum":["forward","reverse","pingpong"]},"repeat":{"type":"integer","minimum":0,"maximum":65535},"replace":{"type":"boolean"}},"required":["op","asset","name","frames"],"additionalProperties":false,"x-priority":"Core"},
+    "op_style_set": {"type":"object","properties":{"op":{"const":"style.set"},"name":{"$ref":"#/$defs/name"},"size":{"$ref":"#/$defs/size"},"palette":{"$ref":"#/$defs/name"},"alpha":{"enum":["any","binary","opaque"]},"anchors":{"type":"array","items":{"$ref":"#/$defs/name"},"minItems":0,"maxItems":64,"uniqueItems":true},"nonempty":{"type":"boolean"},"replace":{"type":"boolean"}},"required":["op","name"],"additionalProperties":false,"x-priority":"Core"},
+    "op_component_transfer": {"type":"object","properties":{"op":{"const":"component.transfer"},"project":{"type":"string","maxLength":65536},"source":{"$ref":"#/$defs/name"},"name":{"$ref":"#/$defs/name"}},"required":["op","project","source","name"],"additionalProperties":false,"x-priority":"Core"},
+    "op_sheet_import": {"type":"object","properties":{"op":{"const":"sheet.import"},"asset":{"$ref":"#/$defs/name"},"layer":{"$ref":"#/$defs/name"},"file":{"type":"string","maxLength":65536},"size":{"$ref":"#/$defs/size"},"names":{"type":"array","items":{"$ref":"#/$defs/name"},"minItems":1,"maxItems":4096,"uniqueItems":true},"durations_ms":{"type":"array","items":{"type":"integer","minimum":1,"maximum":60000},"minItems":1,"maxItems":4096},"columns":{"type":"integer","minimum":1,"maximum":4096},"padding":{"type":"integer","minimum":0,"maximum":64}},"required":["op","asset","layer","file","size","names","columns"],"additionalProperties":false,"x-priority":"Core"},
+    "op_meta_set": {"type":"object","properties":{"op":{"const":"meta.set"},"scope":{"enum":["project","asset","frame"]},"target":{"anyOf":[{"$ref":"#/$defs/name"},{"$ref":"#/$defs/ref2"}]},"key":{"$ref":"#/$defs/name"},"value":{"type":"string","maxLength":65536},"replace":{"type":"boolean"}},"required":["op","scope","key","value"],"additionalProperties":false,"x-priority":"Foundation"},
+    "op_object_delete": {"type":"object","properties":{"op":{"const":"object.delete"},"kind":{"enum":["asset","layer","frame","cel","clip","anchor","palette","style","meta"]},"target":{"type":"string","maxLength":259},"scope":{"enum":["project","asset","frame"]},"key":{"$ref":"#/$defs/name"},"cascade":{"type":"boolean"}},"required":["op","kind"],"additionalProperties":false,"x-priority":"Core"},
+    "operation": {"oneOf":[{"$ref":"#/$defs/op_asset_create"},{"$ref":"#/$defs/op_asset_clone"},{"$ref":"#/$defs/op_asset_set"},{"$ref":"#/$defs/op_layer_create"},{"$ref":"#/$defs/op_layer_set"},{"$ref":"#/$defs/op_frame_create"},{"$ref":"#/$defs/op_frame_set"},{"$ref":"#/$defs/op_cel_create"},{"$ref":"#/$defs/op_cel_offset"},{"$ref":"#/$defs/op_png_import"},{"$ref":"#/$defs/op_grid"},{"$ref":"#/$defs/op_draw"},{"$ref":"#/$defs/op_fill"},{"$ref":"#/$defs/op_stamp"},{"$ref":"#/$defs/op_transform"},{"$ref":"#/$defs/op_palette_set"},{"$ref":"#/$defs/op_palette_extract"},{"$ref":"#/$defs/op_palette_map"},{"$ref":"#/$defs/op_palette_quantize"},{"$ref":"#/$defs/op_alpha"},{"$ref":"#/$defs/op_mask_create"},{"$ref":"#/$defs/op_noise"},{"$ref":"#/$defs/op_anchor_set"},{"$ref":"#/$defs/op_clip_set"},{"$ref":"#/$defs/op_style_set"},{"$ref":"#/$defs/op_component_transfer"},{"$ref":"#/$defs/op_sheet_import"},{"$ref":"#/$defs/op_meta_set"},{"$ref":"#/$defs/op_object_delete"}]},
+    "export": {"type":"object","properties":{"name":{"$ref":"#/$defs/name"},"kind":{"enum":["frame","sheet","frames","contact","diff","onion"]},"targets":{"$ref":"#/$defs/frameTargets"},"scale":{"type":"integer","minimum":1,"maximum":16},"allow_clip":{"type":"boolean"},"components":{"type":"boolean"},"columns":{"type":"integer","minimum":1,"maximum":4096},"padding":{"type":"integer","minimum":0,"maximum":64},"extrude":{"type":"integer","minimum":0,"maximum":16},"clips":{"type":"array","items":{"$ref":"#/$defs/ref2"},"minItems":0,"maxItems":4096,"uniqueItems":true}},"required":["name","kind","targets"],"additionalProperties":false},
+    "exportsRequest": {"type":"object","properties":{"interface":{"const":1},"semantics":{"const":"1.0"},"exports":{"type":"array","items":{"$ref":"#/$defs/export"},"minItems":1,"maxItems":4096}},"required":["interface","semantics","exports"],"additionalProperties":false},
+    "inspectQuery": {"type":"object","properties":{"target":{"anyOf":[{"$ref":"#/$defs/ref2"},{"$ref":"#/$defs/cel"}]},"region":{"$ref":"#/$defs/rect"},"pixels":{"type":"boolean"},"symbols":{"type":"boolean"},"against":{"type":"object","properties":{"project":{"type":"string","maxLength":65536},"target":{"anyOf":[{"$ref":"#/$defs/ref2"},{"$ref":"#/$defs/cel"}]}},"required":["project","target"],"additionalProperties":false},"histogram_limit":{"type":"integer","minimum":1,"maximum":256}},"required":[],"additionalProperties":false},
+    "validateQuery": {"type":"object","properties":{"asset":{"$ref":"#/$defs/name"},"checks":{"$ref":"#/$defs/checks"}},"required":[],"additionalProperties":false}
+  }
+}

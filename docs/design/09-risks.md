@@ -1,39 +1,29 @@
 # 9. Risk assessment
 
-Qualitative likelihood/impact judgments, not measured failure probabilities. Release gates below are assigned to milestones; no unresolved risk silently changes the standard-library constraint.
+Likelihood/impact are qualitative judgments, not measured probabilities. A mitigation is a required future test or decision, not evidence that unimplemented software is correct.
 
-| Risk | Likelihood / impact | Mitigation and release evidence |
+| Risk | Likelihood / impact | Mitigation and gate |
 |---|---|---|
-| Handwritten PNG/DEFLATE bug | High / high | Independent supported/malformed corpus, exact expected sizes, checksum/order/tree/backreference validation, separate graphics review; M4/M6 block release on failures |
-| Clone/recipe amplification | Medium / high | Global structural/string/reference/expanded-command caps, payload budget and nonpixel work charges; low-limit stress fixtures before any amplification allocations |
-| Geometry overflow/excess work | Medium / high | i32 coordinates/bounded extents, checked preflight, wide arithmetic and charged traversal; far-off-canvas lines fail before looping |
-| Incorrect alpha/color semantics | Medium / high | Straight-alpha golden vectors, byte-space policy, canonical zero alpha, palette/alpha validation of final render; no silent quantization |
-| Registration/timing/identity loss | Medium / high | Fixed untrimmed canvases, asset pivot/anchors, explicit frame/clip identity and indices, component scaled/logical metadata; consumer and unaffected-state tests |
-| Imported art lacks semantics | Certain for flattened PNG / medium | State limitation explicitly; masks/source components/native import enable targeted editing; no claim of automatic object extraction |
-| Agent cannot create convincing art | Variable / high product impact | External source/artistic model/human review, representative visual gates; technical pass never labels art “good” |
-| Direction or action inconsistency | Common in reviewed anecdotes, frequency unknown / high | Require supplied views/poses; one palette/anchors/constant components reduce avoidable changes; no unseen-view inference or fake rigging promises |
-| Tile equality misclassified as seamlessness | Medium / medium | Labels structural; exact-strip condition opt-in; checkerboard counterexample; seam mosaic and external inspection required |
-| Palette normalization harms artwork | Medium / medium | Nearest/Bayer algorithms documented; preserve alpha default, explicit binary threshold, histograms and editable original snapshot |
-| Interoperability limits block sources | Medium / high | Clear8/sub-byte PNG support including Adam7; unsupported16-bit/APNG precise errors; record consumer needs before adding codecs; existing authoring tool is optional workflow choice |
-| Stored-block exports too large | Medium / medium | Exact indexed PNG option; measure game collection sizes; don't claim compression equivalence; compression later only with demonstrated distribution need |
-| Fixed grid too large | Medium / medium | Per-animation/per-category sheets or individual frames, allocation/work preflight; defer packing until actual texture-budget evidence |
-| Native schema evolution/old recipes change | Medium / high | Snapshot stores pixels; versioned restricted grammar and engine semantics; explicit future migration, byte round trips; high-cost ADR change requires tests |
-| Cross-project dependency name conflict | Medium / medium | Equal-value palette/style reuse, unequal conflict with actionable rename/rebuild hint; no lossy merge or implicit palette replacement |
-| Platform path/CRT/output behavior | Medium / high | ASCII internal filenames, UTF-8 serialized paths, known symlink/path rejection, trusted output parent; clean macOS/Linux/Windows tests; Windows static CRT |
-| Publication/transport confusion | Medium / medium | Rename is commit boundary; source immutable; post-commit broken-pipe results retained; agents check destination after transport error; no automatic overwrite |
-| Power loss or hostile filesystem races | Low in intended owned workspace / high | Explicit lack of power-loss guarantee/hostile-directory sandbox; flush file writes, same-filesystem staging; use owned parent; no cross-platform atomic-replace claim |
-| True allocator OOM/OS termination | Low within normal workload / high | Limits/try_reserve/detach accounting; metadata/string caps; failure fixtures lower budgets; do not promise every OOM is recoverable |
-| Feature creep/underestimated code | High / medium-high | F01–F25 baseline, deferred admission rules, measured M1/M4 counts, preserve meaningful functionality; revise estimates openly rather than arbitrary line targets |
-| Command drift or overly verbose recipes | Medium / medium | Shared typed descriptors/help, all ten recipes become integration tests, agent usability test; parameters/flat repeat solve batch overhead without language growth |
-| Weak research conclusions | Medium / medium | Primary docs and conservative firsthand evidence grading, historical issues distinct from current defects, no invented consensus/benchmarks; validate tasks rather than market claims |
-| Algorithm/license reuse | Low-medium / medium | Original std-only implementation from specs; check license/provenance before ports/fixtures; optional advanced algorithms deferred, no blind code copying |
+| Independent PNG/DEFLATE implementation is incorrect | High / high | Foundation independent legal/malformed corpus, specification-clause review, output-length/window/tree/checksum bounds. No static-loop acceptance until real import works. |
+| Zero-dependency effort is underestimated | High / high | Keep constraints, retire whole-suite schedule/LOC promises, measure S1 codec/parser work before planning Advanced scope. |
+| Original artwork is technically valid but not useful/recognizable | Unknown / high | Scenario A from empty canvas with compact grids/high-level drawing; independent recognition/artistic review. A syntactically valid PNG alone fails product validation. |
+| LLM commands remain verbose or fragile | Unknown / high | Per-op schemas/help, compact symbolic grids, target arrays, bounded region feedback, actionable pointer errors. Measure failures/tokens/correction loops across providers and compare actual baselines. |
+| Flattened imported art lacks editable semantics | Certain for flat PNG / medium-high | Supplied masks, explicit named parts and component transfer; OpenRaster Advanced. No automatic anatomy/segmentation claim. |
+| Hidden RGB, alpha or unselected pixels change | Medium / high | Preserve stored samples, explicit base-copy rendering, RGB maps preserve alpha, exact before/after diffs including transparent samples and all unrelated state. |
+| Colors look different in managed consumers | Medium / medium-high | Explicit unmanaged encoded-RGB8 policy and profile warnings; sample-preserving is distinct from color-managed appearance. Do not claim complete PNG round trips. |
+| Animation timing/registration/identity changes | Medium / high | Untrimmed canvases, named references, ms durations, explicit anchors, COW edits and independent consumer at scales1/2. New direction/pose artwork remains an artistic input. |
+| Resource amplification/overflow | Medium / high | Checked wide arithmetic and limits on JSON, references, metadata, cloning, decoding and pixel visits; low-limit failure fixtures before allocation/traversal. Payload is not RSS; true OOM remains possible. |
+| Native schemas grow or drift | Medium / high | Data-only JSON, current pixels rather than replay, required fields/versions, complete Core round-trip test and schema/examples checks. No automatic migration framework until needed. |
+| New surfaces/manifest file count or stored PNG size become costly | Medium / medium | Measure realistic snapshot bytes/open/save time; shared allocations may serialize once. Add compression/archive only for a demonstrated bottleneck. |
+| Layered formats lose semantics silently | Medium / high | Limited OpenRaster profile, unsupported features fail, layer order/opacity fixtures, correct required ZIP members. Do not label subset as full baseline or animation support. |
+| Animated raster timing or disposal is misrepresented | Medium / high | APNG export only after exact duration mapping and independent playback tests; import Deferred until rational delays/disposal preservation contract. |
+| Pixel-grid cleanup damages irregular artwork | Medium / medium-high | Explicit phase reduction Core; Advanced analysis reports candidates/ambiguity, no automatic correction. Irregular reconstruction needs evidence/algorithm review. |
+| Tile diagnostics falsely claim seamlessness | Medium / medium | Separate labels, optional exact-strip rules, checkerboard counterexample, repeat/map preview and artistic review. |
+| Game metadata is not directly usable | Medium / high | Explicit schema/coordinate units; independent consumer must prove slicing, timing, anchors and component placement. Prefer established profiles for specific future consumers. |
+| Cross-platform paths/publication differ | Medium / high | Generated ASCII paths, Unicode validation, trusted parent, traversal/symlink checks, source immutable; test macOS/Linux/Windows from Foundation. No security-sandbox or power-loss durability guarantee. |
+| Output transport fails after commit | Medium / medium | Rename boundary explicit, preserve destination, report committed when channel permits; caller checks before retry. |
+| Independence is mistaken for differentiation | High / high | Six comparative tasks and real agent studies; no superiority/demand claim without evidence. Existing drawing/export capability is a parity requirement. |
+| Extensibility becomes speculative framework work | Medium / medium | Modules/ordinary functions; no replacement traits/runtime plugins/optional dependency backends in the baseline. Revisit only for actual use. |
+| Data/algorithm provenance is unclear | Medium / medium | Independently implement specifications; licensed fixture data with provenance, no copied/vendored code. Public documentation can inform behavior without importing implementations. |
 
-## Security/correctness boundary
-
-The CLI is a local tool processing explicit files, not a multitenant service. Safe Rust and bounds do not establish a filesystem sandbox or protect against malicious simultaneous changes to the output parent. Native manifests cannot execute recipe operations, import external files, traverse paths or run programs. Recipes can only invoke known deterministic operations and explicit input reads, with no shell expansion inside the engine. Output filenames are generated; metadata cannot redirect writes.
-
-Pixel/profile bytes and artwork may be confidential. Processing is local, no logs/network by default; error output avoids arbitrary raw contents. Provenance strings are supplied by the caller; output may include them only when explicitly stored as metadata. Checksums are corruption/diagnostic aids, not authenticity/security hashes.
-
-## Residual artistic limits
-
-Technical consistency means exact dimensions/palette/alpha/anchors and metadata. It does not guarantee coherent perspective, attractive shading, anatomy, action readability, visual seam invisibility or a game's art direction. No deterministic transform can reconstruct occluded anatomy or invent action poses. The suite remains useful because it preserves editable parts, reduces repetitive correction and produces precise game-consumable output; artistic sources and approval remain outside it.
+Source snapshots are preserved and processing is local. Metadata cannot execute programs, direct output paths or trigger network reads. This does not imply the tool protects against a hostile concurrent filesystem owner. Artistic quality, coherent motion/perspective and useful variations remain empirical product risks, not solved by dimensions/palette/anchor checks.
