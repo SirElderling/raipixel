@@ -48,7 +48,7 @@ jobs:
       - name: Paired full-codec timings and exact output comparison (informational)
         env:
           RUSTUP_TOOLCHAIN: stable
-        run: python tools/png_timings.py --baseline 68ee8a64b331b5034239809edb405ee448c3162b --output png-timings.json
+        run: python tools/png_timings.py --baseline 126a5568c32ef0e25d4281fed4580d0b6592da3a --output png-timings.json
       - name: Codec stage probes (informational)
         run: |
           cargo +stable run --release --locked --offline --example png_bench -- --export png-stage-inputs
@@ -70,3 +70,7 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: stable
         run: python tools/png_token_replay.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
+      - name: Compare matching and Adler stages against baseline (informational)
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: python tools/png_bottleneck_compare.py --baseline 126a5568c32ef0e25d4281fed4580d0b6592da3a png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png

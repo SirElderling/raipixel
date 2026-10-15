@@ -70,14 +70,23 @@ impl Adler {
             // For byte lane j, the batch contributes 8*prior + (8-j)*sum to B.
             // The derivation and source acknowledgment are in the algorithm notes.
             for group in bulk {
-                let (mut even, mut odd, mut prior_even, mut prior_odd) = (0u64, 0u64, 0u64, 0u64);
-                for bytes in group.as_chunks::<8>().0 {
-                    let word = u64::from_le_bytes(*bytes);
-                    prior_even += even;
-                    prior_odd += odd;
-                    even += word & 0x00ff_00ff_00ff_00ff;
-                    odd += (word >> 8) & 0x00ff_00ff_00ff_00ff;
+                let (mut sums_e, mut sums_o, mut prefix_e, mut prefix_o) =
+                    ([0u64; 2], [0u64; 2], [0u64; 2], [0u64; 2]);
+                for chunk in group.as_chunks::<16>().0 {
+                    for (lane, bytes) in chunk.as_chunks::<8>().0.iter().enumerate() {
+                        let word = u64::from_le_bytes(*bytes);
+                        prefix_e[lane] += sums_e[lane];
+                        prefix_o[lane] += sums_o[lane];
+                        sums_e[lane] += word & 0x00ff_00ff_00ff_00ff;
+                        sums_o[lane] += (word >> 8) & 0x00ff_00ff_00ff_00ff;
+                    }
                 }
+                // Interleaved word streams: P = 2*(P0 + P1) + S0.
+                // Recombination keeps the original per-lane bounds unchanged.
+                let even = sums_e[0] + sums_e[1];
+                let odd = sums_o[0] + sums_o[1];
+                let prior_even = 2 * (prefix_e[0] + prefix_e[1]) + sums_e[0];
+                let prior_odd = 2 * (prefix_o[0] + prefix_o[1]) + sums_o[0];
                 self.b += 128 * self.a;
                 for i in 0..4 {
                     let shift = i * 16;

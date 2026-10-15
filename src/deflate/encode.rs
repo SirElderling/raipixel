@@ -23,16 +23,23 @@ fn match_length(data: &[u8], prior: usize, pos: usize, maximum: usize) -> usize 
     if prior >= pos || pos - prior > 32_768 || data[prior..prior + 3] != data[pos..pos + 3] {
         return 0;
     }
+    let left = &data[prior + 3..prior + maximum];
+    let right = &data[pos + 3..pos + maximum];
+    let (left_bulk, left_tail) = left.as_chunks::<16>();
+    let (right_bulk, right_tail) = right.as_chunks::<16>();
     let mut length = 3;
-    while length + 8 <= maximum
-        && data[prior + length..prior + length + 8] == data[pos + length..pos + length + 8]
-    {
-        length += 8;
-    }
-    while length < maximum && data[prior + length] == data[pos + length] {
-        length += 1;
+    for (a, b) in left_bulk.iter().zip(right_bulk) {
+        if a != b {
+            return length + a.iter().zip(b).take_while(|(x, y)| x == y).count();
+        }
+        length += 16;
     }
     length
+        + left_tail
+            .iter()
+            .zip(right_tail)
+            .take_while(|(x, y)| x == y)
+            .count()
 }
 
 fn distance_code(distance: usize) -> usize {

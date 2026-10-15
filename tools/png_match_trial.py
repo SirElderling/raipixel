@@ -12,15 +12,21 @@ import zlib
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 source = (ROOT / 'src/deflate/encode.rs').read_text()
-a = source.index('    while length + 8 <= maximum')
-b = source.index('    while length < maximum', a)
-candidate = source[:a] + '''    while length + 8 <= maximum {
+a = source.index('fn match_length(')
+b = source.index('\nfn distance_code', a)
+candidate = source[:a] + '''fn match_length(data: &[u8], prior: usize, pos: usize, maximum: usize) -> usize {
+    if prior >= pos || pos-prior > 32_768 || data[prior..prior+3] != data[pos..pos+3] { return 0; }
+    let mut length = 3;
+    while length + 8 <= maximum {
         let left = u64::from_le_bytes(data[prior+length..prior+length+8].try_into().unwrap());
         let right = u64::from_le_bytes(data[pos+length..pos+length+8].try_into().unwrap());
         let difference = left ^ right;
         if difference != 0 { return length + difference.trailing_zeros() as usize / 8; }
         length += 8;
     }
+    while length < maximum && data[prior+length] == data[pos+length] { length += 1; }
+    length
+}
 ''' + source[b:]
 constants = (ROOT / 'src/deflate.rs').read_text()
 constants = constants[constants.index('const LENGTH_BASE:'):constants.index('/// Decode one zlib stream')]
