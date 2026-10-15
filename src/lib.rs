@@ -2,6 +2,7 @@
 //! Deterministic raster primitives. The planned agent interface is not implemented yet.
 
 mod error;
+pub mod json;
 mod limits;
 mod model;
 mod raster;
