@@ -227,6 +227,31 @@ mod tests {
     }
 
     #[test]
+    fn matches_agree_with_scalar_scan_for_overlapping_slices() {
+        for distance in [1, 2, 3, 4, 7, 8, 15, 16, 31, 32] {
+            for maximum in 3..=258 {
+                for cut in 3..=maximum {
+                    let mut data = vec![19; distance + maximum];
+                    if cut < maximum {
+                        data[distance + cut] = 37;
+                    }
+                    let equal = data[..maximum]
+                        .iter()
+                        .zip(&data[distance..])
+                        .take_while(|(a, b)| a == b)
+                        .count();
+                    let expected = if equal < 3 { 0 } else { equal };
+                    assert_eq!(
+                        match_length(&data, 0, distance, maximum),
+                        expected,
+                        "distance {distance}, maximum {maximum}, cut {cut}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn matches_find_every_termination_byte_and_overlapping_run() {
         for maximum in 3..=258 {
             for mismatch in 3..maximum {
