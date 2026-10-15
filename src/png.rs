@@ -378,14 +378,14 @@ fn reconstruct(
             let previous = if y == 0 {
                 None
             } else {
-                Some(&before[(y - 1) * row_bytes..y * row_bytes])
+                Some(&before[offset - row_bytes..offset])
             };
             work.charge((row_bytes + header.width as usize) as u64)?;
             unfilter(row, previous, 4, filter)?;
-            // Compact while this row is hot. The destination follows the
-            // compacted previous row and ends before the next source row.
-            // Subsequent predictors read the compacted layout above.
-            raw.copy_within(offset + 1..offset + stride, y * row_bytes);
+        }
+        for y in 0..header.height as usize {
+            let start = y * stride + 1;
+            raw.copy_within(start..start + row_bytes, y * row_bytes);
         }
         raw.truncate(header.width as usize * header.height as usize * 4);
         return Ok(Image::from_rgba_bytes(

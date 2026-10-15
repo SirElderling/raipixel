@@ -343,4 +343,7 @@ not used. Existing independent mixed-filter PNG tests ran before and after the
 refactor; all 68 tests and exact corpus samples/flags/work/writer artifacts pass.
 No new behavior or speculative edge case is added. Local complete decode is
 0.975 times the prior filter baseline for the original sheet and 0.982 for
-texture. Control timings also move, so native CI determines retention.
+texture. Native CI finds only small large-input gains and consistent tiny-icon
+regressions on Linux and Windows. The candidate is rejected and the previous
+two-loop layout restored. The [decision record](candidates/row-fusion-adler.md)
+retains all platforms, controls and checksum screening trials.
