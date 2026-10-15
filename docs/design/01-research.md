@@ -43,3 +43,32 @@ OpenRaster is valuable layered interchange but insufficient as the sole native p
 ## Validation priorities
 
 [Acceptance tasks](acceptance-scenarios.md) cover original art, real import correction, named component animation edits, variants, game export and agent costs. Record baseline versions, exact instructions, commands, fixtures and failures when tests run. Current evidence supports investigating these workflows, not promising commercial value, quality parity, speedups, adoption or a development schedule.
+
+
+## Research attribution requirements
+
+Any algorithm, technique, design or optimization adopted fully or partially
+from a paper MUST acknowledge that paper's creators in project documentation.
+This requirement applies to adaptations and independently written
+implementations as well as direct use of a described algorithm.
+
+For each adopted contribution, documentation MUST record:
+
+- The authors, paper title, publication year/venue when available, and a stable
+  public link or DOI; include a freely accessible full-text link when available.
+- The particular idea used, where it appears in the design/code, and the changes
+  or simplifications made for this project. A nearby code comment SHOULD link
+  to that documentation when it helps maintainers identify the contribution.
+- Which correctness/performance claims come from the paper and which have been
+  independently verified here. A paper's reported speedup MUST NOT be presented
+  as a raipixel result without our own measurements.
+
+Papers reviewed but not adopted MUST be labeled separately; citing a paper
+MUST NOT imply that its full algorithm was implemented or that its authors
+endorse this project. When further work changes the adopted technique, update
+the attribution with the implementation. Acknowledgments do not relax the
+safe-Rust, std-only or no-copied-implementation-code constraints.
+
+These requirements cover algorithm literature; the product-neutral capability
+assessment above is a separate scope. Research authors and paper links MUST
+remain identifiable even when product comparisons are summarized neutrally.
