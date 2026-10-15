@@ -324,3 +324,23 @@ arithmetic-width gain. Production retains the original 32-bit predictor.
 The [filter decision record](candidates/rgba-filters.md) retains its patch and
 all samples, along with the accepted native 17–21% sheet-decode reduction,
 compact/control regressions and remaining reference gap.
+
+## Interleave RGBA reconstruction and compaction
+
+`src/png.rs::reconstruct` tests a one-pass arrangement of the same unfilter and
+row-copy operations. With row length `d` and source stride `s=d+1`, row `y`
+reads the reconstructed previous row from `[(y-1)*d, y*d)`, unfilters its source
+at `[y*s+1, (y+1)*s)`, then copies it to `[y*d, (y+1)*d)`. The destination ends
+before the next source filter at `(y+1)*s`; overlap within the current row is
+handled by safe `copy_within`. Induction preserves every compacted row and
+leaves all future source rows intact. Copy byte counts, heap allocation and
+charged work stay unchanged. This is not a streaming-row inflate design.
+
+The cache-locality motivation partially follows Joglekar, Kounavis and Berry's
+FAST 2005 compute/copy interleaving discussion (linked above). This PNG row-layout
+adaptation is independently derived; their CRC32c or implementation code is
+not used. Existing independent mixed-filter PNG tests ran before and after the
+refactor; all 68 tests and exact corpus samples/flags/work/writer artifacts pass.
+No new behavior or speculative edge case is added. Local complete decode is
+0.975 times the prior filter baseline for the original sheet and 0.982 for
+texture. Control timings also move, so native CI determines retention.
