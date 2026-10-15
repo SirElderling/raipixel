@@ -35,6 +35,10 @@ fn match_length(data: &[u8], prior: usize, pos: usize, maximum: usize) -> usize 
     length
 }
 
+fn distance_code(distance: usize) -> usize {
+    DISTANCE_BASE.partition_point(|&base| base <= distance) - 1
+}
+
 impl Encoder {
     pub(crate) fn new(max_block: usize) -> Result<Self, Error> {
         let mut positions = Vec::new();
@@ -83,7 +87,7 @@ impl Encoder {
         let index = LENGTH_BASE.partition_point(|&base| base <= length) - 1;
         self.symbol(257 + index as u32);
         self.put((length - LENGTH_BASE[index]) as u32, LENGTH_EXTRA[index]);
-        let index = DISTANCE_BASE.partition_point(|&base| base <= distance) - 1;
+        let index = distance_code(distance);
         self.put((index as u32).reverse_bits() >> 27, 5);
         self.put(
             (distance - DISTANCE_BASE[index]) as u32,
@@ -144,5 +148,19 @@ impl Encoder {
             self.output.extend_from_slice(data);
         }
         &self.output
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn distance_codes_match_every_rfc_range() {
+        for distance in 1..=32_768 {
+            let expected = DISTANCE_BASE.partition_point(|&base| base <= distance) - 1;
+            assert_eq!(distance_code(distance), expected, "distance {distance}");
+            assert!(distance - DISTANCE_BASE[expected] < 1 << DISTANCE_EXTRA[expected]);
+        }
     }
 }

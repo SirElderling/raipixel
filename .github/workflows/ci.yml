@@ -30,6 +30,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Install stable Rust
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy --target ${{ matrix.target }}
       - name: Toolchain details
@@ -44,3 +45,5 @@ jobs:
         run: |
           rustc +stable --edition=2024 -O tools/png_checksum_bench.rs -o png-checksum-bench.exe
           ./png-checksum-bench.exe
+      - name: Paired full-codec timings and exact output comparison (informational)
+        run: python tools/png_timings.py --baseline 8db027502117700bfbd3d18c845d5e77a755fdb1 --output png-timings.json
