@@ -272,3 +272,24 @@ larger parts. This is a measured payload-size policy, not a format restriction:
 large stored/noise payloads benefit consistently, while small compressed IDAT
 parts do not justify the wider table working set. Tests cover both sides of the
 4 KiB crossover. Both unrestricted-width runs remain recorded.
+
+## RGBA Sub recurrence
+
+`src/png.rs::sub_rgba` independently groups the byte recurrence from the PNG
+Working Group's [PNG Third Edition, section 9.2](https://www.w3.org/TR/png-3/#9Filters)
+into four same-channel states for RGBA8. Each pixel adds the preceding decoded
+pixel byte by byte with wrapping arithmetic. The initial four states are zero;
+induction over pixels gives exactly the original byte loop, including alpha
+and transparent RGB. Other bytes-per-pixel values keep the original path.
+No filtering policy, allocation, work charge or writer is changed.
+
+A new scalar-oracle regression was run first and failed to compile because the
+helper did not exist. It then passed with the safe array implementation. The
+first local paired original-sheet run measures decode at 0.907 times baseline;
+texture decode is 1.002 times. Native CI now measures the recorded original
+inputs in addition to our generated Sub/Up inputs. Corpus PNG bytes and RGBA
+hashes in `original-inputs.json` were independently verified with Pillow; CI
+uses only Python/Rust standard libraries. The untimed benchmark export compares
+samples, flags, work remaining and both writer files between versions before
+timing. This avoids accepting a decode speedup that silently drops work or
+changes decoded samples. No third-party implementation source was consulted.

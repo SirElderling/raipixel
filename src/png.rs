@@ -451,9 +451,21 @@ fn reconstruct(
     Ok(image)
 }
 
+// PNG section 9.2: each RGBA channel adds only its reconstructed left
+// channel. Keep those four recurrence states in a pixel rather than indexing
+// backward through the mutable byte slice on every iteration.
+fn sub_rgba(row: &mut [[u8; 4]]) {
+    let mut left = [0u8; 4];
+    for pixel in row {
+        *pixel = std::array::from_fn(|channel| pixel[channel].wrapping_add(left[channel]));
+        left = *pixel;
+    }
+}
+
 fn unfilter(row: &mut [u8], previous: Option<&[u8]>, bpp: usize, filter: u8) -> Result<(), Error> {
     match filter {
         0 => {}
+        1 if bpp == 4 => sub_rgba(row.as_chunks_mut::<4>().0),
         1 => {
             for i in bpp..row.len() {
                 row[i] = row[i].wrapping_add(row[i - bpp]);
@@ -687,4 +699,27 @@ pub fn encode_compressed(
     }
     write_chunk(output, b"IDAT", &adler.value().to_be_bytes())?;
     write_chunk(output, b"IEND", &[])
+}
+
+#[cfg(test)]
+mod filter_tests {
+    use super::*;
+
+    #[test]
+    fn rgba_sub_matches_the_png_byte_recurrence() {
+        for pixels in [1, 2, 3, 4, 7, 16, 65, 1024, 4096] {
+            for seed in [0usize, 17, 255] {
+                let encoded: Vec<u8> = (0..pixels * 4)
+                    .map(|i| (i * 37 + i / 7 + seed) as u8)
+                    .collect();
+                let mut expected = encoded.clone();
+                for i in 4..expected.len() {
+                    expected[i] = expected[i].wrapping_add(expected[i - 4]);
+                }
+                let mut actual = encoded;
+                sub_rgba(actual.as_chunks_mut::<4>().0);
+                assert_eq!(actual, expected, "pixels {pixels}, seed {seed}");
+            }
+        }
+    }
 }

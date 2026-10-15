@@ -173,6 +173,30 @@ fn main() -> Result<()> {
     let source = args
         .first()
         .ok_or("usage: png_bench INPUT.png|--suite|--export [MIN_BATCH_MS|DIRECTORY]")?;
+    // Untimed comparison artifacts for a supplied corpus input. This exposes
+    // samples, decoder flags and charged work as well as both writer outputs.
+    if source == "--export-file" {
+        let path = Path::new(args.get(1).ok_or("missing export directory")?);
+        let input = std::fs::read(args.get(2).ok_or("missing input file")?)?;
+        let mut work = Work::default();
+        let decoded = png::decode(&input, Limits::default(), &mut work)?;
+        std::fs::create_dir_all(path)?;
+        std::fs::write(path.join("rgba.bin"), decoded.image.pixels().as_flattened())?;
+        let metadata = format!(
+            "{{\"width\":{},\"height\":{},\"uninterpreted_color\":{},\"skipped_ancillary\":{},\"trailing_idat_bytes\":{},\"work_remaining\":{}}}\n",
+            decoded.image.size()[0],
+            decoded.image.size()[1],
+            decoded.uninterpreted_color,
+            decoded.skipped_ancillary,
+            decoded.trailing_idat_bytes,
+            work.remaining()
+        );
+        std::fs::write(path.join("decode.json"), metadata)?;
+        let case = Case::new("input".into(), decoded.image, Some(input))?;
+        std::fs::write(path.join("stored.png"), case.stored)?;
+        std::fs::write(path.join("compressed.png"), case.compressed)?;
+        return Ok(());
+    }
     let cases = if source.starts_with("--") {
         if source != "--suite" && source != "--export" {
             return Err("unknown mode".into());

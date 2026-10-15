@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--baseline', required=True)
 parser.add_argument('--output', required=True, type=Path)
 parser.add_argument('--batch-ms', default=25, type=int)
+parser.add_argument('--corpus', type=Path, help='Recorded PNG hex and independently verified RGBA hashes')
 args = parser.parse_args()
 
 def run(*command, cwd=ROOT, capture=True):
@@ -60,17 +61,45 @@ with tempfile.TemporaryDirectory(prefix='raipixel-timings-') as temporary:
                 'png_bench', '--target-dir', str(target), cwd=directory, capture=False)
             executables[label] = target / 'release/examples' / ('png_bench.exe' if os.name == 'nt' else 'png_bench')
         metadata['benchmark_executable_bytes'] = {label: exe.stat().st_size for label, exe in executables.items()}
+        corpus = None
+        if args.corpus:
+            corpus_bytes = args.corpus.read_bytes()
+            corpus = json.loads(corpus_bytes)['cases']
+            metadata['corpus_sha256'] = hashlib.sha256(corpus_bytes).hexdigest()
+            metadata['inputs_sha256'] = {}
+            for item in corpus:
+                data = bytes.fromhex(item['png_hex'])
+                assert hashlib.sha256(data).hexdigest() == item['png_sha256']
+                source = temporary / (item['name'] + '.png')
+                source.write_bytes(data)
+                item['temporary_path'] = str(source)
+                metadata['inputs_sha256'][item['name']] = item['png_sha256']
         hashes = {}
         for label, exe in executables.items():
             folder = temporary / ('outputs-' + label)
-            run(str(exe), '--export', str(folder))
-            hashes[label] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(folder.iterdir())}
-        assert hashes['baseline'] == hashes['current'], 'encoded PNG bytes changed'
-        cases = sorted(name.removesuffix('-compressed.png') for name in hashes['current'] if name.endswith('-compressed.png'))
+            if corpus is None:
+                run(str(exe), '--export', str(folder))
+            else:
+                for item in corpus:
+                    target = folder / item['name']
+                    run(str(exe), '--export-file', str(target), item['temporary_path'])
+                    assert hashlib.sha256((target / 'rgba.bin').read_bytes()).hexdigest() == item['rgba_sha256'], item['name']
+            hashes[label] = {p.relative_to(folder).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                             for p in sorted(folder.rglob('*')) if p.is_file()}
+        assert hashes['baseline'] == hashes['current'], 'samples, flags, work or encoded PNG bytes changed'
+        cases = (sorted(name.removesuffix('-compressed.png') for name in hashes['current'] if name.endswith('-compressed.png'))
+                 if corpus is None else [item['name'] for item in corpus])
         for case in cases:
             for label in metadata['process_order']:
-                rows = [json.loads(line) for line in run(str(executables[label]), '--suite', str(args.batch_ms), case).splitlines()]
-                assert len(rows) == 1 and rows[0]['case'] == case
+                if corpus is None:
+                    arguments = ['--suite', str(args.batch_ms), case]
+                else:
+                    item = next(item for item in corpus if item['name'] == case)
+                    arguments = [item['temporary_path'], str(args.batch_ms)]
+                rows = [json.loads(line) for line in run(str(executables[label]), *arguments).splitlines()]
+                assert len(rows) == 1
+                assert rows[0]['case'] == (case if corpus is None else item['temporary_path'])
+                rows[0]['case'] = case
                 records.append(dict(version=label, cases=rows))
     finally:
         run('git', 'worktree', 'remove', '--force', str(checkout))

@@ -49,6 +49,12 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: stable
         run: python tools/png_timings.py --baseline ad47242649c004b0d22273aa2c87b543ef1d80e8 --batch-ms 100 --output png-timings.json
+      - name: Compare original mixed-filter corpus, samples, flags and work (informational)
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: python tools/png_timings.py --baseline b77a1e8eaccc1afb6a240eafd50f2aa7c2e2d360 --corpus benchmarks/png/original-inputs.json --batch-ms 100 --output png-original-timings.json
+      - name: Restore recorded original PNG inputs
+        run: python -c "import json;from pathlib import Path;p=Path('png-original-inputs');p.mkdir(exist_ok=True);[(p / (c['name'] + '.png')).write_bytes(bytes.fromhex(c['png_hex'])) for c in json.loads(Path('benchmarks/png/original-inputs.json').read_text())['cases']]"
       - name: Codec stage probes (informational)
         run: |
           cargo +stable run --release --locked --offline --example png_bench -- --export png-stage-inputs
@@ -57,7 +63,7 @@ jobs:
       - name: Profile actual decoder stages (informational)
         env:
           RUSTUP_TOOLCHAIN: stable
-        run: python tools/png_decode_stages.py png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png
+        run: python tools/png_decode_stages.py png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
       - name: Screen safe CRC slicing widths (informational)
         env:
           RUSTUP_TOOLCHAIN: stable
@@ -77,4 +83,4 @@ jobs:
       - name: Compare complete codecs under matched build profiles (informational)
         env:
           RUSTUP_TOOLCHAIN: stable
-        run: python tools/png_build_profiles.py --output png-build-profiles.json png-stage-inputs/icon-64-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
+        run: python tools/png_build_profiles.py --output png-build-profiles.json png-stage-inputs/icon-64-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
