@@ -110,7 +110,7 @@ impl Case {
     }
 }
 
-fn suite() -> Result<Vec<Case>> {
+fn suite(filter: Option<&str>) -> Result<Vec<Case>> {
     let mut cases = Vec::new();
     for (name, size) in [
         ("icon", 16),
@@ -119,6 +119,10 @@ fn suite() -> Result<Vec<Case>> {
         ("texture", 1024),
         ("noise", 256),
     ] {
+        let case_name = format!("{name}-{size}");
+        if filter.is_some_and(|value| value != case_name) {
+            continue;
+        }
         let mut state = 0x1234_5678_u32;
         let mut pixels = Vec::with_capacity(size * size);
         for y in 0..size {
@@ -160,7 +164,7 @@ fn suite() -> Result<Vec<Case>> {
             Limits::default(),
             &mut Work::default(),
         )?;
-        cases.push(Case::new(format!("{name}-{size}"), image, None)?);
+        cases.push(Case::new(case_name, image, None)?);
     }
     Ok(cases)
 }
@@ -173,12 +177,15 @@ fn main() -> Result<()> {
         if source != "--suite" && source != "--export" {
             return Err("unknown mode".into());
         }
-        suite()?
+        suite(args.get(2).map(String::as_str))?
     } else {
         let input = std::fs::read(source)?;
         let image = png::decode(&input, Limits::default(), &mut Work::default())?.image;
         vec![Case::new(source.clone(), image, Some(input))?]
     };
+    if cases.is_empty() {
+        return Err("unknown suite case".into());
+    }
     if source == "--export" {
         let path = Path::new(args.get(1).ok_or("missing export directory")?);
         std::fs::create_dir_all(path)?;

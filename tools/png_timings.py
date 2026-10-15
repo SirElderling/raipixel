@@ -37,7 +37,8 @@ metadata = dict(baseline=baseline, current=current,
                 github_run=os.environ.get('GITHUB_RUN_ID'),
                 minimum_batch_ms=args.batch_ms,
                 operation_order=['decode_input', 'decode_stored', 'encode_stored', 'encode_compressed'],
-                process_order=['baseline', 'current', 'current', 'baseline'])
+                process_order=['baseline', 'current', 'current', 'baseline'],
+                process_scope='case')
 metadata['driver_sha256'] = hashlib.sha256((ROOT / 'examples/png_bench.rs').read_bytes()).hexdigest()
 metadata['library_sources_sha256'] = {
     str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
@@ -65,14 +66,18 @@ with tempfile.TemporaryDirectory(prefix='raipixel-timings-') as temporary:
             run(str(exe), '--export', str(folder))
             hashes[label] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(folder.iterdir())}
         assert hashes['baseline'] == hashes['current'], 'encoded PNG bytes changed'
-        for label in metadata['process_order']:
-            rows = [json.loads(line) for line in run(str(executables[label]), '--suite', str(args.batch_ms)).splitlines()]
-            records.append(dict(version=label, cases=rows))
+        cases = sorted(name.removesuffix('-compressed.png') for name in hashes['current'] if name.endswith('-compressed.png'))
+        for case in cases:
+            for label in metadata['process_order']:
+                rows = [json.loads(line) for line in run(str(executables[label]), '--suite', str(args.batch_ms), case).splitlines()]
+                assert len(rows) == 1 and rows[0]['case'] == case
+                records.append(dict(version=label, cases=rows))
     finally:
         run('git', 'worktree', 'remove', '--force', str(checkout))
 
 summary = []
-for case in records[0]['cases']:
+cases = {item['case']: item for record in records for item in record['cases']}
+for case in cases.values():
     row = dict(case=case['case'], operations={})
     for mode, name in enumerate(metadata['operation_order']):
         values = {}

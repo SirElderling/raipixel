@@ -227,3 +227,17 @@ reference Fast: **1.82× slower**, with the same 52,549/53,405 bytes. The preced
 tuple trial's 1.66× ratio used a slower reference observation (0.910 ms); these
 separate runs must not be treated as a controlled before/after speedup. The
 native same-host paired comparisons are the evidence for the new change.
+
+## Timing drift follow-up
+
+A repeated macOS suite-order run at 850798e4 illustrates why the control
+operations are retained: texture compressed encoding rises 13%, but unchanged
+stored encoding also rises 13%, and unchanged decoders rise 22–28%. The earlier
+all-platform improvements are observations of their run, not a stable macOS
+performance guarantee. Raw repeat samples remain in
+[run 38739180001](https://github.com/SirElderling/raipixel/actions/runs/38739180001).
+The runner is therefore tightened to ABBA **per case**, generating/timing just
+one image for adjacent baseline/current processes. This changes only benchmark
+scheduling, not library behavior. A protocol marker distinguishes newer records
+from previous whole-suite process ordering. The bottleneck evidence is much
+stronger than the smaller macOS before/after deltas.

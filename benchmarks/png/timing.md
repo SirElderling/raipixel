@@ -71,3 +71,12 @@ profiling API. `tools/png_token_replay.py INPUT.png ...` captures real tokens
 untimed, verifies complete replay byte equality and times the same bit emitter.
 Replay has different memory/branch behavior, so subtraction is not an exact
 matching-time measurement. Both probes are now part of native CI.
+
+The current paired runner uses ABBA **per image case**, invoking
+`--suite MIN_BATCH_MS CASE` on the identical driver. It generates only that
+case, so the baseline/current samples are adjacent rather than separated by a
+whole suite. Metadata records `process_scope: "case"`; older reports used
+whole-suite process order. This narrows temporal drift, but cannot eliminate
+shared-runner scheduling/frequency changes. Compare medians only within the
+same run/protocol and examine unchanged control operations before interpreting
+a small encoder delta.
