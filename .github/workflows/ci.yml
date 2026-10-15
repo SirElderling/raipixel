@@ -78,3 +78,7 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: stable
         run: python tools/png_parity_screen.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
+      - name: Compare complete codecs under matched build profiles (informational)
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: python tools/png_build_profiles.py --output png-build-profiles.json png-stage-inputs/icon-64-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
