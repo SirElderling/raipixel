@@ -103,6 +103,19 @@ mod tests {
         }
     }
     #[test]
+    fn adler_preserves_each_byte_weight_in_a_full_group() {
+        // The defining recurrence gives byte i weight (length - i) in B.
+        // A single nonzero sample isolates that coefficient independently.
+        for position in 0..128 {
+            let mut data = [0u8; 128];
+            data[position] = 255;
+            let mut adler = Adler::new();
+            adler.update(&data);
+            let expected_b = 128 + 255 * (128 - position as u32);
+            assert_eq!(adler.value(), (expected_b << 16) | 256);
+        }
+    }
+    #[test]
     fn adler_bulk_accumulators_handle_full_blocks() {
         let data = vec![255; 2 * 65_535 + 17];
         let (mut a, mut b) = (1u32, 0u32);
@@ -110,7 +123,7 @@ mod tests {
             a = (a + u32::from(byte)) % 65_521;
             b = (b + a) % 65_521;
         }
-        for chunk_size in [15, 16, 17, 65_535, data.len()] {
+        for chunk_size in [15, 16, 17, 127, 128, 129, 65_535, data.len()] {
             let mut adler = Adler::new();
             for part in data.chunks(chunk_size) {
                 adler.update(part);

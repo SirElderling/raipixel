@@ -1,0 +1,36 @@
+{
+  "source_commit": "9c7b90837841053b6b364aba9a86367eb181dd69",
+  "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "input": "4 MiB, byte i = (17*i+3) mod 256",
+  "method": "release rustc -O; seven batches, alternating operation order; black_box input and output; no file I/O",
+  "input_bytes": 4194304,
+  "iterations_per_batch": 100,
+  "timing_order": [
+    "crc32",
+    "adler32"
+  ],
+  "samples_us": [
+    [
+      3483.23121,
+      3598.32174,
+      3645.72622,
+      3739.9709799999996,
+      3442.75394,
+      3544.69068,
+      3578.4735499999997
+    ],
+    [
+      1757.12329,
+      1700.3490600000002,
+      1866.3810899999999,
+      1753.9704000000002,
+      1641.6482299999998,
+      1708.34565,
+      1966.95466
+    ]
+  ],
+  "median_us": [
+    3578.4735499999997,
+    1753.9704000000002
+  ]
+}
