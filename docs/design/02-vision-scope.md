@@ -4,7 +4,7 @@
 
 raipixel is a local deterministic asset workbench for agents that can write UTF-8 files, invoke a CLI, inspect PNG images and consume JSON. Its reusable Rust core creates and modifies raster assets, maintains named editable parts, assembles animation and tiles, checks objective constraints, and exports game-facing pixels and metadata.
 
-Primary users are developers directing Codex, Claude Code or equivalent agents through game asset production. Secondary users are technical artists running reproducible batches. There is no assumption that the agent can draw convincing anatomy or recognize every defect. Humans retain artistic approval.
+Primary users are developers directing AI coding agents through game asset production. Secondary users are technical artists running reproducible batches. There is no assumption that the agent can draw convincing anatomy or recognize every defect. Humans retain artistic approval.
 
 The first validation collection is a fantasy RPG: characters/NPCs/creatures, equipment/icons, terrain/buildings/dungeons, effects and UI. Asset category is metadata, not an engine type. The same primitives support science-fiction props or abstract interfaces.
 
@@ -12,7 +12,7 @@ The first validation collection is a fantasy RPG: characters/NPCs/creatures, equ
 
 Generate → render → inspect → diagnose → modify → validate → export must work without reconstructing untouched parts. A named armor cel can change while body pixels, frame order and timing remain unchanged. Supplied directional artwork can share a palette and alignment contract. A deterministic recipe can produce twenty controlled variants and preserve their editable snapshots.
 
-Differentiation is a compact agent contract and durable editable state under unusually strict runtime constraints. Aseprite already has useful CLI/scripting; raipixel does not claim headless automation is novel. PixelLab and Retro Diffusion generate new artwork with models; raipixel complements them through local correction and assembly. Neither automatic artistic quality nor automatic unseen-view synthesis is promised.
+Differentiation is a compact agent contract and durable editable state under unusually strict runtime constraints. Existing tools already support forms of headless editing or image generation; raipixel does not claim those capabilities are novel. It focuses on local, deterministic correction and assembly of source artwork. Neither automatic artistic quality nor automatic unseen-view synthesis is promised.
 
 ## Principles and success measures
 
@@ -47,7 +47,7 @@ No automatic fantasy generator, style classifier, anatomical validator, automati
 
 | Capability | Smallest current alternative | Admit later only when |
 |---|---|---|
-| Arbitrary-angle/cleanEdge/rotxel/OmniScale | Quarter-turn + supplied poses; exact nearest integer scale | A representative corpus shows a recurring production need and an algorithm has reviewed deterministic semantics and license |
+| Arbitrary-angle rotation and advanced pixel-preserving scaling | Quarter-turn + supplied poses; exact nearest integer scale | A representative corpus shows a recurring production need and an algorithm has reviewed deterministic semantics and license |
 | GIF/APNG | PNG frames/contact sheet + timings JSON | Consumers demonstrate an animation-preview gap worth another codec |
 | ASE/ORA/PSD native import | Export layers/frames from authoring tool to PNG; manifest imports | Loss of layer workflows repeatedly blocks adoption; not mandatory at runtime |
 | 16-bit PNG/HDR/color management | Exact stated supported PNG subset; externally supply 8-bit PNG | Actual source assets need it; precision/profile policy is specified first |
