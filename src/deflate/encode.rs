@@ -19,25 +19,35 @@ fn hash(data: &[u8], pos: usize) -> usize {
     (key.wrapping_mul(0x9e37_79b1) >> 19) as usize
 }
 
+// Keep candidate rejection inline without also inlining the larger scan.
+#[inline(always)]
 fn match_length(data: &[u8], prior: usize, pos: usize, maximum: usize) -> usize {
     if prior >= pos || pos - prior > 32_768 || data[prior..prior + 3] != data[pos..pos + 3] {
         return 0;
     }
-    let left = &data[prior + 3..prior + maximum];
-    let right = &data[pos + 3..pos + maximum];
-    let (left_bulk, left_tail) = left.as_chunks::<16>();
-    let (right_bulk, right_tail) = right.as_chunks::<16>();
-    let mut length = 3;
-    for (a, b) in left_bulk.iter().zip(right_bulk) {
+    3 + matching_tail(
+        &data[prior + 3..prior + maximum],
+        &data[pos + 3..pos + maximum],
+    )
+}
+#[inline(never)]
+fn matching_tail(left: &[u8], right: &[u8]) -> usize {
+    let mut matched = 0;
+    for (a, b) in left
+        .as_chunks::<16>()
+        .0
+        .iter()
+        .zip(right.as_chunks::<16>().0)
+    {
         if a != b {
-            return length + a.iter().zip(b).take_while(|(x, y)| x == y).count();
+            break;
         }
-        length += 16;
+        matched += 16;
     }
-    length
-        + left_tail
+    matched
+        + left[matched..]
             .iter()
-            .zip(right_tail)
+            .zip(&right[matched..])
             .take_while(|(x, y)| x == y)
             .count()
 }

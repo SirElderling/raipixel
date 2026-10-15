@@ -13,6 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 source = (ROOT / 'src/deflate/encode.rs').read_text()
 a = source.index('fn match_length(')
+annotation = '#[inline(always)]\n'
+if source[:a].endswith(annotation):
+    a -= len(annotation)
 b = source.index('\nfn distance_code', a)
 candidate = source[:a] + '''fn match_length(data: &[u8], prior: usize, pos: usize, maximum: usize) -> usize {
     if prior >= pos || pos-prior > 32_768 || data[prior..prior+3] != data[pos..pos+3] { return 0; }

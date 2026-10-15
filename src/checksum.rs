@@ -70,32 +70,29 @@ impl Adler {
             // For byte lane j, the batch contributes 8*prior + (8-j)*sum to B.
             // The derivation and source acknowledgment are in the algorithm notes.
             for group in bulk {
-                let (mut sums_e, mut sums_o, mut prefix_e, mut prefix_o) =
-                    ([0u64; 2], [0u64; 2], [0u64; 2], [0u64; 2]);
-                for chunk in group.as_chunks::<16>().0 {
-                    for (lane, bytes) in chunk.as_chunks::<8>().0.iter().enumerate() {
-                        let word = u64::from_le_bytes(*bytes);
-                        prefix_e[lane] += sums_e[lane];
-                        prefix_o[lane] += sums_o[lane];
-                        sums_e[lane] += word & 0x00ff_00ff_00ff_00ff;
-                        sums_o[lane] += (word >> 8) & 0x00ff_00ff_00ff_00ff;
-                    }
+                let (mut even, mut odd, mut prior_even, mut prior_odd) = (0u64, 0u64, 0u64, 0u64);
+                for bytes in group.as_chunks::<8>().0 {
+                    let word = u64::from_le_bytes(*bytes);
+                    prior_even += even;
+                    prior_odd += odd;
+                    even += word & 0x00ff_00ff_00ff_00ff;
+                    odd += (word >> 8) & 0x00ff_00ff_00ff_00ff;
                 }
-                // Interleaved word streams: P = 2*(P0 + P1) + S0.
-                // Recombination keeps the original per-lane bounds unchanged.
-                let even = sums_e[0] + sums_e[1];
-                let odd = sums_o[0] + sums_o[1];
-                let prior_even = 2 * (prefix_e[0] + prefix_e[1]) + sums_e[0];
-                let prior_odd = 2 * (prefix_o[0] + prefix_o[1]) + sums_o[0];
-                self.b += 128 * self.a;
-                for i in 0..4 {
-                    let shift = i * 16;
-                    let e = (even >> shift) & 65535;
-                    let o = (odd >> shift) & 65535;
-                    let p = ((prior_even >> shift) & 65535) + ((prior_odd >> shift) & 65535);
-                    self.b += 8 * p + (8 - 2 * i) * e + (7 - 2 * i) * o;
-                    self.a += e + o;
-                }
+                // Four sum lanes total at most 32640; prefix sums cannot carry between
+                // fields in the wrapping multiply. Prior totals need 32-bit fields.
+                let sums = even + odd;
+                let sum_total = sums.wrapping_mul(0x0001_0001_0001_0001) >> 48;
+                let odd_total = odd.wrapping_mul(0x0001_0001_0001_0001) >> 48;
+                let prior = prior_even + prior_odd;
+                let pairs =
+                    (prior & 0x0000_ffff_0000_ffff) + ((prior >> 16) & 0x0000_ffff_0000_ffff);
+                let prior_total = (pairs & 0xffff_ffff) + (pairs >> 32);
+                let weighted = 4 * (sums & 65535)
+                    + 3 * ((sums >> 16) & 65535)
+                    + 2 * ((sums >> 32) & 65535)
+                    + (sums >> 48);
+                self.b += 128 * self.a + 8 * prior_total + 2 * weighted - odd_total;
+                self.a += sum_total;
             }
             for &byte in tail {
                 self.a += u64::from(byte);

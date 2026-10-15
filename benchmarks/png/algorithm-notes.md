@@ -160,3 +160,43 @@ our code and the RFC 1951 ranges, with 828 bytes of static data. Actual-stage
 instrumentation and token replay only analyze our own implementation; they add
 no algorithm attribution claim or production API. Full adaptations and evidence
 are in the lookup/stage decision record linked above.
+
+## Bounded match views and direct packed-lane reduction
+
+The match optimization in `src/deflate/encode.rs` keeps candidate rejection in a
+small inline guard, then scans two already bounded byte slices in 16-byte groups
+and finishes with one scalar remainder loop. Keeping the larger scan out of the
+guard avoids expanding the common failed-candidate path. Match selection,
+window/length limits and tie-breaking still follow our original matcher and
+Deutsch's RFC 1951. No third-party match-search implementation is used.
+
+For the independently regrouped Adler recurrence, let `E_i`, `O_i` denote the
+four 16-bit even/odd sum lanes and `PE_i`, `PO_i` their prior-word sum lanes.
+With `S_i = E_i + O_i`, `P_i = PE_i + PO_i`, for `i=0..3`:
+
+```text
+A' = A + sum(S_i)
+B' = B + 128*A + 8*sum(P_i) + 2*sum((4-i)*S_i) - sum(O_i)
+```
+
+This is the existing byte-weight expression with its even/odd terms collected;
+the recurrence credit remains Mark Adler, Jean-Loup Gailly and RFC 1950's
+L. Peter Deutsch/Jean-Loup Gailly (1996), linked above. The code in
+`checksum::Adler::update` computes these totals directly rather than extracting
+and updating A/B once per lane. This algebra was derived from our implementation
+and the defining recurrence; no new paper algorithm or comparison code is used.
+
+`E_i,O_i <= 4080`, so `S_i <= 8160` and `sum(S_i) <= 32640`. Consequently a
+wrapping multiply by `0x0001000100010001`, followed by a 48-bit shift, gives the
+four-lane sum: no lower 16-bit prefix sum can carry into the next field; terms
+above bit 63 are intentionally discarded. The odd lanes obey a tighter bound.
+`P_i <= 61200`; their total may exceed 16 bits, so they are first collected in
+two 32-bit fields (each <=122400) and then summed. The weighted S total is at
+most 81600. The unchanged 65,535-byte reduction interval and u64 A/B bounds still
+apply. Exhaustive single-byte weights, all-255 full blocks, scalar checksum and
+fragmentation checks validate these identities independently.
+
+Two/four interleaved prefix streams were also screened. Once direct reduction
+was added, the serial prefix version was within a few percent of the two-stream
+version locally, so the retained code keeps the simpler original prefix loop.
+Raw performance records distinguish prototypes from retained implementation.
