@@ -462,6 +462,20 @@ fn sub_rgba(row: &mut [[u8; 4]]) {
     }
 }
 
+// Preserve PNG Paeth's left/up/upper-left tie priority independently for
+// each channel. All channels read the same prior pixel before it advances.
+fn paeth_rgba(row: &mut [[u8; 4]], previous: &[[u8; 4]]) {
+    let mut left = [0u8; 4];
+    let mut upper_left = [0u8; 4];
+    for (pixel, up) in row.iter_mut().zip(previous) {
+        *pixel = std::array::from_fn(|channel| {
+            pixel[channel].wrapping_add(paeth(left[channel], up[channel], upper_left[channel]))
+        });
+        left = *pixel;
+        upper_left = *up;
+    }
+}
+
 fn unfilter(row: &mut [u8], previous: Option<&[u8]>, bpp: usize, filter: u8) -> Result<(), Error> {
     match filter {
         0 => {}
@@ -476,6 +490,14 @@ fn unfilter(row: &mut [u8], previous: Option<&[u8]>, bpp: usize, filter: u8) -> 
                 for (value, &up) in row.iter_mut().zip(previous) {
                     *value = value.wrapping_add(up);
                 }
+            }
+        }
+        4 if bpp == 4 => {
+            let pixels = row.as_chunks_mut::<4>().0;
+            if let Some(previous) = previous {
+                paeth_rgba(pixels, previous.as_chunks::<4>().0);
+            } else {
+                sub_rgba(pixels);
             }
         }
         3 | 4 => {
@@ -706,6 +728,58 @@ mod filter_tests {
     use super::*;
 
     #[test]
+    fn rgba_paeth_matches_independent_neighbor_distances() {
+        // The equivalent distances avoid sharing the implementation's p-based
+        // arithmetic, while retaining the PNG left/up/upper-left tie order.
+        for a in [0u8, 1, 63, 127, 128, 192, 254, 255] {
+            for b in [0u8, 1, 63, 127, 128, 192, 254, 255] {
+                for c in [0u8, 1, 63, 127, 128, 192, 254, 255] {
+                    let distances = [
+                        (i32::from(b) - i32::from(c)).abs(),
+                        (i32::from(a) - i32::from(c)).abs(),
+                        (i32::from(a) + i32::from(b) - 2 * i32::from(c)).abs(),
+                    ];
+                    let closest = distances.iter().min().unwrap();
+                    let index = distances.iter().position(|d| d == closest).unwrap();
+                    let mut row = [[a.wrapping_sub(c); 4], [0; 4]];
+                    paeth_rgba(&mut row, &[[c; 4], [b; 4]]);
+                    assert_eq!(row, [[a; 4], [[a, b, c][index]; 4]]);
+                }
+            }
+        }
+        for pixels in [1, 2, 3, 4, 7, 16, 65, 1024, 4096] {
+            let previous: Vec<u8> = (0..pixels * 4).map(|i| (i * 71 + i / 11) as u8).collect();
+            let encoded: Vec<u8> = (0..pixels * 4)
+                .map(|i| (i * 37 + i / 7 + 17) as u8)
+                .collect();
+            let mut expected = encoded.clone();
+            for i in 0..expected.len() {
+                let a = if i < 4 { 0 } else { expected[i - 4] };
+                let b = previous[i];
+                let c = if i < 4 { 0 } else { previous[i - 4] };
+                let distances = [
+                    (i32::from(b) - i32::from(c)).abs(),
+                    (i32::from(a) - i32::from(c)).abs(),
+                    (i32::from(a) + i32::from(b) - 2 * i32::from(c)).abs(),
+                ];
+                let index = distances
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, d)| *d)
+                    .unwrap()
+                    .0;
+                expected[i] = expected[i].wrapping_add([a, b, c][index]);
+            }
+            let mut actual = encoded.clone();
+            paeth_rgba(actual.as_chunks_mut::<4>().0, previous.as_chunks::<4>().0);
+            assert_eq!(actual, expected, "pixels {pixels}");
+            let mut routed = encoded;
+            unfilter(&mut routed, Some(&previous), 4, 4).unwrap();
+            assert_eq!(routed, expected);
+        }
+    }
+
+    #[test]
     fn rgba_sub_matches_the_png_byte_recurrence() {
         for pixels in [1, 2, 3, 4, 7, 16, 65, 1024, 4096] {
             for seed in [0usize, 17, 255] {
@@ -716,6 +790,9 @@ mod filter_tests {
                 for i in 4..expected.len() {
                     expected[i] = expected[i].wrapping_add(expected[i - 4]);
                 }
+                let mut first_paeth_row = encoded.clone();
+                unfilter(&mut first_paeth_row, None, 4, 4).unwrap();
+                assert_eq!(first_paeth_row, expected);
                 let mut actual = encoded;
                 sub_rgba(actual.as_chunks_mut::<4>().0);
                 assert_eq!(actual, expected, "pixels {pixels}, seed {seed}");

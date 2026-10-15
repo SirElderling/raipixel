@@ -293,3 +293,27 @@ uses only Python/Rust standard libraries. The untimed benchmark export compares
 samples, flags, work remaining and both writer files between versions before
 timing. This avoids accepting a decode speedup that silently drops work or
 changes decoded samples. No third-party implementation source was consulted.
+
+## RGBA Paeth recurrence
+
+`src/png.rs::paeth_rgba` carries decoded-left and previous-upper-left pixel
+states across a scanline, applying our existing scalar predictor independently
+to each channel. The first pixel starts with zero left/upper-left states; the
+first scanline has zero upper neighbors and reduces to Sub. The existing
+predictor's left/up/upper-left tie order and wrapping reconstruction remain.
+
+We acknowledge Alan W. Paeth, *Image File Compression Made Easy*, in *Graphics
+Gems II*, Academic Press, 1991, pp. 93–100
+([publisher reference](https://www.sciencedirect.com/science/article/pii/B9780080507545500293)),
+as credited by the PNG Working Group in PNG Third Edition section 9.4. This
+implementation uses the normative PNG adaptation, not code from the chapter or
+any crate. The pixel-state organization is our independent regrouping.
+
+The new test was first run with a missing helper and failed compilation. It
+then checked representative full-byte neighbor combinations, tie priority,
+varied consecutive rows, helper/routing agreement and first-scanline behavior
+against independently expressed neighbor distances. All 68 core tests pass
+locally. Local paired complete original-sheet decode takes 0.811 times the
+pre-filter baseline, compared with 0.907 for Sub alone. Texture decode measures
+1.018 times baseline; no universal speedup is inferred from these shared-host
+observations. Native measurements decide retention.
