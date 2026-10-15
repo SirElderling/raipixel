@@ -45,3 +45,29 @@ sample, including transparent RGB. Keep the existing stored writer's byte
 contract. Verify a new optional writer with independent decoding, exact sample
 checks, deterministic serialization and the same native three-platform CI.
 No source from the comparison crate has been inspected or copied.
+
+## Attribution for the first compressed writer
+
+`png::encode_compressed` and private `deflate::encode::Encoder` implement our
+own bounded, block-local hash matcher with greedy matches, fixed Huffman codes
+and stored fallback. The wire format, fixed codes, match limits and hashing
+background come from P. Deutsch's RFC 1951; PNG Sub/Up transforms come from the
+PNG specification by the PNG Working Group.
+
+The bounded-window design rationale and explicit decision to favor a practical
+hash matcher over exact suffix-tree parsing acknowledge Philip Bille, Patrick
+Hagge Cording, Johannes Fischer and Inge Li Gørtz, *Lempel-Ziv Compression in a
+Sliding Window*, CPM 2017, linked above. This is a partial conceptual influence,
+not an implementation of their algorithm or a claim to its exact-parse bounds.
+Our simplifications are one recent candidate per hash, a dictionary reset per
+65,535-byte block, a 32 KiB maximum distance and 258-byte maximum match.
+
+The slicing-by-eight CRC technique is credited to Abhijeet Joglekar, Michael E.
+Kounavis and Frank L. Berry's FAST 2005 paper above. Our polynomial-based CRC
+code predates this literature review and was independently authored; the
+reference is added to acknowledge the published technique. Copy/CRC fusion has
+not been adopted. Nekritch's alternative lookup organization, the exact suffix
+structures and the vector/VLIW techniques remain reviewed, not implemented.
+
+Original implementation and tests remain subject to the mandatory
+[research attribution requirements](../../docs/design/01-research.md#research-attribution-requirements).

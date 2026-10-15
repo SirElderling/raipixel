@@ -558,6 +558,17 @@ fn write_chunk(output: &mut impl std::io::Write, name: &[u8; 4], data: &[u8]) ->
     Ok(())
 }
 
+fn write_header(image: &Image, output: &mut impl std::io::Write) -> Result<(), Error> {
+    let mut header = [0u8; 13];
+    header[..4].copy_from_slice(&image.width.to_be_bytes());
+    header[4..8].copy_from_slice(&image.height.to_be_bytes());
+    header[8] = 8;
+    header[9] = 6;
+    output.write_all(SIGNATURE)?;
+    write_chunk(output, b"IHDR", &header)?;
+    Ok(())
+}
+
 /// Stream deterministic noninterlaced RGBA8, filter None and stored DEFLATE.
 /// Scratch is at most 65,540 bytes. Work is preflighted before any output;
 /// I/O errors may leave partial bytes in the caller's sink. File publication
@@ -575,13 +586,7 @@ pub fn encode(
     block
         .try_reserve_exact(raw_size.min(65_535) + 5)
         .map_err(|_| crate::Error::Allocation)?;
-    let mut header = [0u8; 13];
-    header[..4].copy_from_slice(&image.width.to_be_bytes());
-    header[4..8].copy_from_slice(&image.height.to_be_bytes());
-    header[8] = 8;
-    header[9] = 6;
-    output.write_all(SIGNATURE)?;
-    write_chunk(output, b"IHDR", &header)?;
+    write_header(image, output)?;
     write_chunk(output, b"IDAT", &[0x78, 0x01])?;
     let rgba = image.pixels().as_flattened();
     let row_bytes = image.width as usize * 4;
@@ -611,6 +616,74 @@ pub fn encode(
         adler.update(&block[5..]);
         write_chunk(output, b"IDAT", &block)?;
         remaining -= count;
+    }
+    write_chunk(output, b"IDAT", &adler.value().to_be_bytes())?;
+    write_chunk(output, b"IEND", &[])
+}
+
+/// Lossless RGBA8 output with Sub on the first row, Up on subsequent rows,
+/// bounded greedy matching and fixed Huffman codes (stored fallback for noise).
+/// This changes PNG bytes, never RGBA samples. The original `encode` retains its
+/// exact byte contract. Scratch is below 169 KiB, independent of image size.
+/// Work/allocation preflight precedes output; I/O errors may leave partial bytes.
+/// See benchmarks/png/algorithm-notes.md for algorithm sources and credits.
+pub fn encode_compressed(
+    image: &Image,
+    output: &mut impl std::io::Write,
+    work: &mut Work,
+) -> Result<(), Error> {
+    let row_bytes = image.width as usize * 4;
+    let stride = row_bytes + 1;
+    let raw_size = stride * image.height as usize;
+    let blocks = raw_size.div_ceil(crate::deflate::BLOCK);
+    // A linear budget for filtering, bounded matching, coding and checksums,
+    // plus the fixed hash-table reset for each block. No search chains exist.
+    work.charge((raw_size * 12 + blocks * (8192 + 64)) as u64)?;
+    let capacity = raw_size.min(crate::deflate::BLOCK);
+    let mut raw = Vec::new();
+    raw.try_reserve_exact(capacity)
+        .map_err(|_| crate::Error::Allocation)?;
+    let mut encoder = crate::deflate::Encoder::new(capacity)?;
+    write_header(image, output)?;
+    write_chunk(output, b"IDAT", &[0x78, 0x01])?;
+    let rgba = image.pixels().as_flattened();
+    let mut offset = 0;
+    let mut adler = Adler::new();
+    while offset < raw_size {
+        let count = (raw_size - offset).min(capacity);
+        raw.resize(count, 0);
+        let mut filled = 0;
+        while filled < count {
+            let row = offset / stride;
+            let column = offset % stride;
+            if column == 0 {
+                raw[filled] = if row == 0 { 1 } else { 2 };
+                offset += 1;
+                filled += 1;
+            } else {
+                let take = (stride - column).min(count - filled);
+                let start = row * row_bytes + column - 1;
+                let destination = &mut raw[filled..filled + take];
+                if row == 0 {
+                    for (i, value) in destination.iter_mut().enumerate() {
+                        let x = start + i;
+                        *value = rgba[x].wrapping_sub(if x < 4 { 0 } else { rgba[x - 4] });
+                    }
+                } else {
+                    for ((value, &sample), &up) in destination
+                        .iter_mut()
+                        .zip(&rgba[start..start + take])
+                        .zip(&rgba[start - row_bytes..start - row_bytes + take])
+                    {
+                        *value = sample.wrapping_sub(up);
+                    }
+                }
+                offset += take;
+                filled += take;
+            }
+        }
+        adler.update(&raw);
+        write_chunk(output, b"IDAT", encoder.block(&raw, offset == raw_size))?;
     }
     write_chunk(output, b"IDAT", &adler.value().to_be_bytes())?;
     write_chunk(output, b"IEND", &[])

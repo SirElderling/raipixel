@@ -1,3 +1,5 @@
+// Slicing-by-eight technique: Joglekar, Kounavis & Berry, FAST 2005.
+// Independent implementation; attribution/context: benchmarks/png/algorithm-notes.md.
 // Independently implemented from PNG/RFC 1950 polynomial/checksum definitions.
 // Each additional CRC table represents one more trailing zero byte. Combining
 // eight independent byte contributions removes the serial per-byte recurrence.

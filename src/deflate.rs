@@ -1,6 +1,8 @@
 //! Private zlib/DEFLATE decoder; no PNG chunk or pixel knowledge.
 use crate::{Error as ResourceError, Work, checksum::Adler};
 use std::borrow::Cow;
+mod encode;
+pub(crate) use encode::{BLOCK, Encoder};
 
 #[derive(Debug)]
 pub(crate) enum Error {
