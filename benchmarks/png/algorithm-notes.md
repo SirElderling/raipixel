@@ -317,3 +317,10 @@ locally. Local paired complete original-sheet decode takes 0.811 times the
 pre-filter baseline, compared with 0.907 for Sub alone. Texture decode measures
 1.018 times baseline; no universal speedup is inferred from these shared-host
 observations. Native measurements decide retention.
+
+The 16-bit predictor probe remains rejected: the complete-codec trial also
+moves unchanged writers and the Up-heavy texture, so it does not isolate an
+arithmetic-width gain. Production retains the original 32-bit predictor.
+The [filter decision record](candidates/rgba-filters.md) retains its patch and
+all samples, along with the accepted native 17–21% sheet-decode reduction,
+compact/control regressions and remaining reference gap.

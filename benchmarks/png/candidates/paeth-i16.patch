@@ -1,0 +1,13 @@
+diff --git a/src/png.rs b/src/png.rs
+index ad31f46..bcd4ac9 100644
+--- a/src/png.rs
++++ b/src/png.rs
+@@ -522,7 +522,7 @@ fn unfilter(row: &mut [u8], previous: Option<&[u8]>, bpp: usize, filter: u8) ->
+     Ok(())
+ }
+ fn paeth(a: u8, b: u8, c: u8) -> u8 {
+-    let (a, b, c) = (i32::from(a), i32::from(b), i32::from(c));
++    let (a, b, c) = (i16::from(a), i16::from(b), i16::from(c));
+     let p = a + b - c;
+     let (da, db, dc) = ((p - a).abs(), (p - b).abs(), (p - c).abs());
+     if da <= db && da <= dc {

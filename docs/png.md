@@ -72,9 +72,9 @@ under the [mandatory attribution rule](design/01-research.md#research-attributio
 
 ## Verification
 
-66 Rust tests run offline with no external executable or test library:
-22 raster tests, 19 JSON tests, ten PNG integration tests, ten DEFLATE unit tests and five checksum unit
-tests. The PNG/DEFLATE cases include 31 accepted PNG files, 40 rejected-profile
+68 Rust tests run offline with no external executable or test library:
+22 raster tests, 19 JSON tests, ten PNG integration tests, two PNG filter unit tests, ten DEFLATE
+unit tests and five checksum unit tests. The PNG/DEFLATE cases include 31 accepted PNG files, 40 rejected-profile
 files and eight independent zlib streams. Cases cover the required profile
 matrix and the malformed-input rules listed in the design, rather than
 speculative product capabilities.
@@ -210,3 +210,14 @@ read-only data; heap/work policies and every writer byte stay unchanged.
 All 66 tests and independent consumer checks pass. General reference parity
 remains unmet; the record includes both unrestricted-width trials, the size
 policy, creator acknowledgment and all native raw samples.
+
+
+The [RGBA filter pass](../benchmarks/png/candidates/rgba-filters.md) carries
+Sub and Paeth neighbor states per pixel, retaining the generic loops for other
+sample layouts. Both test-first helpers preserve PNG's byte recurrence and
+Paeth tie order. Native original-sheet decoding takes 17–21% less time versus
+the pre-filter implementation, with exact sample, flag, charged-work and writer
+hash equality. Texture timings remain mixed, including a 3.5% macOS regression.
+All 68 tests pass on Linux/macOS/Windows. The original mixed-filter inputs are
+now fixed native benchmarks with independent RGBA digests; reference decode
+still takes less time on the original sheet (ours/reference 1.17–1.39×).

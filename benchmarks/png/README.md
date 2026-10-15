@@ -1,6 +1,8 @@
 # PNG comparison measurements
 
-[Latest decoder profiling and CRC results](candidates/decoder-crc.md) identify
+[Latest RGBA filter results](candidates/rgba-filters.md) record native
+original-sheet decode improvements, exact samples/flags/work checks and the
+remaining reference gap. The [preceding decoder CRC results](candidates/decoder-crc.md) identify
 chunk validation as the noise bottleneck and record safe 32-byte slicing. The
 [preceding encoder results](candidates/wide-buffer-and-prefix.md) record
 matched release-profile comparisons, batched bit output and cached dictionary

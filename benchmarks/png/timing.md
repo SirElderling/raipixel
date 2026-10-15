@@ -88,3 +88,22 @@ each of four stage operations to 50 ms and rotates nine batches. Checksums and
 encoder allocation are measured separately; these isolated numbers are not an
 additive full-codec profile. Source/compiler/input fingerprints and all samples
 are recorded. It is now also run natively in CI for the selected bottlenecks.
+
+
+The original mixed-filter corpus is now a fixed native workload as well:
+
+```sh
+python tools/png_timings.py --baseline b77a1e8eaccc1afb6a240eafd50f2aa7c2e2d360 --corpus benchmarks/png/original-inputs.json --batch-ms 100 --output original-timings.json
+```
+
+The corpus stores the two original PNG byte streams and independently verified
+RGBA SHA256 values. It requires no image library to run in CI. Each version
+first exports untimed RGBA bytes, decoder flags, remaining work and stored/
+compressed PNGs; hashes must agree between versions and decoded RGBA must also
+match the independent expected digest. Timing then uses the same existing
+four-operation driver, compiler/profile and adjacent ABBA process order. The
+100 ms minimum batch reduces clock/short-batch noise but does not remove shared
+runner drift. The matched reference/profile matrix also includes these exact
+inputs; generated Sub/Up inputs and the original mixed-filter sheet must not be
+conflated. The fixed input file records its original Pillow provenance; Pillow
+is not a native CI or production dependency.
