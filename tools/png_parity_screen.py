@@ -53,6 +53,9 @@ fn repeated_length(data: &[u8], prior: usize, pos: usize, maximum: usize) -> usi
 
 def specialize_run(text):
     marker = 'match_length(data, pos - 1, pos, maximum)'
+    if marker not in text:
+        assert 'fn repeated_length(' in text
+        return text  # The broadcast candidate is already the production path.
     assert text.count(marker) == 1
     return text.replace(marker, 'repeated_length(data, pos - 1, pos, maximum)') + run_helper
 

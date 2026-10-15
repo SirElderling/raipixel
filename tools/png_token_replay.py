@@ -48,6 +48,11 @@ with tempfile.TemporaryDirectory(prefix='raipixel-token-replay-') as temporary:
         raw=zlib.decompress(idat)
         (temporary/f'{i}.raw').write_bytes(raw)
         inputs.append(dict(input=path,raw_sha256=hashlib.sha256(raw).hexdigest()))
+    if 'fn flush_bytes(' in source:
+        # Preserve the production writer's end-of-block byte drain.
+        traced = traced.replace('self.symbol(256);if last {self.align();}',
+                                'self.symbol(256);if last {self.align();}self.flush_bytes();')
+        (temporary/'traced.rs').write_text(traced)
     driver='#![forbid(unsafe_code)]\n#![allow(dead_code)]\n'
     driver+='#[path='+json.dumps(str(ROOT/'src/error.rs'))+']mod error;pub use error::{Error,Resource};\n'+constants
     driver+='#[path='+json.dumps(str(ROOT/'src/deflate/encode.rs'))+']mod actual;\nmod traced;\n'

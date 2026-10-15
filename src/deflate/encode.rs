@@ -11,7 +11,7 @@ const HASH_SIZE: usize = 8192;
 pub(crate) struct Encoder {
     positions: Vec<u32>,
     output: Vec<u8>,
-    bits: u32,
+    bits: u64,
     count: u32,
 }
 fn hash(data: &[u8], pos: usize) -> usize {
@@ -50,6 +50,21 @@ fn matching_tail(left: &[u8], right: &[u8]) -> usize {
             .zip(&right[matched..])
             .take_while(|(x, y)| x == y)
             .count()
+}
+
+#[inline(never)]
+fn repeated_length(data: &[u8], prior: usize, pos: usize, maximum: usize) -> usize {
+    let byte = data[prior];
+    let view = &data[pos..pos + maximum];
+    let mut matched = 0;
+    for group in view.as_chunks::<16>().0 {
+        if *group != [byte; 16] {
+            break;
+        }
+        matched += 16;
+    }
+    let length = matched + view[matched..].iter().take_while(|&&x| x == byte).count();
+    if length < 3 { 0 } else { length }
 }
 
 fn distance_code(distance: usize) -> usize {
@@ -115,18 +130,30 @@ impl Encoder {
     }
 
     fn put(&mut self, value: u32, count: u32) {
-        self.bits |= value << self.count;
+        // Pending bits stay below 32; the largest write is 13 distance bits.
+        // A u64 holds both, and at most one four-byte flush is needed.
+        self.bits |= u64::from(value) << self.count;
         self.count += count;
-        while self.count >= 8 {
-            self.output.push(self.bits as u8);
-            self.bits >>= 8;
-            self.count -= 8;
+        if self.count >= 32 {
+            self.output
+                .extend_from_slice(&(self.bits as u32).to_le_bytes());
+            self.bits >>= 32;
+            self.count -= 32;
         }
     }
+    fn flush_bytes(&mut self) {
+        let count = self.count / 8;
+        self.output
+            .extend_from_slice(&self.bits.to_le_bytes()[..count as usize]);
+        self.bits >>= count * 8;
+        self.count -= count * 8;
+    }
     fn align(&mut self) {
-        if self.count != 0 {
-            self.put(0, 8 - self.count);
+        let pending = self.count % 8;
+        if pending != 0 {
+            self.put(0, 8 - pending);
         }
+        self.flush_bytes();
     }
     fn symbol(&mut self, symbol: u32) {
         let packed = FIXED_CODES[symbol as usize];
@@ -163,7 +190,7 @@ impl Encoder {
             self.positions[slot] = pos as u32;
             let maximum = (data.len() - pos).min(258);
             let repeated = if pos > 0 && data[pos] == data[pos - 1] {
-                match_length(data, pos - 1, pos, maximum)
+                repeated_length(data, pos - 1, pos, maximum)
             } else {
                 0
             };
@@ -196,6 +223,7 @@ impl Encoder {
         if last {
             self.align();
         }
+        self.flush_bytes();
         // A stored block is preferable when fixed codes expand this input.
         // Restore the pending bits from the preceding block before retrying.
         if self.output.len() > data.len() + 5 {
@@ -218,6 +246,52 @@ mod tests {
     use super::*;
 
     #[test]
+    fn distance_one_scan_matches_scalar_at_every_termination() {
+        for maximum in 3..=258 {
+            for cut in 0..=maximum {
+                let mut data = vec![19; maximum + 1];
+                if cut < maximum {
+                    data[cut + 1] = 37;
+                }
+                let expected = if cut < 3 { 0 } else { cut };
+                assert_eq!(repeated_length(&data, 0, 1, maximum), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn long_symbol_sequence_matches_independent_bit_stream() {
+        for pending in 0..8 {
+            let mut encoder = Encoder::new(4096).unwrap();
+            let mut expected = vec![true; pending];
+            encoder.put((1 << pending) - 1, pending as u32);
+            for symbol in 0..=285u32 {
+                let (code, count) = match symbol {
+                    0..=143 => (symbol + 48, 8),
+                    144..=255 => (symbol - 144 + 400, 9),
+                    256..=279 => (symbol - 256, 7),
+                    _ => (symbol - 280 + 192, 8),
+                };
+                for bit in (0..count).rev() {
+                    expected.push(code & (1 << bit) != 0);
+                }
+                encoder.symbol(symbol);
+            }
+            encoder.align();
+            let bytes: Vec<u8> = expected
+                .chunks(8)
+                .map(|bits| {
+                    bits.iter()
+                        .enumerate()
+                        .fold(0, |byte, (i, &bit)| byte | (u8::from(bit) << i))
+                })
+                .collect();
+            assert_eq!(encoder.output, bytes);
+            assert_eq!(encoder.count, 0);
+        }
+    }
+
+    #[test]
     fn fixed_symbols_match_rfc_codes_at_every_pending_offset() {
         let mut encoder = Encoder::new(16).unwrap();
         for symbol in 0..=285u32 {
@@ -236,8 +310,9 @@ mod tests {
                 let bits = ((1u32 << pending) - 1) | (reversed << pending);
                 let total = count + pending;
                 let bytes = (total / 8) as usize;
+                encoder.flush_bytes();
                 assert_eq!(encoder.output, bits.to_le_bytes()[..bytes]);
-                assert_eq!(encoder.bits, bits >> (bytes * 8));
+                assert_eq!(encoder.bits, u64::from(bits >> (bytes * 8)));
                 assert_eq!(encoder.count, total % 8);
             }
         }
@@ -306,6 +381,8 @@ mod tests {
                             (distance - DISTANCE_BASE[index]) as u32,
                             DISTANCE_EXTRA[index],
                         );
+                        actual.flush_bytes();
+                        expected.flush_bytes();
                         assert_eq!(
                             (&actual.output, actual.bits, actual.count),
                             (&expected.output, expected.bits, expected.count),
