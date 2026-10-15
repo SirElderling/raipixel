@@ -227,3 +227,34 @@ RFC 1950 recurrence credit above. No new paper implementation or CPU-specific,
 unsafe or assembly code is adopted. Historical rejected screens remain
 reproducible at an explicit source revision; native CI now measures the selected
 codec and the locked reference through complete public operations.
+
+
+## Wider CRC slicing for stored PNG payloads
+
+The actual decoder-stage profile identifies CRC32 validation as the main cost
+on the generated noise input (about 145 of 200 microseconds locally). We extend
+our polynomial-generated slicing tables from eight to 32 byte positions, with
+an eight-byte remainder loop and scalar tail. The published slicing technique
+is credited to Abhijeet Joglekar, Michael E. Kounavis and Frank L. Berry,
+*A Scalable and High Performance Software iSCSI Implementation*, USENIX FAST
+2005, sections 3.2–3.3, linked above. The 32-byte grouping is our independent
+extension; no source from the paper, `png`, or its dependencies is copied.
+
+Let `T[k][v]` be the CRC contribution of byte `v` followed by `k` zero bytes,
+using PNG's reflected polynomial `0xedb88320`. For a 32-byte group, XOR the
+incoming remainder into its first four bytes in little-endian order. The new
+remainder is the XOR of `T[31-i][byte[i]]` for `i=0..31`. These are the same
+polynomial contributions as four successive eight-byte groups; initialization,
+final complement, byte order and fragmented-part handling stay unchanged.
+The static table grows from 8 to 32 KiB, with no heap or work-budget change.
+The paper's CRC32c polynomial is not used for PNG.
+
+Before modifying production code, we added a regression against the independent
+bitwise polynomial recurrence, covering every length through 129, larger block
+boundaries, empty parts and splits through 65. It passes on both the existing
+correct implementation and the candidate. `tools/png_crc_trial.py` freezes the
+original source at `09c7359` and screens 8/16/32-byte versions with nine rotating
+calibrated batches. `tools/png_decode_stages.py` instruments only a temporary
+copy, checks its pixels against the plain build, and records plain/instrumented
+timings. Its nested CRC and Adler timers must not be added to their parent
+stages. Native CI measures the complete codec as well as these probes.

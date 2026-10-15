@@ -1,10 +1,10 @@
-// Slicing-by-eight technique: Joglekar, Kounavis & Berry, FAST 2005.
+// Slicing technique: Joglekar, Kounavis & Berry, FAST 2005.
 // Independent implementation; attribution/context: benchmarks/png/algorithm-notes.md.
 // Independently implemented from PNG/RFC 1950 polynomial/checksum definitions.
 // Each additional CRC table represents one more trailing zero byte. Combining
-// eight independent byte contributions removes the serial per-byte recurrence.
-const fn crc_tables() -> [[u32; 256]; 8] {
-    let mut tables = [[0; 256]; 8];
+// independent byte contributions reduces the serial per-byte recurrence.
+const fn crc_tables() -> [[u32; 256]; 32] {
+    let mut tables = [[0; 256]; 32];
     let mut i = 0;
     while i < 256 {
         let mut value = i as u32;
@@ -17,7 +17,7 @@ const fn crc_tables() -> [[u32; 256]; 8] {
         i += 1;
     }
     let mut level = 1;
-    while level < 8 {
+    while level < 32 {
         let mut i = 0;
         while i < 256 {
             let prior = tables[level - 1][i];
@@ -28,12 +28,50 @@ const fn crc_tables() -> [[u32; 256]; 8] {
     }
     tables
 }
-static CRC: [[u32; 256]; 8] = crc_tables();
+static CRC: [[u32; 256]; 32] = crc_tables();
 
 pub(crate) fn crc32(parts: &[&[u8]]) -> u32 {
     let mut crc = u32::MAX;
     for part in parts {
-        let (bulk, tail) = part.as_chunks::<8>();
+        // Wider groups shorten the dependent checksum chain. Keep eight-byte
+        // groups for the remainder so short PNG chunks retain their fast path.
+        let (wide, tail) = part.as_chunks::<32>();
+        for bytes in wide {
+            let head = u32::from_le_bytes(bytes[..4].try_into().unwrap()) ^ crc;
+            crc = CRC[31][(head & 255) as usize]
+                ^ CRC[30][((head >> 8) & 255) as usize]
+                ^ CRC[29][((head >> 16) & 255) as usize]
+                ^ CRC[28][((head >> 24) & 255) as usize]
+                ^ CRC[27][bytes[4] as usize]
+                ^ CRC[26][bytes[5] as usize]
+                ^ CRC[25][bytes[6] as usize]
+                ^ CRC[24][bytes[7] as usize]
+                ^ CRC[23][bytes[8] as usize]
+                ^ CRC[22][bytes[9] as usize]
+                ^ CRC[21][bytes[10] as usize]
+                ^ CRC[20][bytes[11] as usize]
+                ^ CRC[19][bytes[12] as usize]
+                ^ CRC[18][bytes[13] as usize]
+                ^ CRC[17][bytes[14] as usize]
+                ^ CRC[16][bytes[15] as usize]
+                ^ CRC[15][bytes[16] as usize]
+                ^ CRC[14][bytes[17] as usize]
+                ^ CRC[13][bytes[18] as usize]
+                ^ CRC[12][bytes[19] as usize]
+                ^ CRC[11][bytes[20] as usize]
+                ^ CRC[10][bytes[21] as usize]
+                ^ CRC[9][bytes[22] as usize]
+                ^ CRC[8][bytes[23] as usize]
+                ^ CRC[7][bytes[24] as usize]
+                ^ CRC[6][bytes[25] as usize]
+                ^ CRC[5][bytes[26] as usize]
+                ^ CRC[4][bytes[27] as usize]
+                ^ CRC[3][bytes[28] as usize]
+                ^ CRC[2][bytes[29] as usize]
+                ^ CRC[1][bytes[30] as usize]
+                ^ CRC[0][bytes[31] as usize];
+        }
+        let (bulk, tail) = tail.as_chunks::<8>();
         for bytes in bulk {
             let value = u64::from_le_bytes(*bytes) ^ u64::from(crc);
             crc = CRC[7][(value & 255) as usize]

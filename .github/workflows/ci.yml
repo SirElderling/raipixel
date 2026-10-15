@@ -48,7 +48,7 @@ jobs:
       - name: Paired full-codec timings and exact output comparison (informational)
         env:
           RUSTUP_TOOLCHAIN: stable
-        run: python tools/png_timings.py --baseline 27243e606e9c5c3ef6fddc0c645255570be75be7 --output png-timings.json
+        run: python tools/png_timings.py --baseline ad47242649c004b0d22273aa2c87b543ef1d80e8 --output png-timings.json
       - name: Codec stage probes (informational)
         run: |
           cargo +stable run --release --locked --offline --example png_bench -- --export png-stage-inputs
