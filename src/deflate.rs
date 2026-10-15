@@ -431,8 +431,8 @@ mod tests {
                     let (before, old_pos, old_count, old_buffer) =
                         (bits.work.remaining(), bits.pos, bits.count, bits.buffer);
                     bits.fill(count).unwrap();
-                    let consumed = ((count.saturating_sub(old_count)).div_ceil(8) as usize)
-                        .min(end - old_pos);
+                    let consumed =
+                        ((count.saturating_sub(old_count)).div_ceil(8) as usize).min(end - old_pos);
                     let mut expected = old_buffer;
                     for (index, byte) in data[old_pos..old_pos + consumed].iter().enumerate() {
                         expected |= u64::from(*byte) << (old_count + index as u32 * 8);
