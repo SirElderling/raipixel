@@ -4,7 +4,7 @@ Status: proposed, reconciled after independent review, 2026-10-14. The selected 
 
 | ADR / problem | Alternatives considered | Selected solution and rationale | Trade-offs / consequences |
 |---|---|---|---|
-|001 Product identity | PixForge brief name; raipixel repository/app | **raipixel** package/executable/product; note original brief once | Avoid naming drift; cheap before implementation |
+|001 Product identity | Multiple potential identifiers across repository and tooling | **raipixel** is the sole package/executable/product name | Avoid naming drift; cheap before implementation |
 |002 Runtime/dependencies | Crates; external ImageMagick/editor; custom safe std-only | Stable Rust/std only, forbid unsafe; no runtime subprocess/network | Handwritten codecs materially increase effort; constraints preserved, normal OS/std/compiler libraries allowed |
 |003 Pixel storage **costly** | RGBA; indexed-only; dual backends | RGBA8 straight alpha, canonical alpha-zero; RGB palette contract separate | Four bytes/pixel and no index-preserving identity; one compositor/algorithm suite; indexed PNG exchange still supported |
 |004 Semantic edits | Flattened raster only; scene graph/rig; named layered cels | Asset→layers/frames→cels with integer offsets and anchors | Parts externally labeled/supplied; flat imports not segmented; simpler than hierarchical live rigs |
