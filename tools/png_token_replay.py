@@ -16,6 +16,15 @@ source = (ROOT / 'src/deflate/encode.rs').read_text()
 traced = source.replace('    dictionary: Vec<u32>,','    dictionary: Vec<u32>,\n    trace: Vec<(u16,u16)>,',1)
 traced = traced.replace('            dictionary,','            dictionary,\n            trace: Vec::new(),',1)
 traced = traced.replace('        self.dictionary.fill(u32::MAX);','        self.dictionary.fill(u32::MAX);\n        self.trace.clear();',1)
+# The sampled stored path never creates Huffman tokens. Mark that decision
+# explicitly so replay validates the real stored bytes rather than fabricating
+# an empty fixed-Huffman block.
+if 'self.probably_stored(data)' in source:
+    traced = traced.replace(
+        'if self.probably_stored(data) {',
+        'if self.probably_stored(data) {\\n            self.trace.push((u16::MAX, 0));',
+        1,
+    )
 traced = traced.replace('                self.reference(length, pos - prior);','                self.trace.push((length as u16,(pos-prior)as u16));\n                self.reference(length, pos - prior);',1)
 traced = traced.replace('                self.symbol(u32::from(data[pos]));','                self.trace.push((0,u16::from(data[pos])));\n                self.symbol(u32::from(data[pos]));',1)
 traced = traced.replace('            self.symbol(u32::from(byte));','            self.trace.push((0,u16::from(byte)));\n            self.symbol(u32::from(byte));',1)
@@ -25,6 +34,10 @@ marker = '    /// Block-local dictionary'
 assert traced.count(marker) == 1
 traced = traced.replace(marker, '''    pub(crate) fn take_trace(&mut self) -> Vec<(u16,u16)> { std::mem::take(&mut self.trace) }
     pub(crate) fn replay(&mut self, data:&[u8], last:bool, tokens:&[(u16,u16)]) -> &[u8] {
+        if tokens.len()==1 && tokens[0].0==u16::MAX {
+            self.store(data,last);
+            return &self.output;
+        }
         let saved=(self.bits,self.count);
         self.output.clear();self.put(u32::from(last)|2,3);
         for &(length,value) in tokens {
