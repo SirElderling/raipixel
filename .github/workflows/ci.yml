@@ -49,6 +49,10 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: stable
         run: python tools/png_timings.py --baseline 9122259844497a57149dbe6ba7fa0ef708398c46 --batch-ms 100 --output png-timings.json
+      - name: Paired candidate-versus-accepted PNG timings (informational)
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: python tools/png_timings.py --baseline 7717618f3c56c244283c773425eae1b68c3d1d16 --batch-ms 100 --output png-candidate-timings.json
       - name: Compare original mixed-filter corpus, samples, flags and work (informational)
         env:
           RUSTUP_TOOLCHAIN: stable
