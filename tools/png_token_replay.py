@@ -22,7 +22,7 @@ traced = traced.replace('        self.dictionary.fill(u32::MAX);','        self.
 if 'self.probably_stored(data)' in source:
     traced = traced.replace(
         'if self.probably_stored(data) {',
-        'if self.probably_stored(data) {\\n            self.trace.push((u16::MAX, 0));',
+        'if self.probably_stored(data) {\n            self.trace.push((u16::MAX, 0));',
         1,
     )
 traced = traced.replace('                self.reference(length, pos - prior);','                self.trace.push((length as u16,(pos-prior)as u16));\n                self.reference(length, pos - prior);',1)
