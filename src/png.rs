@@ -364,6 +364,38 @@ fn reconstruct(
     limits: Limits,
     work: &mut Work,
 ) -> Result<Image, Error> {
+    // Noninterlaced RGBA already has the target byte layout after unfiltering.
+    // Remove scanline filter bytes in place and adopt the allocation. Typed pixel
+    // views stay safe through slice::as_chunks, without transmute or unsafe code.
+    if header.color == 6 && !header.interlace {
+        let row_bytes = header.width as usize * 4;
+        let stride = row_bytes + 1;
+        for y in 0..header.height as usize {
+            let offset = y * stride;
+            let (before, tail) = raw.split_at_mut(offset);
+            let filter = tail[0];
+            let row = &mut tail[1..stride];
+            let previous = if y == 0 {
+                None
+            } else {
+                Some(&before[offset - row_bytes..offset])
+            };
+            work.charge((row_bytes + header.width as usize) as u64)?;
+            unfilter(row, previous, 4, filter)?;
+        }
+        for y in 0..header.height as usize {
+            let start = y * stride + 1;
+            raw.copy_within(start..start + row_bytes, y * row_bytes);
+        }
+        raw.truncate(header.width as usize * header.height as usize * 4);
+        return Ok(Image::from_rgba_bytes(
+            header.width,
+            header.height,
+            raw,
+            limits,
+            work,
+        )?);
+    }
     let mut image = Image::new(header.width, header.height, limits, work)?;
     let mut lookup = *palette;
     if header.color == 0 {
@@ -404,7 +436,7 @@ fn reconstruct(
             unfilter(row, previous, bpp, filter)?;
             let y = sy + row_index * dy;
             let start = y * header.width as usize;
-            let destination = &mut image.pixels[start..start + header.width as usize];
+            let destination = &mut image.pixels_mut()[start..start + header.width as usize];
             write_row(
                 row,
                 destination.iter_mut().skip(sx).step_by(dx),

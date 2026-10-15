@@ -40,7 +40,7 @@ impl Rect {
 pub struct Image {
     pub(crate) width: u32,
     pub(crate) height: u32,
-    pub(crate) pixels: Vec<Pixel>,
+    pixels: Vec<u8>,
     pub(crate) limits: Limits,
 }
 
@@ -56,8 +56,8 @@ impl Image {
     pub fn new(width: u32, height: u32, limits: Limits, work: &mut Work) -> Result<Self, Error> {
         let len = limits.image_len(width, height)?;
         work.charge(len as u64)?;
-        let mut pixels = reserve(len)?;
-        pixels.resize(len, [0; 4]);
+        let mut pixels = reserve(len * 4)?;
+        pixels.resize(len * 4, 0);
         Ok(Self {
             width,
             height,
@@ -78,8 +78,8 @@ impl Image {
             return Err(Error::PixelCount);
         }
         work.charge(len as u64)?;
-        let mut pixels = reserve(len)?;
-        pixels.extend_from_slice(samples);
+        let mut pixels = reserve(len * 4)?;
+        pixels.extend_from_slice(samples.as_flattened());
         Ok(Self {
             width,
             height,
@@ -92,18 +92,44 @@ impl Image {
         [self.width, self.height]
     }
     pub fn pixels(&self) -> &[Pixel] {
-        &self.pixels
+        self.pixels.as_chunks::<4>().0
+    }
+
+    pub(crate) fn pixels_mut(&mut self) -> &mut [Pixel] {
+        self.pixels.as_chunks_mut::<4>().0
+    }
+
+    /// Adopt an already validated decoder buffer without a second allocation.
+    /// Byte storage exposes the same safe RGBA pixel slices through as_chunks.
+    pub(crate) fn from_rgba_bytes(
+        width: u32,
+        height: u32,
+        pixels: Vec<u8>,
+        limits: Limits,
+        work: &mut Work,
+    ) -> Result<Self, Error> {
+        let len = limits.image_len(width, height)?;
+        if pixels.len() != len * 4 {
+            return Err(Error::PixelCount);
+        }
+        work.charge(len as u64)?;
+        Ok(Self {
+            width,
+            height,
+            pixels,
+            limits,
+        })
     }
 
     pub fn pixel(&self, x: u32, y: u32) -> Option<Pixel> {
         if x >= self.width || y >= self.height {
             return None;
         }
-        Some(self.pixels[self.index(x, y)])
+        Some(self.pixels()[self.index(x, y)])
     }
 
     pub fn try_copy(&self, work: &mut Work) -> Result<Self, Error> {
-        Self::from_pixels(self.width, self.height, &self.pixels, self.limits, work)
+        Self::from_pixels(self.width, self.height, self.pixels(), self.limits, work)
     }
 
     pub(crate) fn index(&self, x: u32, y: u32) -> usize {
@@ -125,7 +151,7 @@ impl Image {
     }
 }
 
-pub(crate) fn reserve(len: usize) -> Result<Vec<Pixel>, Error> {
+pub(crate) fn reserve<T>(len: usize) -> Result<Vec<T>, Error> {
     let mut pixels = Vec::new();
     pixels
         .try_reserve_exact(len)

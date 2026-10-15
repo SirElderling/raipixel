@@ -232,3 +232,35 @@ fn writer_retains_baseline_bytes_at_row_and_stored_block_boundaries() {
         assert_eq!(actual, expected, "{size}x{size}");
     }
 }
+
+#[test]
+fn decoded_rgba_image_remains_editable_without_changing_other_samples() {
+    let mut image = png::decode(
+        include_bytes!("fixtures/writer-64.png"),
+        Limits::default(),
+        &mut Work::default(),
+    )
+    .unwrap()
+    .image;
+    let before = image.pixels().to_vec();
+    image
+        .fill(
+            raipixel::Rect::new(3, 4, 1, 1).unwrap(),
+            [9, 8, 7, 0],
+            false,
+            &mut Work::default(),
+        )
+        .unwrap();
+    for (index, &pixel) in image.pixels().iter().enumerate() {
+        assert_eq!(
+            pixel,
+            if index == 4 * 64 + 3 {
+                [9, 8, 7, 0]
+            } else {
+                before[index]
+            }
+        );
+    }
+    let copy = image.try_copy(&mut Work::default()).unwrap();
+    assert_eq!(image, copy);
+}

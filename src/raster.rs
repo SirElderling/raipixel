@@ -43,7 +43,7 @@ impl Image {
         for y in y0..y1 {
             let start = self.index(x0, y);
             let end = start + (x1 - x0) as usize;
-            self.pixels[start..end].fill(color);
+            self.pixels_mut()[start..end].fill(color);
         }
         Ok(rect.area() - u64::from(x1 - x0) * u64::from(y1 - y0))
     }
@@ -67,7 +67,7 @@ impl Image {
         work.charge(rect.area())?;
         let origin = [rect.x as u32, rect.y as u32];
         self.apply_stamp(
-            &source.pixels,
+            source.pixels(),
             source.width,
             origin,
             target,
@@ -102,7 +102,7 @@ impl Image {
         let mut snapshot = reserve(rect.area() as usize)?;
         for y in rect.y as u32..rect.y as u32 + rect.height {
             let start = self.index(rect.x as u32, y);
-            snapshot.extend_from_slice(&self.pixels[start..start + rect.width as usize]);
+            snapshot.extend_from_slice(&self.pixels()[start..start + rect.width as usize]);
         }
         self.apply_stamp(
             &snapshot,
@@ -134,7 +134,8 @@ impl Image {
                 let sy = i64::from(origin[1]) + i64::from(y) - i64::from(target.y);
                 let src = samples[sy as usize * stride as usize + sx as usize];
                 let index = self.index(x, y);
-                self.pixels[index] = blend(src, self.pixels[index], opacity, mode);
+                let pixel = &mut self.pixels_mut()[index];
+                *pixel = blend(src, *pixel, opacity, mode);
             }
         }
     }
