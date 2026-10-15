@@ -62,6 +62,10 @@ impl Limits {
 
     pub(crate) fn check_bytes(self, pixels: u64) -> Result<(), Error> {
         let bytes = pixels.checked_mul(4).ok_or(Error::Limit(Resource::Bytes))?;
+        self.check_buffer(bytes)
+    }
+
+    pub(crate) fn check_buffer(self, bytes: u64) -> Result<(), Error> {
         if bytes > self.bytes {
             return Err(Error::Limit(Resource::Bytes));
         }
