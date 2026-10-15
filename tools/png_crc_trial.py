@@ -17,7 +17,7 @@ source = subprocess.check_output(['git', 'show', BASELINE + ':src/checksum.rs'],
 with tempfile.TemporaryDirectory(prefix='raipixel-crc-trial-') as temporary:
     folder = Path(temporary)
     modules = []
-    for width in [8, 16, 32]:
+    for width in [8, 16, 32, 64]:
         candidate = source
         if width != 8:
             candidate = candidate.replace('[[u32; 256]; 8]', f'[[u32; 256]; {width}]').replace('[[0; 256]; 8]', f'[[0; 256]; {width}]').replace('while level < 8', f'while level < {width}')
@@ -38,7 +38,7 @@ fn scalar(parts:&[&[u8]])->u32{
  for part in parts{for &b in *part{crc^=u32::from(b);for _ in 0..8{crc=(crc>>1)^if crc&1!=0{0xedb88320}else{0};}}} !crc
 }
 fn main(){
- let functions:[fn(&[&[u8]])->u32;3]=[crc8::crc32,crc16::crc32,crc32::crc32];
+ let functions:[fn(&[&[u8]])->u32;4]=[crc8::crc32,crc16::crc32,crc32::crc32,crc64::crc32];
  let mut seed=17u32;
  let data:Vec<u8>=(0..4*1024*1024).map(|_|{seed^=seed<<13;seed^=seed>>17;seed^=seed<<5;seed as u8}).collect();
  // Independent polynomial recurrence and fragmentation around every slicing
@@ -49,9 +49,9 @@ fn main(){
  }
  for len in [64,4096,262144,4*1024*1024]{let input=&data[..len];
   let batch=|mode:usize,count:usize|{let start=Instant::now();for _ in 0..count{black_box(functions[mode](&[black_box(input)]));}start.elapsed()};
-  let mut counts=[1;3];for(mode,count)in counts.iter_mut().enumerate(){while batch(mode,*count)<Duration::from_millis(25){*count*=2;}}
-  let mut samples=[Vec::new(),Vec::new(),Vec::new()];
-  for round in 0..9{for n in 0..3{let mode=(round+n)%3;samples[mode].push(batch(mode,counts[mode]).as_secs_f64()*1e6/counts[mode]as f64);}}
+  let mut counts=[1;4];for(mode,count)in counts.iter_mut().enumerate(){while batch(mode,*count)<Duration::from_millis(25){*count*=2;}}
+  let mut samples=[Vec::new(),Vec::new(),Vec::new(),Vec::new()];
+  for round in 0..9{for n in 0..4{let mode=(round+n)%4;samples[mode].push(batch(mode,counts[mode]).as_secs_f64()*1e6/counts[mode]as f64);}}
   println!("{{\"bytes\":{},\"iterations\":{:?},\"samples_us\":{:?}}}",len,counts,samples);
  }
 }
@@ -60,7 +60,7 @@ fn main(){
     exe = folder / ('trial.exe' if sys.platform == 'win32' else 'trial')
     subprocess.run(['rustc', '--edition=2024', '-O', str(folder / 'main.rs'), '-o', str(exe)], check=True)
     rows = subprocess.check_output([str(exe)], text=True).splitlines()
-    print(json.dumps(dict(experiment='safe_crc_slicing_widths', widths=[8,16,32], source_revision=BASELINE,
+    print(json.dumps(dict(experiment='safe_crc_slicing_widths', widths=[8,16,32,64], source_revision=BASELINE,
         compiler=subprocess.check_output(['rustc','--version','--verbose'],text=True), platform=platform.platform(),
         rustflags=os.environ.get('RUSTFLAGS',''), checksum_sha256=hashlib.sha256(source.encode()).hexdigest(),
         driver_sha256=hashlib.sha256(driver.encode()).hexdigest(), cases=list(map(json.loads,rows)))))
