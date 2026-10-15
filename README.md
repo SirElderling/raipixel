@@ -22,6 +22,8 @@ Interoperability between open formats is central: use published specifications, 
 
 ## Status
 
-**Design stage; no application is implemented.** The first static slice must complete both creation and PNG import/edit/save/reopen/export. The first useful toolkit must also demonstrate animation and component reuse. Artistic quality is evaluated separately from technical correctness; missing poses, anatomy, or unseen directions require sufficient authored instructions or source artwork.
+**Initial library implementation.** Bounded RGBA images, rectangular fills, exact copies (including overlapping copies), and integer source-over compositing are implemented with std-only tests. There is no CLI, JSON interface, PNG codec, project persistence, or animation yet. See [implementation status and development commands](docs/implementation.md).
+
+The Foundation milestone remains incomplete: it must complete both creation and PNG import/edit/save/reopen/export. The first useful toolkit must also demonstrate animation and component reuse. Artistic quality is evaluated separately from technical correctness; missing poses, anatomy, or unseen directions require sufficient authored instructions or source artwork.
 
 Start with the [design guide](docs/design/README.md), [scope and priorities](docs/design/02-vision-scope.md), [agent interface](docs/design/06-agent-interface.md), and [capability roadmap](docs/design/07-implementation-plan.md).

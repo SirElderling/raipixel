@@ -1,0 +1,55 @@
+name: Rust CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'feat/**']
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Stable / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Linux
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: macOS
+            runner: macos-15
+            target: aarch64-apple-darwin
+          - os: Windows
+            runner: windows-2022
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install stable Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy --target ${{ matrix.target }}
+      - name: Toolchain details
+        run: rustc +stable --version --verbose
+      - name: Format
+        run: cargo +stable fmt --all -- --check
+      - name: Test natively
+        run: cargo +stable test --locked --offline --target ${{ matrix.target }}
+      - name: Clippy
+        run: cargo +stable clippy --locked --offline --all-targets --target ${{ matrix.target }} -- -D warnings
+
+  msrv:
+    name: Rust 1.85 / Linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install minimum supported Rust
+        run: rustup toolchain install 1.85.0 --profile minimal
+      - name: Test minimum supported Rust
+        run: cargo +1.85.0 test --locked --offline

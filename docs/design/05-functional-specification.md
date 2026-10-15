@@ -1,6 +1,6 @@
 # 5. Functional specification and prioritization
 
-Normative behavior for proposed capabilities. Nothing is implemented. Foundation and Core are the first useful toolkit; Advanced/Deferred/Excluded are not release requirements. IDs F01–F25 retain traceability, with subfeatures separated where their value/cost differs. [Interface](06-agent-interface.md) owns field names; [architecture](04-architecture.md) owns codecs/rendering/storage.
+Normative behavior for proposed capabilities; see [implementation status](../implementation.md) for delivered functions. Foundation and Core are the first useful toolkit; Advanced/Deferred/Excluded are not release requirements. IDs F01–F25 retain traceability, with subfeatures separated where their value/cost differs. [Interface](06-agent-interface.md) owns field names; [architecture](04-architecture.md) owns codecs/rendering/storage.
 
 ## Requirement-by-requirement disposition
 
