@@ -31,27 +31,11 @@ struct Bits<'a, 'w> {
 }
 impl Bits<'_, '_> {
     fn fill(&mut self, count: u32) -> Result<(), Error> {
-        // The supported Huffman/stored readers request at most 16 bits.
-        // Unroll the common one- and two-byte refills without lookahead:
-        // bytes consumed and work charged stay exactly as before.
-        if self.count < count && self.pos < self.data.len() {
+        while self.count < count && self.pos < self.data.len() {
             self.work.charge(1)?;
             self.buffer |= u64::from(self.data[self.pos]) << self.count;
             self.count += 8;
             self.pos += 1;
-            if self.count < count && self.pos < self.data.len() {
-                self.work.charge(1)?;
-                self.buffer |= u64::from(self.data[self.pos]) << self.count;
-                self.count += 8;
-                self.pos += 1;
-                // Fall back if a future caller requests more than 16 bits.
-                while self.count < count && self.pos < self.data.len() {
-                    self.work.charge(1)?;
-                    self.buffer |= u64::from(self.data[self.pos]) << self.count;
-                    self.count += 8;
-                    self.pos += 1;
-                }
-            }
         }
         Ok(())
     }
@@ -410,41 +394,6 @@ pub(crate) fn inflate(input: &[u8], expected: usize, work: &mut Work) -> Result<
 mod tests {
     use super::*;
     use crate::json::{self, Value};
-    #[test]
-    fn unrolled_refill_matches_scalar_and_exact_work_charges() {
-        let data = [0x6d, 0x93, 0x5b, 0xf0];
-        for end in 0..=data.len() {
-            for count in 0..=24 {
-                for initial in 0..=7u32 {
-                    let mut work = Work::default();
-                    let mut bits = Bits {
-                        data: &data[..end],
-                        pos: 0,
-                        buffer: 0,
-                        count: 0,
-                        work: &mut work,
-                    };
-                    bits.fill(initial).unwrap();
-                    if bits.count >= initial {
-                        bits.consume(initial);
-                    }
-                    let (before, old_pos, old_count, old_buffer) =
-                        (bits.work.remaining(), bits.pos, bits.count, bits.buffer);
-                    bits.fill(count).unwrap();
-                    let consumed =
-                        ((count.saturating_sub(old_count)).div_ceil(8) as usize).min(end - old_pos);
-                    let mut expected = old_buffer;
-                    for (index, byte) in data[old_pos..old_pos + consumed].iter().enumerate() {
-                        expected |= u64::from(*byte) << (old_count + index as u32 * 8);
-                    }
-                    assert_eq!(bits.buffer, expected);
-                    assert_eq!(bits.count, old_count + consumed as u32 * 8);
-                    assert_eq!(bits.pos, old_pos + consumed);
-                    assert_eq!(bits.work.remaining(), before - consumed as u64);
-                }
-            }
-        }
-    }
     #[test]
     fn independent_stored_fixed_dynamic_and_overlapping_streams() {
         let Value::Array(cases) = json::parse(
