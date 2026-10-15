@@ -111,3 +111,13 @@ exploratory multiplication-based packed sum were measured before selecting the
 128-byte grouping; the latter was simpler but materially slower in the probe.
 The existing reviewed-only Huffman/vector papers remain reviewed-only; this
 checksum regrouping is derived from the checksum recurrence above.
+
+## Distance-one overlap
+
+`deflate::inflate` uses a direct byte fill for a distance-one history reference.
+This is the overlap behavior specified by L. Peter Deutsch in RFC 1951 section
+3.2.3, linked above: every referenced byte becomes the preceding byte. It does
+not adopt another paper's parsing/matching algorithm. The fill follows the same
+history/window, exact output-length, allocation-capacity and work-budget checks
+as the general copy path. The length-258 fixture spells out the fixed codes
+independently and is checked by standard zlib before the Rust optimization.

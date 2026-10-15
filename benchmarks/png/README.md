@@ -221,3 +221,34 @@ On the local host this gives 1.592/0.528 ms for old/new Adler32, approximately
 3.0×. The native CI jobs compile/run this std-only probe too, recording the
 before/after medians for Linux, macOS and Windows. Timing has no pass/fail
 threshold; checksum equality and the normal correctness checks do.
+
+
+## Native checksum results and distance-one decode
+
+`native-checksum.json` records the paired probe from
+[the three successful native CI jobs](https://github.com/SirElderling/raipixel/actions/runs/38701481286).
+These are before/after comparisons within each runner, not a ranking of CPUs.
+
+| Native runner / target | Previous Adler32, 4 MiB | Packed Adler32, 4 MiB | Observed ratio |
+|---|---:|---:|---:|
+| Linux x86_64 GNU | 1.640 ms | 0.498 ms | 3.3× |
+| macOS ARM64 | 3.070 ms | 0.423 ms | 7.3× |
+| Windows x86_64 MSVC | 1.497 ms | 0.457 ms | 3.3× |
+
+The next simple inflater change turns an overlapping distance-one reference
+into a byte fill. The existing output/history/window/work checks run first;
+other distances retain the general overlap loop. A maximum-length reference
+repeating the most recent of two distinct literal bytes is independently
+constructed, read by zlib, and added to the checked-in fixtures before the code
+change. The corpus now has eight valid zlib streams; the test count remains 57.
+
+`run-fill.json` repeats the complete comparison. Sheet decode falls from
+2.16 to 1.68 ms, versus reference 0.89 ms. That is about twice as fast as the
+3.31 ms starting point before these two changes, while still about 1.9× slower
+than reference decoding for that sheet. The texture measures 1.09/2.04 ms for
+our/reference decode; this content-specific result does not imply general
+superiority. Unchanged encoding measures 2.41 ms for compressed sheets in this
+repeat, versus 2.21 ms in the preceding run and 3.35 ms before the checksum
+change; shared-host timing varies. Both writer modes keep every recorded byte
+hash and all independent sample checks pass. No new allocation or format
+capability was introduced by either optimization.

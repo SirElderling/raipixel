@@ -75,7 +75,7 @@ under the [mandatory attribution rule](design/01-research.md#research-attributio
 57 Rust tests run offline with no external executable or test library:
 22 raster tests, 19 JSON tests, ten PNG integration tests, two DEFLATE unit tests and four checksum unit
 tests. The PNG/DEFLATE cases include 31 accepted PNG files, 40 rejected-profile
-files and seven independent zlib streams. Cases cover the required profile
+files and eight independent zlib streams. Cases cover the required profile
 matrix and the malformed-input rules listed in the design, rather than
 speculative product capabilities.
 
@@ -147,3 +147,11 @@ The checksum microbenchmark fell from 1.75 to 0.55 ms per 4 MiB. Both writer
 modes retain their previous exact SHA256 on all seven benchmark images. See the
 comparison record for samples, methodology and remaining gaps, and the algorithm
 notes for the recurrence derivation and creator acknowledgments.
+
+A distance-one DEFLATE reference now fills the repeated byte directly after the
+existing history, window, length, output-capacity and work checks. This reduces
+1024 sheet decode to 1.68 ms in `run-fill.json`, versus 2.16 ms after the
+checksum pass and 3.31 ms before it; the reference in that run measures 0.89 ms.
+An exact independently constructed maximum-length distance-one stream is
+checked by Python zlib and the Rust fixture test before the optimization.
+Other distances retain the general overlap-copy path.

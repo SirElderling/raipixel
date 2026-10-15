@@ -344,12 +344,19 @@ pub(crate) fn inflate(input: &[u8], expected: usize, work: &mut Work) -> Result<
                                 return Err(Error::Data);
                             }
                             bits.work.charge(len as u64)?;
-                            let start = out.len() - distance;
-                            let mut remaining = len;
-                            while remaining > 0 {
-                                let count = (out.len() - start).min(remaining);
-                                out.extend_from_within(start..start + count);
-                                remaining -= count;
+                            if distance == 1 {
+                                // An overlapping distance-one reference is a run
+                                // of the preceding byte. Length, history, work and
+                                // output capacity have already been checked.
+                                out.resize(out.len() + len, out[out.len() - 1]);
+                            } else {
+                                let start = out.len() - distance;
+                                let mut remaining = len;
+                                while remaining > 0 {
+                                    let count = (out.len() - start).min(remaining);
+                                    out.extend_from_within(start..start + count);
+                                    remaining -= count;
+                                }
                             }
                         }
                         _ => return Err(Error::Data),
