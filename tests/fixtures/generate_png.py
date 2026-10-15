@@ -194,6 +194,14 @@ def wrapped(bits,payload,cmf=0x78):
 
 
 fixed_lengths=[8]*144+[9]*112+[7]*24+[8]*8
+# Exact distance-one overlap: length 258 repeats the most recent byte (B).
+b=Bits();b.put(1,1);b.put(1,2)
+b.symbol(65,fixed_lengths);b.symbol(66,fixed_lengths)
+b.symbol(285,fixed_lengths);b.symbol(0,[5]*32);b.symbol(256,fixed_lengths)
+payload=b'A'+b'B'*259
+stream=wrapped(b,payload)
+assert zlib.decompress(stream)==payload
+deflate.append({'name':'distance-one-maximum-match','zlib':stream.hex(),'data':payload.hex()})
 # Each invalid stream is wrapped with valid PNG framing and CRC so the error
 # must be detected by the inflater, not the outer container.
 def bad_stream(name,stream,header=base):
