@@ -74,3 +74,7 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: stable
         run: python tools/png_bottleneck_compare.py --baseline 126a5568c32ef0e25d4281fed4580d0b6592da3a png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
+      - name: Screen next parity candidates (informational)
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: python tools/png_parity_screen.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
