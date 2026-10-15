@@ -22,11 +22,82 @@ pub enum Value {
 pub struct Number(String);
 
 impl Number {
+    /// Convert exactly, accepting integral decimal/exponent forms without rounding.
     pub fn as_i64(&self) -> Option<i64> {
-        None
+        let magnitude = i128::from(self.magnitude()?);
+        let signed = if self.0.starts_with('-') {
+            -magnitude
+        } else {
+            magnitude
+        };
+        i64::try_from(signed).ok()
     }
+
     pub fn as_u64(&self) -> Option<u64> {
-        None
+        let magnitude = self.magnitude()?;
+        if self.0.starts_with('-') && magnitude != 0 {
+            None
+        } else {
+            Some(magnitude)
+        }
+    }
+
+    fn magnitude(&self) -> Option<u64> {
+        let unsigned = self.0.strip_prefix('-').unwrap_or(&self.0);
+        let (mantissa, exponent) = unsigned.split_once(['e', 'E']).unwrap_or((unsigned, "0"));
+        let digits = mantissa
+            .bytes()
+            .filter(|b| b.is_ascii_digit())
+            .skip_while(|b| *b == b'0');
+        let significant = digits.clone().count();
+        if significant == 0 {
+            return Some(0);
+        }
+        let fraction = mantissa
+            .split_once('.')
+            .map_or(0, |(_, fraction)| fraction.len());
+        // Saturation is sufficient: a nonzero bounded token cannot cancel an
+        // exponent larger than i64. No exponent-sized allocation or traversal.
+        let exponent_negative = exponent.starts_with('-');
+        let exponent_digits = exponent.trim_start_matches(['+', '-']);
+        let mut scale = 0i64;
+        for digit in exponent_digits.bytes() {
+            scale = scale
+                .saturating_mul(10)
+                .saturating_add(i64::from(digit - b'0'));
+        }
+        if exponent_negative {
+            scale = -scale;
+        }
+        scale = scale.saturating_sub(fraction as i64);
+        let mut keep = significant;
+        if scale < 0 {
+            let trailing = mantissa
+                .bytes()
+                .rev()
+                .filter(|b| b.is_ascii_digit())
+                .take_while(|b| *b == b'0')
+                .count();
+            let remove = scale.unsigned_abs();
+            if remove > trailing as u64 {
+                return None;
+            }
+            keep -= remove as usize;
+            scale = 0;
+        }
+        if keep as u64 + scale as u64 > 20 {
+            return None;
+        }
+        let mut value = 0u64;
+        for digit in digits.take(keep) {
+            value = value
+                .checked_mul(10)?
+                .checked_add(u64::from(digit - b'0'))?;
+        }
+        for _ in 0..scale {
+            value = value.checked_mul(10)?;
+        }
+        Some(value)
     }
     pub fn as_str(&self) -> &str {
         &self.0
@@ -382,9 +453,9 @@ impl Parser<'_, '_> {
         let mut value = 0;
         for _ in 0..4 {
             let digit = match self.byte() {
-                Some(b'0'..=b'9') => u32::from(self.byte().unwrap() - b'0'),
-                Some(b'a'..=b'f') => u32::from(self.byte().unwrap() - b'a' + 10),
-                Some(b'A'..=b'F') => u32::from(self.byte().unwrap() - b'A' + 10),
+                Some(byte @ b'0'..=b'9') => u32::from(byte - b'0'),
+                Some(byte @ b'a'..=b'f') => u32::from(byte - b'a' + 10),
+                Some(byte @ b'A'..=b'F') => u32::from(byte - b'A' + 10),
                 _ => return Err(self.syntax("Expected four hexadecimal digits")),
             };
             value = value * 16 + digit;
@@ -404,7 +475,118 @@ fn append(out: &mut String, text: &str, limit: usize, offset: usize) -> Result<(
     Ok(())
 }
 
-/// Emit deterministic UTF-8 JSON. Implementation follows the new tests.
-pub fn emit(_value: &Value, _limits: Limits, _work: &mut Work) -> Result<Vec<u8>, Error> {
-    Err(error(0, ErrorKind::Limit))
+/// Emit compact UTF-8 JSON with sorted object keys and a terminal newline.
+/// Number spellings are retained; this is not a native manifest/schema writer.
+/// Charges one unit per visited value plus actual output bytes. Errors discard
+/// the private output buffer, but may consume already charged work.
+pub fn emit(value: &Value, limits: Limits, work: &mut Work) -> Result<Vec<u8>, Error> {
+    limits.validate()?;
+    let mut writer = Writer {
+        out: Vec::new(),
+        values: 0,
+        limits,
+        work,
+    };
+    writer.value(value, 0)?;
+    writer.push(b"\n")?;
+    Ok(writer.out)
+}
+
+struct Writer<'w> {
+    out: Vec<u8>,
+    values: usize,
+    limits: Limits,
+    work: &'w mut Work,
+}
+
+impl Writer<'_> {
+    // Emission errors identify the byte position reached in the private buffer.
+    fn limit(&self) -> Error {
+        error(self.out.len(), ErrorKind::Limit)
+    }
+
+    fn push(&mut self, bytes: &[u8]) -> Result<(), Error> {
+        if bytes.len() > self.limits.bytes.saturating_sub(self.out.len()) {
+            return Err(self.limit());
+        }
+        self.work
+            .charge(bytes.len() as u64)
+            .map_err(|_| self.limit())?;
+        self.out
+            .try_reserve(bytes.len())
+            .map_err(|_| error(self.out.len(), ErrorKind::Allocation))?;
+        self.out.extend_from_slice(bytes);
+        Ok(())
+    }
+
+    fn value(&mut self, value: &Value, depth: usize) -> Result<(), Error> {
+        if self.values == self.limits.values {
+            return Err(self.limit());
+        }
+        self.work.charge(1).map_err(|_| self.limit())?;
+        self.values += 1;
+        match value {
+            Value::Null => self.push(b"null"),
+            Value::Bool(true) => self.push(b"true"),
+            Value::Bool(false) => self.push(b"false"),
+            Value::Number(number) => {
+                if number.0.len() > self.limits.token_bytes {
+                    return Err(self.limit());
+                }
+                self.push(number.0.as_bytes())
+            }
+            Value::String(text) => self.string(text),
+            Value::Array(_) | Value::Object(_) if depth >= self.limits.depth => Err(self.limit()),
+            Value::Array(values) => {
+                self.push(b"[")?;
+                for (index, value) in values.iter().enumerate() {
+                    if index != 0 {
+                        self.push(b",")?;
+                    }
+                    self.value(value, depth + 1)?;
+                }
+                self.push(b"]")
+            }
+            Value::Object(values) => {
+                self.push(b"{")?;
+                for (index, (key, value)) in values.iter().enumerate() {
+                    if index != 0 {
+                        self.push(b",")?;
+                    }
+                    self.string(key)?;
+                    self.push(b":")?;
+                    self.value(value, depth + 1)?;
+                }
+                self.push(b"}")
+            }
+        }
+    }
+
+    fn string(&mut self, text: &str) -> Result<(), Error> {
+        if text.len() > self.limits.token_bytes {
+            return Err(self.limit());
+        }
+        self.push(b"\"")?;
+        for ch in text.chars() {
+            match ch {
+                '"' => self.push(b"\\\"")?,
+                '\\' => self.push(b"\\\\")?,
+                '\u{8}' => self.push(b"\\b")?,
+                '\u{c}' => self.push(b"\\f")?,
+                '\n' => self.push(b"\\n")?,
+                '\r' => self.push(b"\\r")?,
+                '\t' => self.push(b"\\t")?,
+                '\0'..='\u{1f}' => {
+                    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+                    let code = ch as usize;
+                    self.push(&[b'\\', b'u', b'0', b'0', HEX[code >> 4], HEX[code & 15]])?;
+                }
+                _ => {
+                    let mut bytes = [0; 4];
+                    self.push(ch.encode_utf8(&mut bytes).as_bytes())?;
+                }
+            }
+        }
+        self.push(b"\"")
+    }
 }
