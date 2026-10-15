@@ -9,6 +9,7 @@ import json
 import platform
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from PIL import Image, ImageDraw
@@ -17,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--allow-encoded-changes', action='store_true')
+parser.add_argument('--memory', action='store_true', help='Measure fresh-process peak RSS on Linux')
 args = parser.parse_args()
 baseline = json.loads((ROOT / 'benchmarks/png/baseline.json').read_text())
 expected_hashes = {row['name']: row['sha256']['ours'] for row in baseline['measurements']}
@@ -82,10 +84,28 @@ with tempfile.TemporaryDirectory(prefix='raipixel-png-compare-') as temporary:
             assert result['ours_byte_identical_to_baseline'], name
         measurements.append(result)
         print(json.dumps(result), flush=True)
+    memory = None
+    if args.memory:
+        if platform.system() != 'Linux':
+            raise SystemExit('--memory currently requires Linux (wait4 peak RSS in KiB)')
+        source = work / 'memory-sheet4096.png'
+        sheet = Image.new('RGBA', (4096, 4096))
+        tile = icon.resize((64, 64), Image.Resampling.NEAREST)
+        for y in range(0, 4096, 64):
+            for x in range(0, 4096, 64):
+                sheet.paste(tile, (x, y))
+        sheet.save(source, format='PNG', compress_level=6)
+        # A thin parent prevents the image generator's RSS being inherited by
+        # freshly spawned measurement processes before exec.
+        memory = json.loads(subprocess.check_output([
+            sys.executable, str(ROOT / 'tools/png_memory.py'), str(exe), str(source)
+        ], text=True))
     report = {'rust': subprocess.check_output(['rustc', '--version'], text=True).strip(),
               'host': platform.platform(), 'reference': 'png 0.18.1, locked default features',
               'raipixel_commit': subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip(),
               'working_tree': subprocess.check_output(['git', '-C', str(ROOT), 'status', '--porcelain'], text=True),
               'timing_order': baseline['timing_order'], 'profile': profile, 'measurements': measurements}
+    if memory is not None:
+        report['memory'] = memory
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + '\n')

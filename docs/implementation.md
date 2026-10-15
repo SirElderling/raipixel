@@ -69,8 +69,7 @@ expectations: transparent RGB, row order, selection preservation, copy alignment
 overlap, alpha rounding, bounds and the specified limits. One small exhaustive
 alpha/opacity check covers the byte-valued compositing domain. `tests/json.rs`
 adds 19 tests for the specified JSON syntax, Unicode, limits, exact integer
-ranges, emission and the real proposed command schema. Six PNG tests and two
-DEFLATE unit tests add the independently generated codec corpus. All 49 tests
+ranges, emission and the real proposed command schema. Eight PNG tests, two DEFLATE unit tests and three checksum tests add the independently generated codec corpus. All 54 tests
 need only the Rust toolchain and run offline.
 
 TDD history starts with tests against an empty library: `cargo test --offline`

@@ -1,0 +1,21 @@
+{
+  "raipixel_commit": "0955b39d52f449520a47e536d24111ae50573556",
+  "input": "4096x4096 repeated-icon RGBA sheet",
+  "method": "three fresh Linux processes per decoder; thin Python parent; wait4 ru_maxrss in KiB",
+  "memory-ours": {
+    "peak_rss_kib": [
+      67156,
+      67156,
+      67228
+    ],
+    "median_kib": 67156
+  },
+  "memory-crate": {
+    "peak_rss_kib": [
+      67164,
+      67164,
+      67092
+    ],
+    "median_kib": 67164
+  }
+}

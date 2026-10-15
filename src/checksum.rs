@@ -101,6 +101,22 @@ mod tests {
         }
     }
     #[test]
+    fn adler_bulk_accumulators_handle_full_blocks() {
+        let data = vec![255; 2 * 65_535 + 17];
+        let (mut a, mut b) = (1u32, 0u32);
+        for &byte in &data {
+            a = (a + u32::from(byte)) % 65_521;
+            b = (b + a) % 65_521;
+        }
+        for chunk_size in [15, 16, 17, 65_535, data.len()] {
+            let mut adler = Adler::new();
+            for part in data.chunks(chunk_size) {
+                adler.update(part);
+            }
+            assert_eq!(adler.value(), (b << 16) | a);
+        }
+    }
+    #[test]
     fn adler_matches_standard_vector_and_incremental_updates() {
         let mut adler = Adler::new();
         adler.update(b"123456789");

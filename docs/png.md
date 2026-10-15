@@ -35,7 +35,7 @@ follows section 11.3.1.1.
   reconstruction and output framing. It performs no filesystem/process I/O.
 - Private `deflate` owns buffered bit input, canonical Huffman lookup tables,
   block parsing, history copies and the zlib wrapper. It knows no PNG geometry.
-- Private `checksum` owns a constant CRC32 table and incremental Adler32.
+- Private `checksum` owns a slicing-by-eight CRC32 tables and incremental Adler32.
   Ordinary functions connect the modules; no backend traits or registry exist.
 
 Fixed Huffman lookup tables are constructed at compile time. Dynamic tables
@@ -47,22 +47,23 @@ The input ceiling is 128 MiB. Image dimensions/pixels and each heap buffer are
 checked against the supplied raster limits. Pass geometry determines the exact
 inflate size before allocation; inflate cannot grow beyond it. A single IDAT
 payload stays borrowed; multiple payloads are joined with fallible reservations.
-Joined compressed storage is released before the RGBA allocation. Filters are
-reversed in place in the inflated buffer; no extra full-size unfilter copy exists.
-The decoder still holds the complete inflated raster and RGBA image concurrently.
+Joined compressed storage is released before reconstruction. Filters are
+reversed in place in the inflated buffer. Noninterlaced RGBA8 compacts out
+filter bytes in place and adopts that allocation as the image; other color
+formats and Adam7 still hold inflated samples and a separate RGBA image.
 It is not a streaming-row decoder and has no aggregate project-memory accountant.
 
 The writer uses at most 65,540 scratch bytes and streams IDAT chunks to an
 ordinary `Write` sink. Work is preflighted before output. I/O failure may leave
 partial bytes in that sink; the future publication layer must stage files.
-Stored-only output is valid but deliberately uncompressed. Current performance
-measurements show that the writer also needs throughput optimization; small
-code and bounded scratch are not proof of a fast implementation.
+Stored-only output is valid but deliberately uncompressed. Bulk checksum processing and contiguous row copies preserve the original
+encoded bytes while improving measured throughput. Compression remains a
+separate feature; stored output is much larger than compressed output.
 
 ## Verification
 
-49 Rust tests run offline with no external executable or test library:
-22 raster tests, 19 JSON tests, six PNG integration tests and two DEFLATE unit
+54 Rust tests run offline with no external executable or test library:
+22 raster tests, 19 JSON tests, eight PNG integration tests, two DEFLATE unit tests and three checksum unit
 tests. The PNG/DEFLATE cases include 31 accepted PNG files, 40 rejected-profile
 files and seven independent zlib streams. Cases cover the required profile
 matrix and the malformed-input rules listed in the design, rather than
@@ -108,9 +109,15 @@ Output allocation and checksums are included; disk I/O is excluded.
 | 64×64 icon | 19.96 µs | 84.60 µs | 16,540 |
 | 1024×1024 repeated-icon sheet | 4.82 ms | 21.74 ms | 4,196,508 |
 
-Three fresh-process measurements of a 4096×4096 repeated-icon sheet produced
-median process peak RSS of 132,656 KiB (about 129.5 MiB), including the runtime
-and input. This is an observation, not a portable RSS guarantee. Results vary
-with image content, machine and compiler; correctness CI is not a timing gate.
-The initial writer and full-raster decoder are baselines, not performance parity
-claims. Profile measured hot loops before adding more format features.
+The byte-preserving optimization pass reduced the 1024×1024 sheet writer to
+about 4.0–4.5 ms (roughly 5× faster), and decode to about 3.2–3.5 ms. Byte-backed
+images preserve the public pixel-slice API while letting the RGBA import path
+reuse its inflated buffer. Three fresh-process 4096×4096 sheet decodes reduced
+median peak RSS from 132,656 KiB to 67,156 KiB, matching the reference's roughly
+67,000 KiB. Other input formats still require separate output storage.
+
+See the [comparison record](../benchmarks/png/README.md) for raw baseline,
+intermediate and final measurements, independent output checks, remaining
+feature gaps and experiments that were not adopted. These observations come
+from a shared Linux host and are not portable performance guarantees. Native
+Linux/macOS/Windows CI checks correctness; timing is not a CI gate.
