@@ -1,6 +1,7 @@
 # Next encoder candidate: run-first matching and direct code mapping
 
-Status: isolated prototype, **not adopted in production source**. Baseline is
+Status: run-first/direct-code implementation adopted after adding the paired
+full-codec harness and exhaustive Rust distance-code test. Baseline is
 448be5f00eacbcaae72c912e1866d8671f080b47. Investigated 2026-10-15.
 The patches target only private `deflate::encode::Encoder`; no API, allocation,
 filter policy, dictionary size, work budget or output format changes.
@@ -71,7 +72,7 @@ complete comparison preserves all fourteen stored/compressed PNG SHA256 values,
 independently checks both writers on the 31 profile fixtures and checks the
 multi-block noise output. This is stronger than only a self-round trip.
 
-## Next testing gate
+## Historical testing gate (now exercised by the paired harness)
 
 Recommend the **combined** patch as the next production trial. Before adoption:
 
@@ -105,3 +106,25 @@ to pursue the Balanced-size gap. It adds code-length generation and header
 encoding and changes PNG bytes. It is not the first speed experiment while these
 small, byte-preserving adjustments show a measured gain. Larger suffix indices,
 match-search chains and decoder-table redesign are not justified by this trial.
+
+
+## Full-codec integration
+
+The permanent [timing protocol](../timing.md) now compares complete codec calls
+on all three native CI platforms, including fresh allocations and exact writer
+SHA256 equality. Local [control](../timing-control.json) runs show several-percent
+temporal drift (one unchanged texture decode differs by 13%). The first paired
+[implementation run](../timing-run-first.json) reduces the generated sheet's
+compressed encoding median from 1.942 to 1.427 ms (26.5%) and texture from 2.098
+to 1.945 ms (7.3%). Noise encoding rises 2.301 to 2.479 ms (7.7%); this is an
+observed potential regression requiring subsequent measurement, not a claimed
+improvement. These generated icons/sheet differ from the original comparison
+corpus, so compare only matching cases within each report.
+
+The next small experiment packs the length code with its extra bits and the
+distance code with its extra bits before calling the bit writer. It aims to
+reduce four bit-buffer updates to two without changing tokens, bytes, allocation
+or format. A test first compares emitted bytes **and pending bits** against the
+original four-call sequence for every length, both endpoints of every distance
+range and all eight pending-bit offsets. Native results and independent crate
+comparison remain required before reporting a cross-platform improvement.

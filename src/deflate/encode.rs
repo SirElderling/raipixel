@@ -36,7 +36,13 @@ fn match_length(data: &[u8], prior: usize, pos: usize, maximum: usize) -> usize 
 }
 
 fn distance_code(distance: usize) -> usize {
-    DISTANCE_BASE.partition_point(|&base| base <= distance) - 1
+    let x = distance - 1;
+    if x < 4 {
+        x
+    } else {
+        let n = x.ilog2() as usize;
+        2 * n + ((x >> (n - 1)) & 1)
+    }
 }
 
 impl Encoder {
@@ -84,7 +90,11 @@ impl Encoder {
         self.put(code.reverse_bits() >> (32 - count), count);
     }
     fn reference(&mut self, length: usize, distance: usize) {
-        let index = LENGTH_BASE.partition_point(|&base| base <= length) - 1;
+        let index = if length == 258 {
+            28
+        } else {
+            LENGTH_BASE.partition_point(|&base| base <= length) - 1
+        };
         self.symbol(257 + index as u32);
         self.put((length - LENGTH_BASE[index]) as u32, LENGTH_EXTRA[index]);
         let index = distance_code(distance);
@@ -106,19 +116,26 @@ impl Encoder {
         let mut pos = 0;
         while pos + 3 <= data.len() {
             let slot = hash(data, pos);
-            let mut prior = self.positions[slot] as usize;
+            let stored = self.positions[slot] as usize;
             self.positions[slot] = pos as u32;
             let maximum = (data.len() - pos).min(258);
-            let mut length = match_length(data, prior, pos, maximum);
-            // A second, constant-time candidate favors distance-one runs without
-            // replacing useful dictionary entries or following a search chain.
-            if pos > 0 && data[pos] == data[pos - 1] {
-                let repeated = match_length(data, pos - 1, pos, maximum);
-                if repeated >= 3 && repeated >= length {
-                    prior = pos - 1;
-                    length = repeated;
+            let repeated = if pos > 0 && data[pos] == data[pos - 1] {
+                match_length(data, pos - 1, pos, maximum)
+            } else {
+                0
+            };
+            // The old tie-break already preferred distance one. A maximal run
+            // cannot lose; retain the dictionary update for subsequent tokens.
+            let (prior, length) = if repeated == maximum {
+                (pos - 1, repeated)
+            } else {
+                let matched = match_length(data, stored, pos, maximum);
+                if repeated >= 3 && repeated >= matched {
+                    (pos - 1, repeated)
+                } else {
+                    (stored, matched)
                 }
-            }
+            };
             if length >= 3 {
                 self.reference(length, pos - prior);
                 pos += length;
@@ -154,6 +171,43 @@ impl Encoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn references_preserve_rfc_bits_at_every_length_and_pending_offset() {
+        let mut actual = Encoder::new(32).unwrap();
+        let mut expected = Encoder::new(32).unwrap();
+        for length in 3..=258 {
+            for (index, &base) in DISTANCE_BASE.iter().enumerate() {
+                for distance in [base, base + (1 << DISTANCE_EXTRA[index]) - 1] {
+                    for pending in 0..8 {
+                        actual.output.clear();
+                        expected.output.clear();
+                        actual.bits = 0;
+                        actual.count = 0;
+                        expected.bits = 0;
+                        expected.count = 0;
+                        actual.put(0x55 & ((1 << pending) - 1), pending);
+                        expected.put(0x55 & ((1 << pending) - 1), pending);
+                        actual.reference(length, distance);
+                        let index = LENGTH_BASE.partition_point(|&b| b <= length) - 1;
+                        expected.symbol(257 + index as u32);
+                        expected.put((length - LENGTH_BASE[index]) as u32, LENGTH_EXTRA[index]);
+                        let index = DISTANCE_BASE.partition_point(|&b| b <= distance) - 1;
+                        expected.put((index as u32).reverse_bits() >> 27, 5);
+                        expected.put(
+                            (distance - DISTANCE_BASE[index]) as u32,
+                            DISTANCE_EXTRA[index],
+                        );
+                        assert_eq!(
+                            (&actual.output, actual.bits, actual.count),
+                            (&expected.output, expected.bits, expected.count),
+                            "length {length}, distance {distance}, pending {pending}"
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn distance_codes_match_every_rfc_range() {
