@@ -20,9 +20,9 @@ traced = traced.replace('        let saved = (self.bits, self.count);\n        s
 # The sampled stored path never creates Huffman tokens. Mark that decision
 # explicitly so replay validates the real stored bytes rather than fabricating
 # an empty fixed-Huffman block.
-if 'self.probably_stored(data)' in source:
+if 'Self::probably_stored(data)' in source:
     traced = traced.replace(
-        'if self.probably_stored(data) {',
+        'if data.len() >= 16_384 && Self::probably_stored(data) {',
         'if self.probably_stored(data) {\n            self.trace.push((u16::MAX, 0));',
         1,
     )
