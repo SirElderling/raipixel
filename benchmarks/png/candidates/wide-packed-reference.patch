@@ -1,0 +1,25 @@
+--- a/src/deflate/encode.rs
++++ b/src/deflate/encode.rs
+@@ -142,13 +142,9 @@
+-        if length == 258 {
+-            self.symbol(285);
+-        } else {
+-            let index = usize::from(LENGTH_CODES[length - 3]);
+-            self.symbol(257 + index as u32);
+-            self.put((length - LENGTH_BASE[index]) as u32, LENGTH_EXTRA[index]);
+-        }
+-        let index = distance_code(distance);
+-        self.put((index as u32).reverse_bits() >> 27, 5);
+-        self.put(
+-            (distance - DISTANCE_BASE[index]) as u32,
+-            DISTANCE_EXTRA[index],
+-        );
++        let li = if length == 258 {28} else {usize::from(LENGTH_CODES[length-3])};
++        let packed=FIXED_CODES[257+li];
++        let code_count=u32::from(packed>>9);
++        let count=code_count+LENGTH_EXTRA[li];
++        let value=u32::from(packed&511)|(((length-LENGTH_BASE[li])as u32)<<code_count);
++        let di=distance_code(distance);
++        let value=value|((di as u32).reverse_bits()>>27)<<count
++            |((distance-DISTANCE_BASE[di])as u32)<<(count+5);
++        self.put(value,count+5+DISTANCE_EXTRA[di]);

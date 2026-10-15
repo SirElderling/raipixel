@@ -209,3 +209,21 @@ Their algebra follows our existing independent RFC 1950 grouping; they preserve
 the RFC 1951 match limits. No new paper algorithm, external implementation,
 production SIMD/unsafe/assembly code or codec feature is adopted. The record
 distinguishes generic native CI from CPU-specific code-generation diagnostics.
+
+## Batched output and dictionary prefix caching
+
+The [complete-codec decision record](candidates/wide-buffer-and-prefix.md)
+documents and attributes four-byte bit-buffer flushing, constant-run broadcast
+scanning and cached two-byte prefixes in the existing u32 dictionary slots.
+These are independently derived changes around L. Peter Deutsch's RFC 1951
+(1996), with unchanged token selection and file bytes. Block-local positions
+fit in 16 bits; the other 16 bits cache immutable input bytes. The remaining
+third byte and all history/window limits are checked normally, without assuming
+collision-free hashing. Pending bit counts and block-boundary drains are proved
+in the record and checked against independent bit streams/output hashes.
+
+The rejected smaller-column Adler prototype retains the Adler/Gailly and
+RFC 1950 recurrence credit above. No new paper implementation or CPU-specific,
+unsafe or assembly code is adopted. Historical rejected screens remain
+reproducible at an explicit source revision; native CI now measures the selected
+codec and the locked reference through complete public operations.

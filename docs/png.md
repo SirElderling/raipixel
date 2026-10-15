@@ -72,8 +72,8 @@ under the [mandatory attribution rule](design/01-research.md#research-attributio
 
 ## Verification
 
-62 Rust tests run offline with no external executable or test library:
-22 raster tests, 19 JSON tests, ten PNG integration tests, seven DEFLATE unit tests and four checksum unit
+65 Rust tests run offline with no external executable or test library:
+22 raster tests, 19 JSON tests, ten PNG integration tests, ten DEFLATE unit tests and four checksum unit
 tests. The PNG/DEFLATE cases include 31 accepted PNG files, 40 rejected-profile
 files and eight independent zlib streams. Cases cover the required profile
 matrix and the malformed-input rules listed in the design, rather than
@@ -188,3 +188,13 @@ The original independent comparison now measures compressed sheet encoding
 1.177/0.797 ms for our/reference Fast writers. See the
 [decision record](../benchmarks/png/candidates/matching-and-adler.md) for all
 samples, rejected variants, no-carry proof, attribution and limitations.
+
+The next [complete-codec pass](../benchmarks/png/candidates/wide-buffer-and-prefix.md)
+keeps default release settings after matched comparisons against the reference.
+It batches bit output into four-byte writes, specializes constant-run scanning
+and caches two prefix bytes in the unused half of each dictionary entry. All
+writer bytes, scratch bounds, filters and work policies remain unchanged. Native
+Linux/macOS/Windows measurements show 21-39% less noise encoding time, 11-14%
+less for sheets and 2-4% less for textures. All 65 tests and independent hashes
+pass. The generated-sheet Fast ratios are 1.108/0.917/1.148 respectively; noise
+and several other cases still trail. This does not establish general parity.
