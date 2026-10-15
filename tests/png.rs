@@ -169,6 +169,13 @@ fn limits_are_enforced_before_output_or_large_decode_allocations() {
         "E_LIMIT"
     );
     assert!(output.is_empty());
+    assert_eq!(
+        png::encode_compressed(&image, &mut output, &mut Work::new(0).unwrap())
+            .unwrap_err()
+            .code(),
+        "E_LIMIT"
+    );
+    assert!(output.is_empty());
     let fixture = fixtures();
     let Value::Array(cases) = &fixture["valid"] else {
         panic!("array expected")
@@ -208,6 +215,12 @@ fn writer_propagates_io_failure() {
     let image = Image::new(1, 1, Limits::default(), &mut Work::default()).unwrap();
     assert_eq!(
         png::encode(&image, &mut Fails, &mut Work::default())
+            .unwrap_err()
+            .code(),
+        "E_IO"
+    );
+    assert_eq!(
+        png::encode_compressed(&image, &mut Fails, &mut Work::default())
             .unwrap_err()
             .code(),
         "E_IO"
@@ -263,4 +276,60 @@ fn decoded_rgba_image_remains_editable_without_changing_other_samples() {
     }
     let copy = image.try_copy(&mut Work::default()).unwrap();
     assert_eq!(image, copy);
+}
+
+#[test]
+fn compressed_writer_matches_independent_fixed_huffman_bytes() {
+    let image = Image::from_pixels(
+        1,
+        1,
+        &[[1, 2, 3, 0]],
+        Limits::default(),
+        &mut Work::default(),
+    )
+    .unwrap();
+    let mut output = Vec::new();
+    png::encode_compressed(&image, &mut output, &mut Work::default()).unwrap();
+    assert_eq!(output, hex(text(&fixtures(), "compressed_writer")));
+}
+
+#[test]
+fn compressed_writer_preserves_samples_across_blocks_and_falls_back_for_noise() {
+    for size in [1, 17, 128, 256] {
+        for noise in [false, true] {
+            let mut seed = 17u32;
+            let pixels: Vec<_> = (0..size * size)
+                .map(|i| {
+                    if noise {
+                        std::array::from_fn(|_| {
+                            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                            (seed >> 24) as u8
+                        })
+                    } else {
+                        [(i % 17) as u8, 31, 59, if i % 3 == 0 { 0 } else { 255 }]
+                    }
+                })
+                .collect();
+            let image =
+                Image::from_pixels(size, size, &pixels, Limits::default(), &mut Work::default())
+                    .unwrap();
+            let mut compressed = Vec::new();
+            png::encode_compressed(&image, &mut compressed, &mut Work::default()).unwrap();
+            let mut repeated = Vec::new();
+            png::encode_compressed(&image, &mut repeated, &mut Work::default()).unwrap();
+            assert_eq!(compressed, repeated);
+            assert_eq!(
+                png::decode(&compressed, Limits::default(), &mut Work::default())
+                    .unwrap()
+                    .image,
+                image
+            );
+            let mut stored = Vec::new();
+            png::encode(&image, &mut stored, &mut Work::default()).unwrap();
+            assert!(compressed.len() <= stored.len(), "{size}, noise={noise}");
+            if size == 256 && !noise {
+                assert!(compressed.len() < stored.len() / 10);
+            }
+        }
+    }
 }

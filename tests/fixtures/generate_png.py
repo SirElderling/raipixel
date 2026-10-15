@@ -267,6 +267,10 @@ writer_raw=b'\0\1\2\3\0\4\5\6\xff'
 writer_zlib=b'\x78\x01'
 writer_block=b'\x01'+struct.pack('<HH',len(writer_raw),len(writer_raw)^0xffff)+writer_raw
 writer=(SIGNATURE+ihdr(2,1,8,6)+chunk(b'IDAT',writer_zlib)+chunk(b'IDAT',writer_block)+chunk(b'IDAT',struct.pack('>I',zlib.adler32(writer_raw)))+chunk(b'IEND')).hex()
-for name,value in [('png',{'valid':valid,'invalid':invalid,'writer':writer}),('deflate',deflate)]:
+compressed_raw=b'\1\1\2\3\0'
+compressor=zlib.compressobj(level=1,strategy=zlib.Z_FIXED)
+compressed_stream=compressor.compress(compressed_raw)+compressor.flush()
+compressed_writer=(SIGNATURE+ihdr(1,1,8,6)+chunk(b'IDAT',compressed_stream[:2])+chunk(b'IDAT',compressed_stream[2:-4])+chunk(b'IDAT',compressed_stream[-4:])+chunk(b'IEND')).hex()
+for name,value in [('png',{'valid':valid,'invalid':invalid,'writer':writer,'compressed_writer':compressed_writer}),('deflate',deflate)]:
     (folder/(name+'.json')).write_text(json.dumps(value,separators=(',',':'))+'\n')
 print(f'Wrote {len(valid)} valid PNGs, {len(invalid)} rejected PNGs and {len(deflate)} zlib streams')
