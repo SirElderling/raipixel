@@ -42,7 +42,9 @@ the reference; some are deliberate policy differences such as bytes after IEND.
 At the baseline, raipixel wrote only RGBA8 stored data, had no
 streaming-row decode, and explicitly rejected 16-bit/APNG. Reference 16-bit and
 two-frame APNG read/write were exercised through public APIs. Metadata parsing,
-additional output sample formats and selectable compression are also outside
+additional output sample formats and selectable compression were also baseline
+gaps. The optional compression increment is documented below; 16-bit/APNG,
+streaming rows, metadata parsing and other output sample formats remain outside
 our current implementation. Pixel equality does not establish robustness parity.
 
 `tools/png_compare.rs` records the independent comparison harness. It requires
