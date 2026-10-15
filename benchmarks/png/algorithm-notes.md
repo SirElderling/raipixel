@@ -258,3 +258,8 @@ calibrated batches. `tools/png_decode_stages.py` instruments only a temporary
 copy, checks its pixels against the plain build, and records plain/instrumented
 timings. Its nested CRC and Adler timers must not be added to their parent
 stages. Native CI measures the complete codec as well as these probes.
+
+The initial native 25 ms pass improves noise/stored throughput but shows a
+macOS compressed-sheet regression amid large timing stalls. The follow-up
+raises the complete-codec minimum batch to 100 ms; both runs are retained in
+the decision record, and the initial regression is not discarded.
