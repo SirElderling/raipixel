@@ -7,7 +7,7 @@ only the library functions listed below are available today. The API is unstable
 
 ## Delivered
 
-- One edition-2024 Cargo library, minimum Rust 1.85, with unsafe code forbidden.
+- One edition-2024 Cargo library, minimum Rust 1.99, with unsafe code forbidden.
 - No dependencies, dev-dependencies, build-dependencies, or build script.
 - Positive-size, contiguous row-major straight RGBA8 images. Transparent RGB is preserved.
 - Half-open filled rectangles, copy and source-over stamps, explicit clipping,
@@ -53,7 +53,8 @@ all 22 tests pass; formatting and Clippy then passed. The red commit is retained
 as development evidence, not a passing revision to use on its own.
 
 GitHub CI runs native stable tests, formatting and Clippy on Linux x86_64,
-macOS ARM64 and Windows x86_64 MSVC. A separate Linux test checks Rust 1.85.
+macOS ARM64 and Windows x86_64 MSVC. CI follows the latest stable Rust
+(currently 1.99); older compiler compatibility is not maintained.
 Toolchain installation uses the network; Cargo build/test commands run offline.
 The workflow runs on pull requests and pushes to main/feat branches.
 
