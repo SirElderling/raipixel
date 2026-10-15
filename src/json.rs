@@ -22,6 +22,12 @@ pub enum Value {
 pub struct Number(String);
 
 impl Number {
+    pub fn as_i64(&self) -> Option<i64> {
+        None
+    }
+    pub fn as_u64(&self) -> Option<u64> {
+        None
+    }
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -396,4 +402,9 @@ fn append(out: &mut String, text: &str, limit: usize, offset: usize) -> Result<(
         .map_err(|_| error(offset, ErrorKind::Allocation))?;
     out.push_str(text);
     Ok(())
+}
+
+/// Emit deterministic UTF-8 JSON. Implementation follows the new tests.
+pub fn emit(_value: &Value, _limits: Limits, _work: &mut Work) -> Result<Vec<u8>, Error> {
+    Err(error(0, ErrorKind::Limit))
 }

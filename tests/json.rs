@@ -296,3 +296,157 @@ fn parses_the_real_proposed_command_schema() {
         Value::Object(_)
     ));
 }
+
+#[test]
+fn converts_decimal_and_exponent_numbers_to_exact_integers() {
+    for (text, expected) in [
+        ("0", Some(0)),
+        ("-0", Some(0)),
+        ("1.000", Some(1)),
+        ("10e-1", Some(1)),
+        ("0.1e1", Some(1)),
+        ("12.34e2", Some(1234)),
+        ("-3.0e2", Some(-300)),
+        ("1.2", None),
+        ("1e-1", None),
+        ("1000e-4", None),
+        ("1.00000000000000000001", None),
+    ] {
+        let Value::Number(n) = parse(text) else {
+            panic!("number expected")
+        };
+        assert_eq!(n.as_i64(), expected, "{text}");
+    }
+    let text = format!("1{}e-50", "0".repeat(50));
+    let Value::Number(n) = parse(&text) else {
+        panic!("number expected")
+    };
+    assert_eq!(n.as_i64(), Some(1));
+}
+
+#[test]
+fn integer_conversion_checks_signed_and_unsigned_ranges() {
+    for (text, signed, unsigned) in [
+        ("9223372036854775807", Some(i64::MAX), Some(i64::MAX as u64)),
+        ("-9223372036854775808", Some(i64::MIN), None),
+        ("9223372036854775808", None, Some(1u64 << 63)),
+        ("-9223372036854775809", None, None),
+        ("18446744073709551615", None, Some(u64::MAX)),
+        ("18446744073709551616", None, None),
+        ("1e99999999999999999999999", None, None),
+        ("1e-99999999999999999999999", None, None),
+        ("-0e99999999999999999999999", Some(0), Some(0)),
+    ] {
+        let Value::Number(n) = parse(text) else {
+            panic!("number expected")
+        };
+        assert_eq!(n.as_i64(), signed, "{text}");
+        assert_eq!(n.as_u64(), unsigned, "{text}");
+    }
+}
+
+fn emit(value: &Value) -> Vec<u8> {
+    json::emit(value, Limits::default(), &mut Work::default()).unwrap()
+}
+
+#[test]
+fn emits_sorted_keys_ordered_arrays_and_terminal_newline() {
+    let value = parse(r#"{"z":[],"a":[null,true,false,1.20e+2]}"#);
+    assert_eq!(
+        emit(&value),
+        b"{\"a\":[null,true,false,1.20e+2],\"z\":[]}\n"
+    );
+}
+
+#[test]
+fn emission_escapes_controls_and_preserves_unicode() {
+    let value = Value::String("\"\\\u{8}\u{c}\n\r\t\0\u{1f}/ação🗡".into());
+    assert_eq!(
+        String::from_utf8(emit(&value)).unwrap(),
+        "\"\\\"\\\\\\b\\f\\n\\r\\t\\u0000\\u001F/ação🗡\"\n"
+    );
+    assert_eq!(
+        json::parse(&emit(&value), Limits::default(), &mut Work::default()).unwrap(),
+        value
+    );
+}
+
+#[test]
+fn parse_emit_preserves_the_real_schema_and_numbers() {
+    let schema = parse(include_str!("../docs/design/command-schema.json"));
+    assert_eq!(
+        json::parse(&emit(&schema), Limits::default(), &mut Work::default()).unwrap(),
+        schema
+    );
+    for text in [
+        "-0",
+        "18446744073709551615",
+        "0.123456789012345678901",
+        "1e99999999999999999999999",
+    ] {
+        let value = parse(text);
+        assert_eq!(
+            String::from_utf8(emit(&value)).unwrap(),
+            format!("{text}\n")
+        );
+    }
+}
+
+#[test]
+fn emission_enforces_the_same_limits_for_caller_built_values() {
+    let base = Limits::default();
+    let value = Value::Array(vec![Value::String("abc".into())]);
+    for limits in [
+        Limits { bytes: 3, ..base },
+        Limits { depth: 0, ..base },
+        Limits {
+            token_bytes: 2,
+            ..base
+        },
+        Limits { values: 1, ..base },
+    ] {
+        assert_eq!(
+            json::emit(&value, limits, &mut Work::default())
+                .unwrap_err()
+                .code(),
+            "E_LIMIT"
+        );
+    }
+    assert!(
+        json::emit(
+            &Value::Null,
+            Limits {
+                bytes: 5,
+                depth: 0,
+                values: 1,
+                ..base
+            },
+            &mut Work::default()
+        )
+        .is_ok()
+    );
+    assert!(
+        json::emit(
+            &Value::Null,
+            Limits { bytes: 4, ..base },
+            &mut Work::default()
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn emission_charges_value_visits_and_actual_output_bytes() {
+    let mut work = Work::new(6).unwrap();
+    assert_eq!(
+        json::emit(&Value::Null, Limits::default(), &mut work).unwrap(),
+        b"null\n"
+    );
+    assert_eq!(work.remaining(), 0);
+    assert_eq!(
+        json::emit(&Value::Null, Limits::default(), &mut work)
+            .unwrap_err()
+            .code(),
+        "E_LIMIT"
+    );
+}
