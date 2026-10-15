@@ -551,9 +551,10 @@ pub fn encode(
     output.write_all(SIGNATURE)?;
     write_chunk(output, b"IHDR", &header)?;
     write_chunk(output, b"IDAT", &[0x78, 0x01])?;
-    let mut raw = image.pixels.chunks(image.width as usize).flat_map(|row| {
-        std::iter::once(0).chain(row.iter().flat_map(|pixel| pixel.iter().copied()))
-    });
+    let rgba = image.pixels().as_flattened();
+    let row_bytes = image.width as usize * 4;
+    let stride = row_bytes + 1;
+    let mut raw_offset = 0;
     let mut remaining = raw_size;
     let mut adler = Adler::new();
     while remaining > 0 {
@@ -562,7 +563,19 @@ pub fn encode(
         block.push(u8::from(count == remaining));
         block.extend_from_slice(&(count as u16).to_le_bytes());
         block.extend_from_slice(&(!(count as u16)).to_le_bytes());
-        block.extend(raw.by_ref().take(count));
+        while block.len() < count + 5 {
+            let row = raw_offset / stride;
+            let column = raw_offset % stride;
+            if column == 0 {
+                block.push(0);
+                raw_offset += 1;
+            } else {
+                let take = (stride - column).min(count + 5 - block.len());
+                let start = row * row_bytes + column - 1;
+                block.extend_from_slice(&rgba[start..start + take]);
+                raw_offset += take;
+            }
+        }
         adler.update(&block[5..]);
         write_chunk(output, b"IDAT", &block)?;
         remaining -= count;
