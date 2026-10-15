@@ -80,3 +80,11 @@ whole-suite process order. This narrows temporal drift, but cannot eliminate
 shared-runner scheduling/frequency changes. Compare medians only within the
 same run/protocol and examine unchanged control operations before interpreting
 a small encoder delta.
+
+`tools/png_bottleneck_compare.py --baseline SHA INPUT.png ...` compares actual
+old/current private encoder and checksum modules in one executable. It validates
+complete DEFLATE bytes and the scalar Adler recurrence first, then calibrates
+each of four stage operations to 50 ms and rotates nine batches. Checksums and
+encoder allocation are measured separately; these isolated numbers are not an
+additive full-codec profile. Source/compiler/input fingerprints and all samples
+are recorded. It is now also run natively in CI for the selected bottlenecks.

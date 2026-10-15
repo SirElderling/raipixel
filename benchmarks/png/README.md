@@ -342,3 +342,25 @@ measures original-sheet compressed encoding at 1.483 ms versus reference Fast
 lookup trial's 1.66× ratio came from a different run with reference Fast at
 0.910 ms; native paired controls provide the before/after evidence. All fourteen
 original writer hashes and the independent profile/noise sample checks pass.
+
+## Bounded matching and direct Adler reduction
+
+[The bottleneck decision record](candidates/matching-and-adler.md) documents the
+next test-first optimization pass, including unsuccessful stream/remainder
+variants and the mathematical checksum proof. Candidate rejection stays inline;
+validated matches scan bounded 16-byte views and one scalar remainder. Adler32
+keeps its original serial prefix loop and combines packed lane totals directly.
+All 62 core tests and exact writer hashes pass in native run 38752771416.
+
+Against 126a556, generated sheet encoding takes 19–25% less time and texture
+13–19% less time across the three native platforms in that run. macOS noise
+encoding measured 15% slower; Linux/Windows noise improved. This tradeoff remains
+explicit in the raw record. Source/heap/work policies and output bytes remain
+unchanged; executable growth is 608/16/1,024 bytes for Linux/macOS/Windows.
+
+The [final original-corpus comparison](run-match-adler-final.json) puts our
+compressed sheet writer at 1.177 ms versus reference Fast 0.797 ms, about 1.48×
+slower, retaining 52,549/53,405 bytes. Independent readers still check both
+writers on all 31 profile fixtures and the multi-block noise case. The recorded
+fourteen original PNG SHA256 values remain unchanged. Matching and Adler remain
+the primary measured costs; the actual-writer profiling overhead is reported.

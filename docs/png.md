@@ -72,8 +72,8 @@ under the [mandatory attribution rule](design/01-research.md#research-attributio
 
 ## Verification
 
-61 Rust tests run offline with no external executable or test library:
-22 raster tests, 19 JSON tests, ten PNG integration tests, six DEFLATE unit tests and four checksum unit
+62 Rust tests run offline with no external executable or test library:
+22 raster tests, 19 JSON tests, ten PNG integration tests, seven DEFLATE unit tests and four checksum unit
 tests. The PNG/DEFLATE cases include 31 accepted PNG files, 40 rejected-profile
 files and eight independent zlib streams. Cases cover the required profile
 matrix and the malformed-input rules listed in the design, rather than
@@ -177,3 +177,14 @@ encoding at 1.597 ms versus reference Fast 0.816 ms (about 1.96× slower).
 The generated paired suite is a separate workload, with approximately 30% less
 sheet encoding time locally; shared-host results are observations. A bit-packing
 experiment was rejected when alternating measurements showed no reliable gain.
+
+A subsequent measured pass bounds match slices once, compares 16-byte groups and
+keeps candidate rejection inline while the larger scan remains separate. It
+also reduces packed Adler lane totals directly, retaining the original prefix
+loop and checksum/work/allocation contracts. All 62 core tests and writer hashes
+pass on Linux/macOS/Windows. The native trial reduces generated sheet/texture
+encoding time by 19–25%/13–19%; macOS noise encoding is 15% slower in that run.
+The original independent comparison now measures compressed sheet encoding
+1.177/0.797 ms for our/reference Fast writers. See the
+[decision record](../benchmarks/png/candidates/matching-and-adler.md) for all
+samples, rejected variants, no-carry proof, attribution and limitations.
