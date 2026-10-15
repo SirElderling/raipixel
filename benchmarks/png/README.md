@@ -1,6 +1,10 @@
 # PNG comparison measurements
 
-[Latest RGBA filter results](candidates/rgba-filters.md) record native
+[Latest two-stream Adler results](candidates/two-stream-adler.md) record native
+complete-codec gains, unchanged output/work, small-case regressions and the
+remaining crate gap. The [row-layout/arithmetic trials](candidates/row-fusion-adler.md)
+retain rejected compaction and dot-product variants. The preceding
+[RGBA filter results](candidates/rgba-filters.md) record native
 original-sheet decode improvements, exact samples/flags/work checks and the
 remaining reference gap. The [preceding decoder CRC results](candidates/decoder-crc.md) identify
 chunk validation as the noise bottleneck and record safe 32-byte slicing. The

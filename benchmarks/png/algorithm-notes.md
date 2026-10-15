@@ -200,6 +200,8 @@ Two/four interleaved prefix streams were also screened. Once direct reduction
 was added, the serial prefix version was within a few percent of the two-stream
 version locally, so the retained code keeps the simpler original prefix loop.
 Raw performance records distinguish prototypes from retained implementation.
+The later two-stream trial below supersedes this serial-retention decision:
+it reduces streams independently rather than recombining packed fields first.
 
 ## Parity review prototypes
 
@@ -351,8 +353,11 @@ retains all platforms, controls and checksum screening trials.
 ## Two interleaved packed Adler streams
 
 This trial revisits interleaving after the earlier direct-reduction screen
-found little benefit. Loop spelling and the resulting complete codec must be
-measured again; this is not a claim of a newly discovered checksum algorithm.
+found little benefit. That prototype recombined the streams' packed sums/prior
+fields before one reduction; this trial reduces each stream separately and
+combines its scalar contribution. This removes the packed recombination chain
+at the cost of two reductions. It is not an identical repeat of the rejected
+variant or a claim of a newly discovered checksum algorithm.
 `src/checksum.rs::Adler::update` uses two fixed streams of eight words, preserving
 the existing 128-byte grouping and scalar remainder. For stream `t=0,1`, byte
 lane `j=0..7`, word `k=0..7`, let `S[t,j]=sum(x[16*k+8*t+j])` and
@@ -378,4 +383,8 @@ as above. Stream regrouping and this safe Rust implementation are independently
 derived. Existing tests for every isolated byte weight, full all-255 blocks,
 patterned scalar checks and fragmented updates passed before this refactor and
 after it. Complete-codec hashes, public-API reference comparisons and native
-three-platform CI determine whether this candidate should be retained.
+three-platform CI now support retention. The [complete-codec decision](candidates/two-stream-adler.md)
+records 6.8-11.8% less original-sheet decode time and 12.3-12.6% less compressed
+encoding time, the small-case regressions and remaining reference gap. Row-copy
+fusion, narrow dot accumulation and the smaller prior-sum reduction are rejected;
+their raw results and mathematical/source acknowledgments remain recorded.

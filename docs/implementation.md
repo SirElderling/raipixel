@@ -91,7 +91,7 @@ Python is a verification facility, not an application or Rust test dependency.
 
 GitHub CI runs native stable tests, formatting and Clippy on Linux x86_64,
 macOS ARM64 and Windows x86_64 MSVC. CI follows the latest stable Rust
-(currently 1.99); older compiler compatibility is not maintained.
+(currently 1.99.1); older compiler compatibility is not maintained.
 A std-only checksum probe also compares previous/current arithmetic in each
 native job; checksum equality is checked and timings are informational.
 The [full-codec timing runner](../benchmarks/png/timing.md) additionally builds
@@ -102,6 +102,12 @@ validation, inflate and reconstruction, with nested CRC/Adler timers and paired
 plain builds to expose instrumentation overhead. The CRC size-policy decision
 and all mixed results are recorded in the [decoder report](../benchmarks/png/candidates/decoder-crc.md). Native samples and independent comparison
 results are recorded in the PNG benchmark directory.
+The [latest Adler decision](../benchmarks/png/candidates/two-stream-adler.md)
+records independently reduced packed streams, native complete-codec gains,
+unchanged sample/flag/work/output artifacts, small-case regressions and the
+remaining crate gap. All 68 core tests pass natively. Rejected row-copy fusion,
+dot-product and smaller prior-sum variants remain reproducible; they do not
+change production behavior.
 Toolchain installation uses the network; Cargo build/test commands run offline.
 The workflow runs on pull requests and pushes to main/feat branches.
 

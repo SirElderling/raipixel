@@ -221,3 +221,13 @@ hash equality. Texture timings remain mixed, including a 3.5% macOS regression.
 All 68 tests pass on Linux/macOS/Windows. The original mixed-filter inputs are
 now fixed native benchmarks with independent RGBA digests; reference decode
 still takes less time on the original sheet (ours/reference 1.17–1.39×).
+
+The subsequent [two-stream Adler pass](../benchmarks/png/candidates/two-stream-adler.md)
+reduces each packed stream independently. Native original-sheet decode takes
+another 6.8–11.8% less time and compressed encoding 12.3–12.6% less, with the
+same samples, flags, work accounting and writer bytes. All 68 tests, formatting
+and Clippy pass on Linux/macOS/Windows. A Linux tiny-icon decode regression and
+other mixed compact/noise results remain recorded. The current original-sheet
+decode ratio is 1.025–1.192× reference; general parity remains unmet. No heap
+buffer, dependency, unsafe code, assembly or build-profile change is added.
+The row-copy fusion and narrower arithmetic screens remain rejected.
