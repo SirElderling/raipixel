@@ -9,20 +9,28 @@ pub(crate) const BLOCK: usize = 65_535;
 const HASH_SIZE: usize = 8192;
 
 pub(crate) struct Encoder {
-    positions: Vec<u32>,
+    dictionary: Vec<u32>,
     output: Vec<u8>,
     bits: u64,
     count: u32,
 }
-fn hash(data: &[u8], pos: usize) -> usize {
+fn hash(data: &[u8], pos: usize) -> (usize, u32) {
     let key = u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], 0]);
-    (key.wrapping_mul(0x9e37_79b1) >> 19) as usize
+    ((key.wrapping_mul(0x9e37_79b1) >> 19) as usize, key & 65535)
 }
 
 // Keep candidate rejection inline without also inlining the larger scan.
 #[inline(always)]
-fn match_length(data: &[u8], prior: usize, pos: usize, maximum: usize) -> usize {
-    if prior >= pos || pos - prior > 32_768 || data[prior..prior + 3] != data[pos..pos + 3] {
+fn match_candidate(data: &[u8], entry: u32, prefix: u32, pos: usize, maximum: usize) -> usize {
+    let prior = (entry & 65535) as usize;
+    // The upper half caches the first two bytes of the immutable input. Block
+    // positions fit the lower half; 65535 is an unused sentinel. On a prefix hit
+    // only the third byte remains to establish the minimum three-byte match.
+    if entry >> 16 != prefix
+        || prior >= pos
+        || pos - prior > 32_768
+        || data[prior + 2] != data[pos + 2]
+    {
         return 0;
     }
     3 + matching_tail(
@@ -111,18 +119,18 @@ static LENGTH_CODES: [u8; 256] = length_codes();
 
 impl Encoder {
     pub(crate) fn new(max_block: usize) -> Result<Self, Error> {
-        let mut positions = Vec::new();
-        positions
+        let mut dictionary = Vec::new();
+        dictionary
             .try_reserve_exact(HASH_SIZE)
             .map_err(|_| Error::Allocation)?;
-        positions.resize(HASH_SIZE, u32::MAX);
+        dictionary.resize(HASH_SIZE, u32::MAX);
         let mut output = Vec::new();
         // At most nine bits per literal, plus headers, EOB and pending bits.
         output
             .try_reserve_exact(max_block * 9 / 8 + 16)
             .map_err(|_| Error::Allocation)?;
         Ok(Self {
-            positions,
+            dictionary,
             output,
             bits: 0,
             count: 0,
@@ -181,13 +189,14 @@ impl Encoder {
         debug_assert!(data.len() <= BLOCK);
         let saved = (self.bits, self.count);
         self.output.clear();
-        self.positions.fill(u32::MAX);
+        self.dictionary.fill(u32::MAX);
         self.put(u32::from(last) | 2, 3); // BTYPE=01, least-significant bit first.
         let mut pos = 0;
         while pos + 3 <= data.len() {
-            let slot = hash(data, pos);
-            let stored = self.positions[slot] as usize;
-            self.positions[slot] = pos as u32;
+            let (slot, prefix) = hash(data, pos);
+            let entry = self.dictionary[slot];
+            let stored = (entry & 65535) as usize;
+            self.dictionary[slot] = (prefix << 16) | pos as u32;
             let maximum = (data.len() - pos).min(258);
             let repeated = if pos > 0 && data[pos] == data[pos - 1] {
                 repeated_length(data, pos - 1, pos, maximum)
@@ -197,11 +206,11 @@ impl Encoder {
             // The old tie-break already preferred distance one. A maximal run
             // cannot lose; retain the dictionary update for subsequent tokens.
             let (prior, length) = if repeated == 0 {
-                (stored, match_length(data, stored, pos, maximum))
+                (stored, match_candidate(data, entry, prefix, pos, maximum))
             } else if repeated == maximum {
                 (pos - 1, repeated)
             } else {
-                let matched = match_length(data, stored, pos, maximum);
+                let matched = match_candidate(data, entry, prefix, pos, maximum);
                 if repeated >= matched {
                     (pos - 1, repeated)
                 } else {
@@ -244,6 +253,22 @@ impl Encoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Build the documented dictionary entry independently of hash slot selection.
+    fn match_length(data: &[u8], prior: usize, pos: usize, maximum: usize) -> usize {
+        let prefix = u32::from(u16::from_le_bytes([data[pos], data[pos + 1]]));
+        let stored = u32::from(u16::from_le_bytes([data[prior], data[prior + 1]]));
+        match_candidate(data, (stored << 16) | prior as u32, prefix, pos, maximum)
+    }
+
+    #[test]
+    fn dictionary_prefix_rejection_preserves_three_byte_matching() {
+        let data = [1, 2, 3, 7, 9, 2, 3, 7, 1, 9, 3, 7, 1, 2, 9, 7, 1, 2, 3, 8];
+        for (pos, length) in [(4, 0), (8, 0), (12, 0), (16, 3)] {
+            assert_eq!(match_length(&data, 0, pos, 4), length);
+        }
+        assert_eq!(match_candidate(&[255; 3], u32::MAX, 65535, 0, 3), 0);
+    }
 
     #[test]
     fn distance_one_scan_matches_scalar_at_every_termination() {

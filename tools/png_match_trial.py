@@ -1,7 +1,8 @@
-"""Alternating current/XOR-match experiment on our encoder; std libraries only.
+"""Historical baseline/XOR-match experiment on our encoder; std libraries only.
 Uses a temporary copy of our source, never modifies the production implementation.
-Usage: python tools/png_match_trial.py INPUT.png [INPUT.png ...]
+Usage: python tools/png_match_trial.py [--baseline SHA] INPUT.png [INPUT.png ...]
 """
+import argparse
 import hashlib
 import json
 import platform
@@ -11,7 +12,12 @@ import tempfile
 import zlib
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
-source = (ROOT / 'src/deflate/encode.rs').read_text(encoding='utf-8')
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--baseline', default='27243e606e9c5c3ef6fddc0c645255570be75be7')
+parser.add_argument('inputs', nargs='+')
+args = parser.parse_args()
+source = subprocess.check_output(['git', 'show', args.baseline + ':src/deflate/encode.rs'],
+                                 cwd=ROOT, encoding='utf-8')
 a = source.index('fn match_length(')
 annotation = '#[inline(always)]\n'
 if source[:a].endswith(annotation):
@@ -38,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix='raipixel-match-trial-') as temporary:
     (temporary / 'before.rs').write_text(source, encoding='utf-8')
     (temporary / 'after.rs').write_text(candidate, encoding='utf-8')
     inputs = []
-    for i, path in enumerate(sys.argv[1:]):
+    for i, path in enumerate(args.inputs):
         data = Path(path).read_bytes()
         offset, idat = 8, bytearray()
         while offset < len(data):
@@ -74,7 +80,8 @@ println!("{{\\"iterations\\":{:?},\\"median_us\\":{:?},\\"samples_us\\":{:?}}}",
     exe = temporary / ('trial.exe' if sys.platform == 'win32' else 'trial')
     subprocess.run(['rustc', '--edition=2024', '-O', str(temporary / 'main.rs'), '-o', str(exe)], check=True)
     rows = subprocess.check_output([str(exe), *[str(temporary / f'{i}.raw') for i in range(len(inputs))]], text=True).splitlines()
-    print(json.dumps(dict(experiment='match_termination_xor', modes=['current', 'xor'],
+    print(json.dumps(dict(experiment='match_termination_xor', modes=['baseline', 'xor'],
+        source_revision=args.baseline,
         compiler=subprocess.check_output(['rustc', '--version', '--verbose'], text=True),
         platform=platform.platform(), encoder_sha256=hashlib.sha256(source.encode()).hexdigest(),
         candidate_sha256=hashlib.sha256(candidate.encode()).hexdigest(),

@@ -54,14 +54,6 @@ jobs:
           cargo +stable run --release --locked --offline --example png_bench -- --export png-stage-inputs
           cargo +stable run --release --locked --offline --example png_stages -- png-stage-inputs/sheet-1024-compressed.png
           cargo +stable run --release --locked --offline --example png_stages -- png-stage-inputs/texture-1024-compressed.png
-      - name: Screen filter/checksum and match candidates (informational)
-        env:
-          RUSTUP_TOOLCHAIN: stable
-        run: |
-          rustc +stable --edition=2024 -O tools/png_filter_adler_trial.rs -o png-filter-adler-trial.exe
-          ./png-filter-adler-trial.exe
-          python tools/png_match_trial.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
-          python tools/png_decoder_profile.py --recompress png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png
       - name: Profile actual writer stages (informational)
         env:
           RUSTUP_TOOLCHAIN: stable
@@ -73,11 +65,7 @@ jobs:
       - name: Compare matching and Adler stages against baseline (informational)
         env:
           RUSTUP_TOOLCHAIN: stable
-        run: python tools/png_bottleneck_compare.py --baseline 126a5568c32ef0e25d4281fed4580d0b6592da3a png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
-      - name: Screen next parity candidates (informational)
-        env:
-          RUSTUP_TOOLCHAIN: stable
-        run: python tools/png_parity_screen.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
+        run: python tools/png_bottleneck_compare.py --baseline 27243e606e9c5c3ef6fddc0c645255570be75be7 png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
       - name: Compare complete codecs under matched build profiles (informational)
         env:
           RUSTUP_TOOLCHAIN: stable

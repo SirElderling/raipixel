@@ -1,4 +1,4 @@
-"""Screen original byte-preserving candidates; never read reference-crate code.
+"""Screen historical byte-preserving candidates; never read reference-crate code.
 
 Trusted PNG inputs only. Extraction, scalar checks and byte equality are untimed.
 --cpu/--features are local diagnostics, not portable defaults or parity claims.
@@ -15,6 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--baseline', default='27243e606e9c5c3ef6fddc0c645255570be75be7')
 parser.add_argument('--cpu')
 parser.add_argument('--features')
 parser.add_argument('--codegen-units', type=int, default=16)
@@ -25,7 +26,8 @@ if args.cpu:
     flags += ['-C', 'target-cpu=' + args.cpu]
 if args.features:
     flags += ['-C', 'target-feature=' + args.features]
-source = (ROOT / 'src/deflate/encode.rs').read_text(encoding='utf-8')
+source = subprocess.check_output(['git', 'show', args.baseline + ':src/deflate/encode.rs'],
+                                 cwd=ROOT, encoding='utf-8')
 narrow = source
 for before, after in [
     ('positions: Vec<u32>', 'positions: Vec<u16>'),
@@ -108,6 +110,7 @@ fn main(){for path in std::env::args().skip(1){
         assert len(rows) == len(inputs)
         reports[name] = [dict(**item, **json.loads(row)) for item, row in zip(inputs, rows)]
     print(json.dumps(dict(experiment='parity_candidates',
+        source_revision=args.baseline,
         diagnostic_cpu_flags=bool(args.cpu or args.features), rustc_flags=flags,
         compiler=subprocess.check_output(['rustc', '--version', '--verbose'], text=True),
         platform=platform.platform(),

@@ -13,9 +13,9 @@ import zlib
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 source = (ROOT / 'src/deflate/encode.rs').read_text()
-traced = source.replace('    positions: Vec<u32>,','    positions: Vec<u32>,\n    trace: Vec<(u16,u16)>,',1)
-traced = traced.replace('            positions,','            positions,\n            trace: Vec::new(),',1)
-traced = traced.replace('        self.positions.fill(u32::MAX);','        self.positions.fill(u32::MAX);\n        self.trace.clear();',1)
+traced = source.replace('    dictionary: Vec<u32>,','    dictionary: Vec<u32>,\n    trace: Vec<(u16,u16)>,',1)
+traced = traced.replace('            dictionary,','            dictionary,\n            trace: Vec::new(),',1)
+traced = traced.replace('        self.dictionary.fill(u32::MAX);','        self.dictionary.fill(u32::MAX);\n        self.trace.clear();',1)
 traced = traced.replace('                self.reference(length, pos - prior);','                self.trace.push((length as u16,(pos-prior)as u16));\n                self.reference(length, pos - prior);',1)
 traced = traced.replace('                self.symbol(u32::from(data[pos]));','                self.trace.push((0,u16::from(data[pos])));\n                self.symbol(u32::from(data[pos]));',1)
 traced = traced.replace('            self.symbol(u32::from(byte));','            self.trace.push((0,u16::from(byte)));\n            self.symbol(u32::from(byte));',1)
