@@ -1,5 +1,6 @@
 //! Private zlib/DEFLATE decoder; no PNG chunk or pixel knowledge.
 use crate::{Error as ResourceError, Work, checksum::Adler};
+use std::borrow::Cow;
 
 #[derive(Debug)]
 pub(crate) enum Error {
@@ -65,7 +66,7 @@ enum Alphabet {
     Distances,
 }
 struct Huffman {
-    entries: Vec<Entry>,
+    entries: Cow<'static, [Entry]>,
     width: u32,
 }
 impl Huffman {
@@ -84,7 +85,7 @@ impl Huffman {
         if width == 0 {
             return if matches!(alphabet, Alphabet::Distances) {
                 Ok(Self {
-                    entries: Vec::new(),
+                    entries: Cow::Borrowed(&[]),
                     width: 0,
                 })
             } else {
@@ -129,7 +130,10 @@ impl Huffman {
                 };
             }
         }
-        Ok(Self { entries, width })
+        Ok(Self {
+            entries: Cow::Owned(entries),
+            width,
+        })
     }
     fn symbol(&self, bits: &mut Bits<'_, '_>) -> Result<u16, Error> {
         if self.width == 0 {
@@ -146,14 +150,52 @@ impl Huffman {
     }
 }
 
-fn fixed(work: &mut Work) -> Result<(Huffman, Huffman), Error> {
-    let mut lengths = [8; 288];
-    lengths[144..256].fill(9);
-    lengths[256..280].fill(7);
-    Ok((
-        Huffman::new(&lengths, Alphabet::Literals, work)?,
-        Huffman::new(&[5; 32], Alphabet::Distances, work)?,
-    ))
+// The fixed alphabets are defined by RFC 1951. Construct their lookup tables
+// once at compile time, avoiding per-block allocation and reconstruction.
+const fn fixed_literals() -> [Entry; 512] {
+    let mut entries = [Entry { symbol: 0, bits: 0 }; 512];
+    let mut symbol = 0u16;
+    while symbol < 288 {
+        let (code, bits) = if symbol < 144 {
+            (symbol + 48, 8u8)
+        } else if symbol < 256 {
+            (symbol - 144 + 400, 9)
+        } else if symbol < 280 {
+            (symbol - 256, 7)
+        } else {
+            (symbol - 280 + 192, 8)
+        };
+        let mut index = (code.reverse_bits() >> (16 - bits)) as usize;
+        while index < 512 {
+            entries[index] = Entry { symbol, bits };
+            index += 1usize << bits;
+        }
+        symbol += 1;
+    }
+    entries
+}
+const fn fixed_distances() -> [Entry; 32] {
+    let mut entries = [Entry { symbol: 0, bits: 5 }; 32];
+    let mut symbol = 0u16;
+    while symbol < 32 {
+        entries[(symbol.reverse_bits() >> 11) as usize].symbol = symbol;
+        symbol += 1;
+    }
+    entries
+}
+static FIXED_LITERALS: [Entry; 512] = fixed_literals();
+static FIXED_DISTANCES: [Entry; 32] = fixed_distances();
+fn fixed() -> (Huffman, Huffman) {
+    (
+        Huffman {
+            entries: Cow::Borrowed(&FIXED_LITERALS),
+            width: 9,
+        },
+        Huffman {
+            entries: Cow::Borrowed(&FIXED_DISTANCES),
+            width: 5,
+        },
+    )
 }
 
 fn dynamic(bits: &mut Bits<'_, '_>) -> Result<(Huffman, Huffman), Error> {
@@ -269,7 +311,7 @@ pub(crate) fn inflate(input: &[u8], expected: usize, work: &mut Work) -> Result<
             }
             kind @ (1 | 2) => {
                 let (literals, distances) = if kind == 1 {
-                    fixed(bits.work)?
+                    fixed()
                 } else {
                     dynamic(&mut bits)?
                 };

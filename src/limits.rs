@@ -73,7 +73,7 @@ impl Limits {
     }
 }
 
-/// Monotonic pixel-visit budget, shared across calls by the caller.
+/// Monotonic work budget shared by raster operations, JSON and codecs.
 /// Failed reservations leave it unchanged; later allocation failures may consume
 /// already charged work. It is not a process time or memory limit.
 #[derive(Debug)]

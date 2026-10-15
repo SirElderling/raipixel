@@ -36,10 +36,31 @@ impl Error {
 }
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.code())
+        let message = match self {
+            Self::Signature => "Invalid PNG signature",
+            Self::Chunk => "Invalid PNG chunk, ordering, dimensions or samples",
+            Self::Crc => "PNG chunk CRC mismatch",
+            Self::Filter => "Invalid PNG scanline filter",
+            Self::Deflate => "Invalid or out-of-bounds zlib/DEFLATE stream",
+            Self::Adler => "Zlib Adler32 mismatch",
+            Self::UnsupportedDepth => "16-bit PNG import is not supported by this profile",
+            Self::UnsupportedAnimation => "Animated PNG import is not supported",
+            Self::Unsupported => "Unknown critical PNG chunk",
+            Self::Resource(err) => return std::fmt::Display::fmt(err, f),
+            Self::Io(err) => return std::fmt::Display::fmt(err, f),
+        };
+        write!(f, "{}: {message}", self.code())
     }
 }
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Resource(err) => Some(err),
+            Self::Io(err) => Some(err),
+            _ => None,
+        }
+    }
+}
 impl From<crate::Error> for Error {
     fn from(value: crate::Error) -> Self {
         Self::Resource(value)
@@ -166,7 +187,7 @@ fn chunk<'a>(input: &'a [u8], pos: &mut usize) -> Result<([u8; 4], &'a [u8]), Er
         return Err(Error::Chunk);
     }
     let name: [u8; 4] = header[4..].try_into().map_err(|_| Error::Chunk)?;
-    if !name.iter().all(u8::is_ascii_alphabetic) || name[2] & 32 != 0 {
+    if !name.iter().all(u8::is_ascii_alphabetic) {
         return Err(Error::Chunk);
     }
     let end = pos
