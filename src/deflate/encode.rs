@@ -183,12 +183,62 @@ impl Encoder {
         );
     }
 
+    // Incompressible blocks are often expanded by fixed Huffman coding and
+    // then discarded for the stored fallback. Sample across the block before
+    // doing that expensive full parse. Require multiple actual three-byte
+    // matches to reject the fast path; a single hash collision is insufficient.
+    // This is a compression policy heuristic, not a correctness requirement.
+    fn probably_stored(&mut self, data: &[u8]) -> bool {
+        if data.len() < 16_384 {
+            return false;
+        }
+        let mut matches = 0;
+        for window in 0..8 {
+            let offset = window * (data.len() - 258) / 7;
+            for pos in offset..offset + 256 {
+                let (slot, prefix) = hash(data, pos);
+                let entry = self.dictionary[slot];
+                self.dictionary[slot] = (prefix << 16) | pos as u32;
+                let prior = (entry & 65_535) as usize;
+                if entry >> 16 == prefix
+                    && prior < pos
+                    && pos - prior <= 32_768
+                    && data[prior + 2] == data[pos + 2]
+                {
+                    matches += 1;
+                    if matches >= 4 {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    fn store(&mut self, data: &[u8], last: bool) {
+        self.output.clear();
+        self.put(u32::from(last), 3);
+        self.align();
+        self.output
+            .extend_from_slice(&(data.len() as u16).to_le_bytes());
+        self.output
+            .extend_from_slice(&(!(data.len() as u16)).to_le_bytes());
+        self.output.extend_from_slice(data);
+    }
+
     /// Block-local dictionary, with no match search chains or input-sized index.
     /// Fixed blocks keep bit continuity; only stored blocks/final output align.
     pub(crate) fn block(&mut self, data: &[u8], last: bool) -> &[u8] {
         debug_assert!(data.len() <= BLOCK);
         let saved = (self.bits, self.count);
         self.output.clear();
+        self.dictionary.fill(u32::MAX);
+        if self.probably_stored(data) {
+            self.store(data, last);
+            return &self.output;
+        }
+        // A sample may have updated dictionary slots, but the full matcher's
+        // choices must start with the same empty dictionary as before.
         self.dictionary.fill(u32::MAX);
         self.put(u32::from(last) | 2, 3); // BTYPE=01, least-significant bit first.
         let mut pos = 0;
@@ -237,14 +287,7 @@ impl Encoder {
         // Restore the pending bits from the preceding block before retrying.
         if self.output.len() > data.len() + 5 {
             (self.bits, self.count) = saved;
-            self.output.clear();
-            self.put(u32::from(last), 3);
-            self.align();
-            self.output
-                .extend_from_slice(&(data.len() as u16).to_le_bytes());
-            self.output
-                .extend_from_slice(&(!(data.len() as u16)).to_le_bytes());
-            self.output.extend_from_slice(data);
+            self.store(data, last);
         }
         &self.output
     }
@@ -417,6 +460,40 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn sampled_incompressibility_preserves_stored_bytes_and_compressible_tails() {
+        let mut state = 0x6ad1_7e95u32;
+        let mut noise = vec![0u8; BLOCK];
+        for byte in &mut noise {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            *byte = (state >> 16) as u8;
+        }
+        let mut encoder = Encoder::new(BLOCK).unwrap();
+        encoder.dictionary.fill(u32::MAX);
+        assert!(encoder.probably_stored(&noise));
+        let stored = encoder.block(&noise, true);
+        assert_eq!(stored.len(), BLOCK + 5);
+        assert_eq!(stored[0], 1);
+        assert_eq!(&stored[5..], &noise);
+
+        // No first-window-only shortcuts: a compressible tail must be seen.
+        let mut tail = noise;
+        tail[BLOCK - 4096..].fill(7);
+        let mut encoder = Encoder::new(BLOCK).unwrap();
+        encoder.dictionary.fill(u32::MAX);
+        assert!(!encoder.probably_stored(&tail));
+        assert!(encoder.block(&tail, true).len() < BLOCK + 5);
+
+        // Every block must reset the sampled dictionary; preserved prior bits
+        // allow a stored block after an earlier fixed block.
+        let mut encoder = Encoder::new(BLOCK).unwrap();
+        let first = encoder.block(&[0; 8192], false).to_vec();
+        let last = encoder.block(&tail, true).to_vec();
+        assert!(!first.is_empty() && !last.is_empty());
     }
 
     #[test]
