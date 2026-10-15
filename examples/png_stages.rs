@@ -7,6 +7,10 @@ mod checksum;
 #[allow(dead_code)]
 #[path = "../src/deflate.rs"]
 mod deflate;
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "../src/json.rs"]
+mod json;
 #[allow(dead_code)]
 #[path = "../src/limits.rs"]
 mod limits;

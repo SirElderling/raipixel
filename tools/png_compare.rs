@@ -208,90 +208,57 @@ fn main() -> Result<(), AnyError> {
     );
     sizes.push(("compressed", compressed.len()));
     std::fs::write(folder.join("compressed.png"), compressed)?;
+    let operation = |index| -> Result<(), AnyError> {
+        match index {
+            0 => {
+                black_box(raipixel::png::decode(
+                    black_box(&input),
+                    Limits::default(),
+                    &mut Work::default(),
+                )?);
+            }
+            1 => {
+                black_box(reference_decode(black_box(&input))?);
+            }
+            2 | 6 => {
+                let mut out = Vec::new();
+                if index == 2 {
+                    raipixel::png::encode(black_box(&ours.image), &mut out, &mut Work::default())?;
+                } else {
+                    raipixel::png::encode_compressed(
+                        black_box(&ours.image),
+                        &mut out,
+                        &mut Work::default(),
+                    )?;
+                }
+                black_box(out);
+            }
+            3..=5 => {
+                let mode = ["none", "fast", "default"][index - 3];
+                let mut out = Vec::new();
+                reference_encode(&mut out, black_box(&rgba), w, h, mode)?;
+                black_box(out);
+            }
+            _ => unreachable!(),
+        }
+        Ok(())
+    };
+    let mut counts = [iterations.max(1); 7];
+    for (index, count) in counts.iter_mut().enumerate() {
+        while measure(|| operation(index), *count)? * (*count as f64) < 25_000.0 {
+            *count = count.checked_mul(2).ok_or("iteration overflow")?;
+        }
+    }
     let mut timings: Vec<Vec<f64>> = (0..7).map(|_| Vec::new()).collect();
-    // Rotate execution order across seven batches; medians reduce shared-host noise.
+    // Warm/calibrate before seven rotating batches, matching our native driver.
     for round in 0..7 {
         for n in 0..7 {
             let index = (n + round) % 7;
-            let time = match index {
-                0 => measure(
-                    || {
-                        black_box(raipixel::png::decode(
-                            black_box(&input),
-                            Limits::default(),
-                            &mut Work::default(),
-                        )?);
-                        Ok(())
-                    },
-                    iterations,
-                )?,
-                1 => measure(
-                    || {
-                        black_box(reference_decode(black_box(&input))?);
-                        Ok(())
-                    },
-                    iterations,
-                )?,
-                2 => measure(
-                    || {
-                        let mut out = Vec::new();
-                        raipixel::png::encode(
-                            black_box(&ours.image),
-                            &mut out,
-                            &mut Work::default(),
-                        )?;
-                        black_box(out);
-                        Ok(())
-                    },
-                    iterations,
-                )?,
-                3 => measure(
-                    || {
-                        let mut out = Vec::new();
-                        reference_encode(&mut out, black_box(&rgba), w, h, "none")?;
-                        black_box(out);
-                        Ok(())
-                    },
-                    iterations,
-                )?,
-                4 => measure(
-                    || {
-                        let mut out = Vec::new();
-                        reference_encode(&mut out, black_box(&rgba), w, h, "fast")?;
-                        black_box(out);
-                        Ok(())
-                    },
-                    iterations,
-                )?,
-                5 => measure(
-                    || {
-                        let mut out = Vec::new();
-                        reference_encode(&mut out, black_box(&rgba), w, h, "default")?;
-                        black_box(out);
-                        Ok(())
-                    },
-                    iterations,
-                )?,
-                6 => measure(
-                    || {
-                        let mut out = Vec::new();
-                        raipixel::png::encode_compressed(
-                            black_box(&ours.image),
-                            &mut out,
-                            &mut Work::default(),
-                        )?;
-                        black_box(out);
-                        Ok(())
-                    },
-                    iterations,
-                )?,
-                _ => unreachable!(),
-            };
-            timings[index].push(time);
+            timings[index].push(measure(|| operation(index), counts[index])?);
         }
     }
     print!(
-        "{{\"width\":{w},\"height\":{h},\"input_bytes\":{},\"iterations\":{iterations},\"us\":[",
+        "{{\"width\":{w},\"height\":{h},\"input_bytes\":{},\"iterations\":{iterations},\"iterations_per_operation\":{counts:?},\"minimum_batch_ms\":25,\"samples_us\":{timings:?},\"us\":[",
         input.len()
     );
     for (i, times) in timings.into_iter().enumerate() {

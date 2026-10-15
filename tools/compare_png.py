@@ -117,6 +117,9 @@ with tempfile.TemporaryDirectory(prefix='raipixel-png-compare-') as temporary:
             sys.executable, str(ROOT / 'tools/png_memory.py'), str(exe), str(source)
         ], text=True))
     report = {'rust': subprocess.check_output(['rustc', '--version'], text=True).strip(),
+              'compiler': subprocess.check_output(['rustc', '--version', '--verbose'], text=True),
+              'driver_sha256': hashlib.sha256((ROOT / 'tools/png_compare.rs').read_bytes()).hexdigest(),
+              'library_sources_sha256': {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(ROOT.glob('src/**/*.rs'))},
               'host': platform.platform(), 'reference': 'png 0.18.1, locked default features',
               'raipixel_commit': subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip(),
               'working_tree': subprocess.check_output(['git', '-C', str(ROOT), 'status', '--porcelain'], text=True),

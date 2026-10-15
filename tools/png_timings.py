@@ -58,6 +58,7 @@ with tempfile.TemporaryDirectory(prefix='raipixel-timings-') as temporary:
             run('cargo', 'build', '--release', '--locked', '--offline', '--example',
                 'png_bench', '--target-dir', str(target), cwd=directory, capture=False)
             executables[label] = target / 'release/examples' / ('png_bench.exe' if os.name == 'nt' else 'png_bench')
+        metadata['benchmark_executable_bytes'] = {label: exe.stat().st_size for label, exe in executables.items()}
         hashes = {}
         for label, exe in executables.items():
             folder = temporary / ('outputs-' + label)

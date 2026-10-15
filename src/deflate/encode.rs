@@ -45,6 +45,37 @@ fn distance_code(distance: usize) -> usize {
     }
 }
 
+const fn fixed_codes() -> [(u16, u8); 286] {
+    let mut result = [(0, 0); 286];
+    let mut symbol = 0;
+    while symbol < result.len() {
+        let (code, count) = match symbol {
+            0..=143 => (symbol as u16 + 48, 8),
+            144..=255 => (symbol as u16 - 144 + 400, 9),
+            256..=279 => (symbol as u16 - 256, 7),
+            _ => (symbol as u16 - 280 + 192, 8),
+        };
+        result[symbol] = (code.reverse_bits() >> (16 - count), count);
+        symbol += 1;
+    }
+    result
+}
+const fn length_codes() -> [u8; 256] {
+    let mut result = [0; 256];
+    let mut length = 3;
+    let mut index = 0;
+    while length <= 258 {
+        while index + 1 < LENGTH_BASE.len() && LENGTH_BASE[index + 1] <= length {
+            index += 1;
+        }
+        result[length - 3] = index as u8;
+        length += 1;
+    }
+    result
+}
+static FIXED_CODES: [(u16, u8); 286] = fixed_codes();
+static LENGTH_CODES: [u8; 256] = length_codes();
+
 impl Encoder {
     pub(crate) fn new(max_block: usize) -> Result<Self, Error> {
         let mut positions = Vec::new();
@@ -80,21 +111,11 @@ impl Encoder {
         }
     }
     fn symbol(&mut self, symbol: u32) {
-        let (code, count) = match symbol {
-            0..=143 => (symbol + 48, 8),
-            144..=255 => (symbol - 144 + 400, 9),
-            256..=279 => (symbol - 256, 7),
-            280..=285 => (symbol - 280 + 192, 8),
-            _ => unreachable!("encoder symbol outside RFC 1951 alphabet"),
-        };
-        self.put(code.reverse_bits() >> (32 - count), count);
+        let (code, count) = FIXED_CODES[symbol as usize];
+        self.put(u32::from(code), u32::from(count));
     }
     fn reference(&mut self, length: usize, distance: usize) {
-        let index = if length == 258 {
-            28
-        } else {
-            LENGTH_BASE.partition_point(|&base| base <= length) - 1
-        };
+        let index = usize::from(LENGTH_CODES[length - 3]);
         self.symbol(257 + index as u32);
         self.put((length - LENGTH_BASE[index]) as u32, LENGTH_EXTRA[index]);
         let index = distance_code(distance);
