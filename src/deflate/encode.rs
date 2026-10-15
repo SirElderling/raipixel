@@ -14,6 +14,27 @@ pub(crate) struct Encoder {
     bits: u32,
     count: u32,
 }
+fn hash(data: &[u8], pos: usize) -> usize {
+    let key = u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], 0]);
+    (key.wrapping_mul(0x9e37_79b1) >> 19) as usize
+}
+
+fn match_length(data: &[u8], prior: usize, pos: usize, maximum: usize) -> usize {
+    if prior >= pos || pos - prior > 32_768 || data[prior..prior + 3] != data[pos..pos + 3] {
+        return 0;
+    }
+    let mut length = 3;
+    while length + 8 <= maximum
+        && data[prior + length..prior + length + 8] == data[pos + length..pos + length + 8]
+    {
+        length += 8;
+    }
+    while length < maximum && data[prior + length] == data[pos + length] {
+        length += 1;
+    }
+    length
+}
+
 impl Encoder {
     pub(crate) fn new(max_block: usize) -> Result<Self, Error> {
         let mut positions = Vec::new();
@@ -80,23 +101,21 @@ impl Encoder {
         self.put(u32::from(last) | 2, 3); // BTYPE=01, least-significant bit first.
         let mut pos = 0;
         while pos + 3 <= data.len() {
-            let key = u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], 0]);
-            let hash = (key.wrapping_mul(0x9e37_79b1) >> 19) as usize;
-            let prior = self.positions[hash] as usize;
-            self.positions[hash] = pos as u32;
-            if prior < pos && pos - prior <= 32_768 && data[prior..prior + 3] == data[pos..pos + 3]
-            {
-                let maximum = (data.len() - pos).min(258);
-                let mut length = 3;
-                while length + 8 <= maximum
-                    && data[prior + length..prior + length + 8]
-                        == data[pos + length..pos + length + 8]
-                {
-                    length += 8;
+            let slot = hash(data, pos);
+            let mut prior = self.positions[slot] as usize;
+            self.positions[slot] = pos as u32;
+            let maximum = (data.len() - pos).min(258);
+            let mut length = match_length(data, prior, pos, maximum);
+            // A second, constant-time candidate favors distance-one runs without
+            // replacing useful dictionary entries or following a search chain.
+            if pos > 0 && data[pos] == data[pos - 1] {
+                let repeated = match_length(data, pos - 1, pos, maximum);
+                if repeated >= 3 && repeated >= length {
+                    prior = pos - 1;
+                    length = repeated;
                 }
-                while length < maximum && data[prior + length] == data[pos + length] {
-                    length += 1;
-                }
+            }
+            if length >= 3 {
                 self.reference(length, pos - prior);
                 pos += length;
             } else {

@@ -39,8 +39,8 @@ This is an isolated standards-backed disagreement, not evidence of general
 conformance superiority. The JSON records rejected-profile inputs accepted by
 the reference; some are deliberate policy differences such as bytes after IEND.
 
-Feature gaps remain substantial: raipixel writes only RGBA8 stored data, has no
-streaming-row decode, and explicitly rejects 16-bit/APNG. Reference 16-bit and
+At the baseline, raipixel wrote only RGBA8 stored data, had no
+streaming-row decode, and explicitly rejected 16-bit/APNG. Reference 16-bit and
 two-frame APNG read/write were exercised through public APIs. Metadata parsing,
 additional output sample formats and selectable compression are also outside
 our current implementation. Pixel equality does not establish robustness parity.
@@ -104,7 +104,7 @@ accepted fixtures retain the independently expected samples, including hidden
 RGB. Full writer-byte regression fixtures and an import/edit test protect both
 serialization and the public image behavior. The checksum tests also compare
 bulk/fragmented calculations with the defining scalar recurrence, including
-full accumulator blocks. Native CI runs the 54 std-only Rust tests.
+full accumulator blocks. That checkpoint had 54 std-only Rust tests.
 
 Additional experiments were deliberately not adopted: grouping RGBA Paeth
 reconstruction into four-byte lanes took roughly 0.82 ms versus 0.68 ms for
@@ -114,10 +114,55 @@ complexity. These are exploratory own-code measurements, not portable claims.
 The probe included allocation for reconstruction and excluded file I/O; the
 complete comparison above determines the retained implementation's result.
 
-Output size and feature coverage are unchanged. The 1024 sheet still takes
+In the byte-preserving phase, output size and feature coverage were unchanged.
+The 1024 sheet took
 4,196,508 bytes versus 53,405 with reference Fast and 11,233 with Balanced.
 Reaching those sizes requires a separately tested lossless compressor/filter
 policy and necessarily changes PNG file bytes; it must preserve decoded RGBA.
 Streaming rows, 16-bit samples, APNG and metadata remain explicit feature gaps.
 This pass improves throughput and memory without claiming full parity or
 trading output correctness for benchmark values.
+
+
+## Optional lossless compression and research credits
+
+The new `png::encode_compressed` keeps every RGBA sample while changing the
+encoded PNG bytes. The original `png::encode` retains its exact byte contract.
+This is one explicit optional function, not a backend/settings framework.
+See [algorithm notes and creator acknowledgments](algorithm-notes.md) for the
+papers reviewed, ideas adopted partially, simplifications and deferred work.
+PR1 makes those acknowledgments mandatory in its research guidelines.
+
+The small implementation uses Sub/Up filtering, bounded greedy hash matching,
+fixed Huffman codes, a distance-one run candidate and stored fallback. There
+are no match chains, dynamic code construction or whole-image scratch buffers.
+The dictionary resets per block, deliberately trading some ratio for simplicity.
+
+`compressed-initial.json` records the first one-candidate matcher;
+`compressed.json` adds the bounded run candidate. For the 1024 sheet this
+reduced output from 72,224 to 52,549 bytes. An alternative that inserted the
+end of every match into the table was rejected: it displaced useful entries
+and failed the repetitive-image compression regression. The retained change
+preserves the useful hash candidate and checks a run separately.
+
+| Input | Our compressed bytes | Reference Fast bytes | Reference Balanced bytes | Our compressed time | Reference Fast time |
+|---|---:|---:|---:|---:|---:|
+| 16×16 icon | 228 | 279 | 198 | 3.14 µs | 1.72 µs |
+| 64×64 icon | 479 | 470 | 301 | 14.30 µs | 5.78 µs |
+| 256×256 sheet | 3,908 | 3,911 | 1,513 | 0.20 ms | 0.06 ms |
+| 1024×1024 sheet | 52,549 | 53,405 | 11,233 | 3.35 ms | 0.94 ms |
+| 1024×1024 texture | 83,186 | 3,316,027 | 12,533 | 3.10 ms | 5.55 ms |
+
+This reaches approximately Fast-mode output size on the tested icon/sheets;
+it does not reach Fast speed or Balanced size generally. The texture's different
+result demonstrates how filter policies/content affect comparisons, not broad
+superiority. Our tiny fixed-code writer has neither the feature coverage nor
+compression choices of the reference. Times remain shared-host observations.
+
+All seven original stored output hashes still match baseline. Both reference
+and independent image decoders confirm exact compressed RGBA. The runner also
+checks both writers on all 31 accepted profile fixtures and independently reads
+a 257×257 pseudorandom RGBA image to exercise multi-block stored fallback.
+56 std-only tests cover the new writer, independent fixed-code canonical bytes,
+repeatability, block boundaries, compression of repeated data, noise fallback,
+work preflight and I/O failure. Native CI validates Linux, macOS and Windows.

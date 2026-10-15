@@ -59,7 +59,7 @@ hash matcher over exact suffix-tree parsing acknowledge Philip Bille, Patrick
 Hagge Cording, Johannes Fischer and Inge Li Gørtz, *Lempel-Ziv Compression in a
 Sliding Window*, CPM 2017, linked above. This is a partial conceptual influence,
 not an implementation of their algorithm or a claim to its exact-parse bounds.
-Our simplifications are one recent candidate per hash, a dictionary reset per
+Our simplifications are one recent candidate per hash plus a distance-one run candidate, a dictionary reset per
 65,535-byte block, a 32 KiB maximum distance and 258-byte maximum match.
 
 The slicing-by-eight CRC technique is credited to Abhijeet Joglekar, Michael E.

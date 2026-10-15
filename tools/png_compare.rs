@@ -145,11 +145,13 @@ fn main() -> Result<(), AnyError> {
         );
         return Ok(());
     }
-    if mode == "verify-ours" || mode == "reencode-ours" {
+    if mode == "verify-ours" || mode == "reencode-ours" || mode == "reencode-compressed" {
         let input = std::fs::read(&args[2])?;
         let decoded = raipixel::png::decode(&input, Limits::default(), &mut Work::default())?;
         let mut out = std::io::stdout().lock();
-        if mode == "reencode-ours" {
+        if mode == "reencode-compressed" {
+            raipixel::png::encode_compressed(&decoded.image, &mut out, &mut Work::default())?;
+        } else if mode == "reencode-ours" {
             raipixel::png::encode(&decoded.image, &mut out, &mut Work::default())?;
         } else {
             for dim in decoded.image.size() {
@@ -197,11 +199,20 @@ fn main() -> Result<(), AnyError> {
         sizes.push((mode, out.len()));
         std::fs::write(folder.join(format!("{mode}.png")), out)?;
     }
-    let mut timings: Vec<Vec<f64>> = (0..6).map(|_| Vec::new()).collect();
+    let mut compressed = Vec::new();
+    raipixel::png::encode_compressed(&ours.image, &mut compressed, &mut Work::default())?;
+    assert_eq!(reference_decode(&compressed)?.2, rgba);
+    assert_eq!(
+        raipixel::png::decode(&compressed, Limits::default(), &mut Work::default())?.image,
+        ours.image
+    );
+    sizes.push(("compressed", compressed.len()));
+    std::fs::write(folder.join("compressed.png"), compressed)?;
+    let mut timings: Vec<Vec<f64>> = (0..7).map(|_| Vec::new()).collect();
     // Rotate execution order across seven batches; medians reduce shared-host noise.
     for round in 0..7 {
-        for n in 0..6 {
-            let index = (n + round) % 6;
+        for n in 0..7 {
+            let index = (n + round) % 7;
             let time = match index {
                 0 => measure(
                     || {
@@ -256,6 +267,19 @@ fn main() -> Result<(), AnyError> {
                     || {
                         let mut out = Vec::new();
                         reference_encode(&mut out, black_box(&rgba), w, h, "default")?;
+                        black_box(out);
+                        Ok(())
+                    },
+                    iterations,
+                )?,
+                6 => measure(
+                    || {
+                        let mut out = Vec::new();
+                        raipixel::png::encode_compressed(
+                            black_box(&ours.image),
+                            &mut out,
+                            &mut Work::default(),
+                        )?;
                         black_box(out);
                         Ok(())
                     },

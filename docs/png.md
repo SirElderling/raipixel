@@ -2,7 +2,7 @@
 
 This implements the Foundation import profile in the design, not full PNG
 conformance or completion of S1. The library exposes `png::decode` and
-`png::encode`; typed jobs, persistence and the CLI remain separate work.
+`png::encode` and optional `png::encode_compressed`; typed jobs, persistence and the CLI remain separate work.
 
 ## Format coverage
 
@@ -12,7 +12,7 @@ conformance or completion of S1. The library exposes `png::decode` and
 | Row encoding | All five filters; noninterlaced and Adam7, including empty passes and pass-local previous rows |
 | Transparency | Straight RGBA samples, hidden RGB, palette alpha and unscaled tRNS comparisons with unused high bits masked |
 | Compression input | Stored, fixed and dynamic Huffman DEFLATE; overlapping references and permitted degenerate alphabets |
-| Output | Deterministic noninterlaced RGBA8, filter None and stored blocks; consecutive bounded IDAT chunks |
+| Output | Deterministic noninterlaced RGBA8: original None/stored writer or optional Sub/Up, fixed Huffman LZ matches and stored fallback; bounded IDAT chunks |
 | Integrity | Chunk CRC32, zlib header/Adler32, exact inflate length, required critical chunks/order, palette/sample constraints |
 | Metadata | Color/profile chunks flagged as uninterpreted; other ancillary chunks flagged as skipped; payloads CRC checked but never inflated or preserved |
 | Unsupported | 16-bit input and animation chunks explicitly rejected; unknown critical chunks rejected |
@@ -34,8 +34,9 @@ follows section 11.3.1.1.
 - `png` owns chunk validation, PNG policy/diagnostics, pass geometry, row
   reconstruction and output framing. It performs no filesystem/process I/O.
 - Private `deflate` owns buffered bit input, canonical Huffman lookup tables,
-  block parsing, history copies and the zlib wrapper. It knows no PNG geometry.
-- Private `checksum` owns a slicing-by-eight CRC32 tables and incremental Adler32.
+  block parsing, history copies and the zlib wrapper. Its `encode` submodule
+  owns bounded hash matching and fixed/stored block emission. It knows no PNG geometry.
+- Private `checksum` owns slicing-by-eight CRC32 tables and incremental Adler32.
   Ordinary functions connect the modules; no backend traits or registry exist.
 
 Fixed Huffman lookup tables are constructed at compile time. Dynamic tables
@@ -56,14 +57,23 @@ It is not a streaming-row decoder and has no aggregate project-memory accountant
 The writer uses at most 65,540 scratch bytes and streams IDAT chunks to an
 ordinary `Write` sink. Work is preflighted before output. I/O failure may leave
 partial bytes in that sink; the future publication layer must stage files.
-Stored-only output is valid but deliberately uncompressed. Bulk checksum processing and contiguous row copies preserve the original
-encoded bytes while improving measured throughput. Compression remains a
-separate feature; stored output is much larger than compressed output.
+The original output is valid but deliberately uncompressed. Bulk checksum processing and contiguous row copies preserve the original
+encoded bytes while improving measured throughput. The optional compressed writer adds less than 169 KiB of bounded scratch,
+independent of dimensions, and precharges a linear work budget before output.
+It tries one recent hash candidate plus a distance-one run candidate, limits
+length/distance to 258/32,768, resets the dictionary per 65,535-byte block and
+uses stored fallback when fixed coding would expand a block. Sub on the first
+row and Up thereafter preserve every sample, including hidden RGB. No dynamic
+Huffman generation, match chains or input-sized index is introduced.
+
+Algorithm sources, creator acknowledgments and the exact partial influences
+are recorded in [the algorithm notes](../benchmarks/png/algorithm-notes.md),
+under the [mandatory attribution rule](design/01-research.md#research-attribution-requirements).
 
 ## Verification
 
-54 Rust tests run offline with no external executable or test library:
-22 raster tests, 19 JSON tests, eight PNG integration tests, two DEFLATE unit tests and three checksum unit
+56 Rust tests run offline with no external executable or test library:
+22 raster tests, 19 JSON tests, ten PNG integration tests, two DEFLATE unit tests and three checksum unit
 tests. The PNG/DEFLATE cases include 31 accepted PNG files, 40 rejected-profile
 files and seven independent zlib streams. Cases cover the required profile
 matrix and the malformed-input rules listed in the design, rather than
@@ -121,3 +131,10 @@ intermediate and final measurements, independent output checks, remaining
 feature gaps and experiments that were not adopted. These observations come
 from a shared Linux host and are not portable performance guarantees. Native
 Linux/macOS/Windows CI checks correctness; timing is not a CI gate.
+
+The first optional compression pass reduces the 1024 sheet from 4,196,508 to
+52,549 bytes, compared with reference Fast's 53,405 and Balanced's 11,233.
+Its measured encoding time is 3.35 ms versus Fast's 0.94 ms; this is size parity
+on one workload, not general speed or feature parity. The final comparison adds
+independent decoding of compressed output for all 31 profile fixtures and a
+multi-block noise image. `png::encode` still matches all baseline byte hashes.

@@ -7,6 +7,7 @@ import hashlib
 import io
 import json
 import platform
+import random
 import shutil
 import subprocess
 import sys
@@ -43,10 +44,11 @@ with tempfile.TemporaryDirectory(prefix='raipixel-png-compare-') as temporary:
         assert ours[8:] == expected, case['name']
         reference = run('verify', source).stdout
         profile.append({'name': case['name'], 'reference': 'exact' if reference[8:] == expected else 'pixels differ'})
-        encoded = run('reencode-ours', source).stdout
-        with Image.open(io.BytesIO(encoded)) as image:
-            image.load()
-            assert image.convert('RGBA').tobytes() == expected, case['name']
+        for writer in ['reencode-ours', 'reencode-compressed']:
+            encoded = run(writer, source).stdout
+            with Image.open(io.BytesIO(encoded)) as image:
+                image.load()
+                assert image.convert('RGBA').tobytes() == expected, (case['name'], writer)
     icon = Image.new('RGBA', (16, 16), (17, 23, 31, 0))
     draw = ImageDraw.Draw(icon)
     draw.polygon([(8, 0), (10, 3), (8, 9), (6, 9), (6, 3)], fill=(173, 184, 198, 255))
@@ -73,7 +75,7 @@ with tempfile.TemporaryDirectory(prefix='raipixel-png-compare-') as temporary:
         result = json.loads(run('bench', source, count, folder).stdout)
         result['name'] = name
         result['sha256'] = {}
-        for mode in ['ours', 'none', 'fast', 'default']:
+        for mode in ['ours', 'none', 'fast', 'default', 'compressed']:
             encoded = (folder / (mode + '.png')).read_bytes()
             result['sha256'][mode] = hashlib.sha256(encoded).hexdigest()
             with Image.open(io.BytesIO(encoded)) as decoded:
@@ -84,6 +86,16 @@ with tempfile.TemporaryDirectory(prefix='raipixel-png-compare-') as temporary:
             assert result['ours_byte_identical_to_baseline'], name
         measurements.append(result)
         print(json.dumps(result), flush=True)
+    noise = Image.frombytes('RGBA', (257, 257), random.Random(17).randbytes(257 * 257 * 4))
+    source = work / 'noise.png'
+    noise.save(source, format='PNG', compress_level=0)
+    encoded = run('reencode-compressed', source).stdout
+    compressed_source = work / 'noise-compressed.png'
+    compressed_source.write_bytes(encoded)
+    assert run('verify', compressed_source).stdout[8:] == noise.tobytes()
+    with Image.open(io.BytesIO(encoded)) as image:
+        image.load()
+        assert image.convert('RGBA').tobytes() == noise.tobytes()
     memory = None
     if args.memory:
         if platform.system() != 'Linux':
@@ -104,7 +116,7 @@ with tempfile.TemporaryDirectory(prefix='raipixel-png-compare-') as temporary:
               'host': platform.platform(), 'reference': 'png 0.18.1, locked default features',
               'raipixel_commit': subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip(),
               'working_tree': subprocess.check_output(['git', '-C', str(ROOT), 'status', '--porcelain'], text=True),
-              'timing_order': baseline['timing_order'], 'profile': profile, 'measurements': measurements}
+              'timing_order': baseline['timing_order'] + ['ours_compressed_encode'], 'profile': profile, 'measurements': measurements}
     if memory is not None:
         report['memory'] = memory
     args.output.parent.mkdir(parents=True, exist_ok=True)
