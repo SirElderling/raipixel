@@ -121,8 +121,8 @@ observed potential regression requiring subsequent measurement, not a claimed
 improvement. These generated icons/sheet differ from the original comparison
 corpus, so compare only matching cases within each report.
 
-The next small experiment packs the length code with its extra bits and the
-distance code with its extra bits before calling the bit writer. It aims to
+The subsequently rejected experiment packed the length code with its extra bits and the
+distance code with its extra bits before calling the bit writer. It aimed to
 reduce four bit-buffer updates to two without changing tokens, bytes, allocation
 or format. A test first compares emitted bytes **and pending bits** against the
 original four-call sequence for every length, both endpoints of every distance

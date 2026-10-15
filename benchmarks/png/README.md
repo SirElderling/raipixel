@@ -292,3 +292,24 @@ The subsequent [bit-packing experiment](timing-packing-rejected.json) was reject
 its apparent full-writer gain coincided with unchanged decode speeding up;
 alternating isolated DEFLATE measurements showed essentially no gain. See the
 [candidate record](candidates/README.md) for reasoning and the rejected result.
+
+### Native full-codec results at bed74af
+
+All 59 tests, formatting, Clippy, checksum comparison and full-codec exact-byte
+comparison pass in [run 38728097613](https://github.com/SirElderling/raipixel/actions/runs/38728097613).
+The baseline is 8db0275, before these encoder changes.
+
+| Native runner | Sheet baseline → current | Reduction | Noise current/baseline |
+|---|---:|---:|---:|
+| [Linux x86-64](native-matcher-linux.json) | 1.757 → 1.270 ms | 27.7% | 0.999× |
+| [Windows x86-64](native-matcher-windows.json) | 1.149 → 0.827 ms | 28.0% | 0.980× |
+| [macOS ARM64](native-matcher-macos.json) | 2.518 → 1.655 ms | 34.3% | 0.808× |
+
+Linux/Windows texture encoding falls 10.2%/8.8%. macOS texture encoding rises
+8.8% and icon-16 rises 15.9%; unchanged control operations vary by up to about
+16%, and repeated per-process texture encoder medians range 1.872–2.469 ms even
+for the baseline. Treat these macOS cases as unresolved timing variability,
+not proof of either improvement or absence of regression. The sheet gain is
+consistent across both native runs. No performance threshold or general parity
+claim is justified. The follow-up documentation commit repeats the native jobs
+with identical library and harness source so the variability remains visible.

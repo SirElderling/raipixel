@@ -72,8 +72,8 @@ under the [mandatory attribution rule](design/01-research.md#research-attributio
 
 ## Verification
 
-57 Rust tests run offline with no external executable or test library:
-22 raster tests, 19 JSON tests, ten PNG integration tests, two DEFLATE unit tests and four checksum unit
+59 Rust tests run offline with no external executable or test library:
+22 raster tests, 19 JSON tests, ten PNG integration tests, four DEFLATE unit tests and four checksum unit
 tests. The PNG/DEFLATE cases include 31 accepted PNG files, 40 rejected-profile
 files and eight independent zlib streams. Cases cover the required profile
 matrix and the malformed-input rules listed in the design, rather than
@@ -99,13 +99,23 @@ outside this profile.
 ## Measure
 
 ```sh
-cargo run --release --locked --offline --example png_bench -- INPUT.png 1000
+cargo run --release --locked --offline --example png_bench -- INPUT.png 25
 ```
 
-The small std-only tool reports per-call decode/encode microseconds. It excludes
-file I/O and process startup, includes fresh decoder/output allocations, and
-observes actual encoded output buffers through `black_box`. Discarding writes
-to an optimizable sink is not used as the encoding comparison methodology.
+The std-only tool calibrates each operation to at least 25 ms per batch, then
+reports seven rotating samples for input/stored decode and stored/compressed
+encode. It excludes file I/O and startup, includes fresh allocations and
+integrity checks, and observes actual buffers through `black_box`.
+
+```sh
+python tools/png_timings.py --baseline 8db0275 --output timings.json
+```
+
+This runner compares the same driver/compiler/profile against baseline/current
+libraries in ABBA process order, checks complete writer SHA256 equality outside
+timing, and records provenance, raw samples and median/range summaries. It runs
+natively on all three CI platforms. See the [timing protocol](../benchmarks/png/timing.md).
+The separate optional reference comparison retains independent image checks.
 
 A development baseline on shared Linux x86_64, AMD EPYC 9V74, Rust 1.99.0 and
 default Cargo release settings measured the following. Inputs were independently
@@ -155,3 +165,15 @@ checksum pass and 3.31 ms before it; the reference in that run measures 0.89 ms.
 An exact independently constructed maximum-length distance-one stream is
 checked by Python zlib and the Rust fixture test before the optimization.
 Other distances retain the general overlap-copy path.
+
+
+The latest encoder pass checks maximal distance-one runs before scanning the
+hash candidate, computes distance-code ranges directly, and shortcuts length
+258. A direct no-run branch retains literal-heavy throughput. Match selection,
+dictionary updates, filters, budgets, allocations and both writers' bytes remain
+unchanged. Exhaustive valid-distance and reference-bit tests preceded the
+changes. The original reference corpus now measures 1024 sheet compressed
+encoding at 1.597 ms versus reference Fast 0.816 ms (about 1.96× slower).
+The generated paired suite is a separate workload, with approximately 30% less
+sheet encoding time locally; shared-host results are observations. A bit-packing
+experiment was rejected when alternating measurements showed no reliable gain.
