@@ -231,6 +231,7 @@ codec and the locked reference through complete public operations.
 
 ## Wider CRC slicing for stored PNG payloads
 
+The implementation is in `src/checksum.rs` (`crc_tables` and `crc32`).
 The actual decoder-stage profile identifies CRC32 validation as the main cost
 on the generated noise input (about 145 of 200 microseconds locally). We extend
 our polynomial-generated slicing tables from eight to 32 byte positions, with

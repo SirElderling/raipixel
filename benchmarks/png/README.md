@@ -1,6 +1,8 @@
 # PNG comparison measurements
 
-[Latest implementation and results](candidates/wide-buffer-and-prefix.md) record
+[Latest decoder profiling and CRC results](candidates/decoder-crc.md) identify
+chunk validation as the noise bottleneck and record safe 32-byte slicing. The
+[preceding encoder results](candidates/wide-buffer-and-prefix.md) record
 matched release-profile comparisons, batched bit output and cached dictionary
 prefixes. The [preceding parity review](candidates/parity-review.md) assesses the remaining gap,
 safe SIMD/code-generation screens, dictionary/run candidates and the case for

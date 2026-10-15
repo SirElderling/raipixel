@@ -72,8 +72,8 @@ under the [mandatory attribution rule](design/01-research.md#research-attributio
 
 ## Verification
 
-65 Rust tests run offline with no external executable or test library:
-22 raster tests, 19 JSON tests, ten PNG integration tests, ten DEFLATE unit tests and four checksum unit
+66 Rust tests run offline with no external executable or test library:
+22 raster tests, 19 JSON tests, ten PNG integration tests, ten DEFLATE unit tests and five checksum unit
 tests. The PNG/DEFLATE cases include 31 accepted PNG files, 40 rejected-profile
 files and eight independent zlib streams. Cases cover the required profile
 matrix and the malformed-input rules listed in the design, rather than
@@ -198,3 +198,15 @@ Linux/macOS/Windows measurements show 21-39% less noise encoding time, 11-14%
 less for sheets and 2-4% less for textures. All 65 tests and independent hashes
 pass. The generated-sheet Fast ratios are 1.108/0.917/1.148 respectively; noise
 and several other cases still trail. This does not establish general parity.
+
+
+The [decoder profiling pass](../benchmarks/png/candidates/decoder-crc.md) finds
+CRC validation dominant on noise, and row reconstruction dominant on the
+original mixed-filter sheet. CRC now uses 32-byte slicing for payloads at least
+4 KiB, keeping the original eight-byte loop for smaller parts. Native paired
+noise decoding takes 36–40% less time and large stored encoding 24–43% less,
+with mixed compact-case results explicitly retained. Tables add 24 KiB of
+read-only data; heap/work policies and every writer byte stay unchanged.
+All 66 tests and independent consumer checks pass. General reference parity
+remains unmet; the record includes both unrestricted-width trials, the size
+policy, creator acknowledgment and all native raw samples.
