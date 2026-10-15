@@ -121,6 +121,8 @@ good('masked-tRNS-gray',png(ihdr(1,1,2,0),zlib.compress(b'\0\x40'),chunk(b'tRNS'
 valid[-1]['rgba']='55555500'
 good('masked-tRNS-rgb',png(ihdr(1,1,8,2),zlib.compress(b'\0\1\2\3'),chunk(b'tRNS',b'\xff\1\xff\2\xff\3')))
 
+good('reserved-ancillary',png(base,compressed,chunk(b'abcd',b'inert')),ancillary_warning=True)
+
 invalid=[]
 def bad(name,data,code):
     invalid.append({'name':name,'png':data.hex(),'code':code})
@@ -135,6 +137,7 @@ bad('IHDR-not-first',SIGNATURE+chunk(b'tEXt',b'n\0x')+original[8:],'E_PNG_CHUNK'
 bad('zero-width',png(ihdr(0,1,8,6),compressed),'E_PNG_CHUNK')
 bad('illegal-depth',png(ihdr(1,1,4,6),compressed),'E_PNG_CHUNK')
 bad('16-bit',png(ihdr(1,1,16,6),compressed),'E_UNSUPPORTED_DEPTH')
+bad('reserved-critical',png(base,compressed,chunk(b'ABcD')),'E_UNSUPPORTED_PNG')
 bad('unknown-critical',png(base,compressed,chunk(b'ABCD')),'E_UNSUPPORTED_PNG')
 for name in [b'acTL',b'fcTL',b'fdAT']:
     bad(name.decode(),png(base,compressed,chunk(name)),'E_UNSUPPORTED_ANIMATION')
@@ -160,6 +163,104 @@ for name,payload,level,strategy,kind in [
     stream=compressor.compress(payload)+compressor.flush()
     assert (stream[2]>>1)&3==kind,(name,stream[:8].hex())
     deflate.append({'name':name,'zlib':stream.hex(),'data':payload.hex()})
+
+# Explicit format cases from RFC 1950/1951, authored as bit fields.
+class Bits:
+    def __init__(self): self.bits=[]
+    def put(self,value,count): self.bits.extend((value>>i)&1 for i in range(count))
+    def symbol(self,symbol,lengths):
+        counts=[0]*16
+        for length in lengths:
+            if length: counts[length]+=1
+        next_code=[0]*16
+        for length in range(1,16): next_code[length]=(next_code[length-1]+counts[length-1])*2
+        for index,length in enumerate(lengths):
+            if not length: continue
+            code=next_code[length];next_code[length]+=1
+            if index==symbol:
+                # Huffman code order is MSB-first within the LSB-packed stream.
+                self.bits.extend((code>>i)&1 for i in reversed(range(length)))
+                return
+        raise AssertionError(symbol)
+    def finish(self):
+        out=bytearray((len(self.bits)+7)//8)
+        for index,bit in enumerate(self.bits): out[index//8]|=bit<<(index%8)
+        return bytes(out)
+
+
+def wrapped(bits,payload,cmf=0x78):
+    flag=next(flag for flag in range(32) if (cmf*256+flag)%31==0)
+    return bytes([cmf,flag])+bits.finish()+struct.pack('>I',zlib.adler32(payload))
+
+
+fixed_lengths=[8]*144+[9]*112+[7]*24+[8]*8
+# Each invalid stream is wrapped with valid PNG framing and CRC so the error
+# must be detected by the inflater, not the outer container.
+def bad_stream(name,stream,header=base):
+    bad(name,png(header,stream),'E_PNG_DEFLATE')
+
+for name,cmf,flag in [('method',0x79,0),('CINFO',0x88,0),('FDICT',0x78,32)]:
+    flag=next(f for f in range(flag,flag+32) if (cmf*256+f)%31==0)
+    bad_stream(name,bytes([cmf,flag])+compressed[2:])
+bad_stream('FCHECK',bytes([compressed[0],compressed[1]^1])+compressed[2:])
+bad_stream('stored-LEN-NLEN',b'\x78\x01\x01\x05\x00\x00\x00'+raw+struct.pack('>I',zlib.adler32(raw)))
+b=Bits();b.put(1,1);b.put(3,2);bad_stream('reserved-block',wrapped(b,raw))
+b=Bits();b.put(1,1);b.put(1,2);b.symbol(286,fixed_lengths);bad_stream('reserved-literal',wrapped(b,raw))
+b=Bits();b.put(1,1);b.put(1,2);b.symbol(257,fixed_lengths);b.symbol(0,[5]*32);bad_stream('distance-before-history',wrapped(b,raw))
+b=Bits();b.put(1,1);b.put(1,2);b.symbol(65,fixed_lengths);b.symbol(257,fixed_lengths);b.symbol(30,[5]*32);bad_stream('reserved-distance',wrapped(b,raw))
+b=Bits();b.put(1,1);b.put(1,2)
+for _ in range(257): b.symbol(65,fixed_lengths)
+b.symbol(257,fixed_lengths);b.symbol(16,[5]*32);b.put(0,7)
+bad_stream('advertised-window',wrapped(b,b'A'*260,cmf=0x08),ihdr(259,1,8,0))
+
+
+def dynamic_header(lengths,hlit=0):
+    order=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15]
+    count=max(4,max(i+1 for i,symbol in enumerate(order) if lengths[symbol]))
+    b=Bits();b.put(1,1);b.put(2,2);b.put(hlit,5);b.put(0,5);b.put(count-4,4)
+    for symbol in order[:count]: b.put(lengths[symbol],3)
+    return b
+
+lengths=[0]*19;lengths[0]=lengths[16]=1
+b=dynamic_header(lengths);b.symbol(16,lengths);b.put(0,2)
+bad_stream('repeat-without-previous',wrapped(b,raw))
+lengths=[0]*19;lengths[0]=lengths[16]=lengths[17]=1
+bad_stream('oversubscribed-code-tree',wrapped(dynamic_header(lengths),raw))
+lengths=[0]*19;lengths[0]=1
+bad_stream('incomplete-code-tree',wrapped(dynamic_header(lengths),raw))
+lengths=[0]*19;lengths[0]=lengths[18]=1
+b=dynamic_header(lengths)
+for _ in range(2): b.symbol(18,lengths);b.put(127,7)
+bad_stream('repeat-overrun',wrapped(b,raw))
+b=dynamic_header(lengths);b.symbol(18,lengths);b.put(127,7);b.symbol(18,lengths);b.put(109,7)
+bad_stream('missing-end-code',wrapped(b,raw))
+b=Bits();b.put(1,1);b.put(2,2);b.put(30,5);b.put(0,5);b.put(0,4)
+bad_stream('reserved-HLIT',wrapped(b,raw))
+
+# Valid degenerate trees: one EOB or two literal codes, no distance alphabet
+# (or the permitted single one-bit distance code, unused by these blocks).
+for name,literal,distance_length in [('empty-single-EOB',False,0),('literal-only-empty-distance',True,0),('literal-only-single-distance',True,1)]:
+    lengths=[0]*19;lengths[0]=1;lengths[1]=lengths[18]=2
+    b=dynamic_header(lengths)
+    def zeros(count):
+        while count>=11:
+            amount=min(138,count);b.symbol(18,lengths);b.put(amount-11,7);count-=amount
+        for _ in range(count): b.symbol(0,lengths)
+    if literal:
+        zeros(65);b.symbol(1,lengths);zeros(190)
+    else: zeros(256)
+    b.symbol(1,lengths);b.symbol(distance_length,lengths)
+    if literal: b.put(0,1);b.put(1,1)
+    else: b.put(0,1)
+    payload=b'A' if literal else b''
+    stream=wrapped(b,payload)
+    assert zlib.decompress(stream)==payload,name
+    deflate.append({'name':name,'zlib':stream.hex(),'data':payload.hex()})
+compressor=zlib.compressobj()
+payload=b'A'*1000+b'B'*1000
+stream=compressor.compress(payload[:1000])+compressor.flush(zlib.Z_SYNC_FLUSH)+compressor.compress(payload[1000:])+compressor.flush()
+assert zlib.decompress(stream)==payload
+deflate.append({'name':'mixed-blocks','zlib':stream.hex(),'data':payload.hex()})
 
 folder=Path('tests/fixtures')
 writer_raw=b'\0\1\2\3\0\4\5\6\xff'
