@@ -1,5 +1,5 @@
 {
-  "source_commit": "9c7b90837841053b6b364aba9a86367eb181dd69",
+  "source_commit": "14baddae0c7a546c74ecf5f692b610466259d4eb",
   "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
   "input": "4 MiB, byte i = (17*i+3) mod 256",
   "method": "release rustc -O; seven batches, alternating operation order; black_box input and output; no file I/O",
@@ -32,5 +32,7 @@
   "median_us": [
     3578.4735499999997,
     1753.9704000000002
-  ]
+  ],
+  "checksum_source_sha256": "a8db85db57803218db840febb788cc46f00477f95256b137315660cd29686bb3",
+  "host": "Linux-6.18.44-x86_64-with-glibc2.39"
 }

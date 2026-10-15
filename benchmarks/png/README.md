@@ -165,6 +165,59 @@ All seven original stored output hashes still match baseline. Both reference
 and independent image decoders confirm exact compressed RGBA. The runner also
 checks both writers on all 31 accepted profile fixtures and independently reads
 a 257×257 pseudorandom RGBA image to exercise multi-block stored fallback.
-56 std-only tests cover the new writer, independent fixed-code canonical bytes,
+At that checkpoint, 56 std-only tests covered the new writer, independent fixed-code canonical bytes,
 repeatability, block boundaries, compression of repeated data, noise fallback,
 work preflight and I/O failure. Native CI validates Linux, macOS and Windows.
+
+
+## Packed Adler32 throughput pass
+
+`packed-adler.json` records the next whole-codec run. The comparison now freezes
+both stored and compressed output hashes against their respective baselines.
+All fourteen output hashes match; the independent 31-fixture and noise-image
+checks also pass. There is no format, filter policy, output-size or scratch-
+allocation change in this pass.
+
+`checksum-before.json` and `checksum-after.json` isolate our checksum code on
+4 MiB of deterministic bytes, with seven alternating batches and input/output
+observed through `black_box`. Adler32's median drops from 1.754 to 0.549 ms
+(about 3.2× faster); the unchanged CRC32 control measures 3.578/3.629 ms.
+The raw samples retain shared-host variation. Reproduce the std-only probe with:
+
+```sh
+rustc --edition=2024 -O tools/png_checksum_bench.rs -o /tmp/png-checksum-bench
+/tmp/png-checksum-bench
+```
+
+The probe may also read a raw byte file supplied as its first argument. To
+compare old/new code, compile it in the respective source checkout. No reference
+implementation or dependency is needed for this probe.
+
+| 1024×1024 workload | Before this pass | After this pass | Reference in after run |
+|---|---:|---:|---:|
+| Sheet decode | 3.31 ms | 2.16 ms | 0.89 ms |
+| Sheet encode, compressed | 3.35 ms | 2.21 ms | 0.92 ms (Fast) |
+| Sheet encode, stored | 4.24 ms | 3.00 ms | 2.24 ms (NoCompression) |
+| Texture decode | 2.16 ms | 1.11 ms | 2.02 ms |
+| Texture encode, compressed | 3.10 ms | 2.09 ms | 5.65 ms (Fast) |
+
+The sheet writer/decode gap narrows, but remains roughly 2.4× against the shown
+reference Fast/decode results. Texture results differ because content and filter
+policies differ. Reference stored timing has varied substantially across runs;
+none of these samples establishes universal parity or superiority.
+
+[The algorithm notes](algorithm-notes.md#adler32-grouping-the-defining-recurrence)
+credit the checksum/format creators and derive the packed sums from RFC 1950.
+Each 16-bit lane's sum and prefix sum are proved below the carry threshold.
+A direct test isolates every byte weight, before production code changes;
+fragmented/full all-255 tests verify batching and accumulator bounds. All 57
+std-only Rust tests run under native Linux/macOS/Windows CI. No unsafe code,
+architecture-specific intrinsics, extra dependency or framework was added.
+
+`checksum-paired.json` also compares both algorithms in the same executable,
+retaining our previous eight-byte weighting only as a measurement control.
+It asserts checksum equality before timing and rotates all three operations.
+On the local host this gives 1.592/0.528 ms for old/new Adler32, approximately
+3.0×. The native CI jobs compile/run this std-only probe too, recording the
+before/after medians for Linux, macOS and Windows. Timing has no pass/fail
+threshold; checksum equality and the normal correctness checks do.

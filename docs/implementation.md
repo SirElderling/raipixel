@@ -69,7 +69,8 @@ expectations: transparent RGB, row order, selection preservation, copy alignment
 overlap, alpha rounding, bounds and the specified limits. One small exhaustive
 alpha/opacity check covers the byte-valued compositing domain. `tests/json.rs`
 adds 19 tests for the specified JSON syntax, Unicode, limits, exact integer
-ranges, emission and the real proposed command schema. Ten PNG tests, two DEFLATE unit tests and three checksum tests add the independently generated codec corpus. All 56 tests
+ranges, emission and the real proposed command schema. Ten PNG tests, two DEFLATE unit tests and four checksum tests add the
+independently generated codec corpus. All 57 tests
 need only the Rust toolchain and run offline.
 
 TDD history starts with tests against an empty library: `cargo test --offline`
@@ -90,6 +91,8 @@ Python is a verification facility, not an application or Rust test dependency.
 GitHub CI runs native stable tests, formatting and Clippy on Linux x86_64,
 macOS ARM64 and Windows x86_64 MSVC. CI follows the latest stable Rust
 (currently 1.99); older compiler compatibility is not maintained.
+A std-only checksum probe also compares previous/current arithmetic in each
+native job; checksum equality is checked and timings are informational.
 Toolchain installation uses the network; Cargo build/test commands run offline.
 The workflow runs on pull requests and pushes to main/feat branches.
 

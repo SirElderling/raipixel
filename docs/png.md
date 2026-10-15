@@ -72,8 +72,8 @@ under the [mandatory attribution rule](design/01-research.md#research-attributio
 
 ## Verification
 
-56 Rust tests run offline with no external executable or test library:
-22 raster tests, 19 JSON tests, ten PNG integration tests, two DEFLATE unit tests and three checksum unit
+57 Rust tests run offline with no external executable or test library:
+22 raster tests, 19 JSON tests, ten PNG integration tests, two DEFLATE unit tests and four checksum unit
 tests. The PNG/DEFLATE cases include 31 accepted PNG files, 40 rejected-profile
 files and seven independent zlib streams. Cases cover the required profile
 matrix and the malformed-input rules listed in the design, rather than
@@ -138,3 +138,12 @@ Its measured encoding time is 3.35 ms versus Fast's 0.94 ms; this is size parity
 on one workload, not general speed or feature parity. The final comparison adds
 independent decoding of compressed output for all 31 profile fixtures and a
 multi-block noise image. `png::encode` still matches all baseline byte hashes.
+
+The next byte-preserving pass groups Adler32 into packed 128-byte sums, with
+explicit no-carry bounds and no additional heap storage. In the recorded Linux
+run, 1024 sheet compressed encoding fell from 3.35 to 2.21 ms and decode from
+3.31 to 2.16 ms; reference Fast encoding/decode were about 0.92/0.89 ms.
+The checksum microbenchmark fell from 1.75 to 0.55 ms per 4 MiB. Both writer
+modes retain their previous exact SHA256 on all seven benchmark images. See the
+comparison record for samples, methodology and remaining gaps, and the algorithm
+notes for the recurrence derivation and creator acknowledgments.
