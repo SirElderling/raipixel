@@ -175,6 +175,44 @@ mod tests {
     use super::*;
 
     #[test]
+    fn fixed_symbols_match_rfc_codes_at_every_pending_offset() {
+        let mut encoder = Encoder::new(16).unwrap();
+        for symbol in 0..=285u32 {
+            let (code, count) = match symbol {
+                0..=143 => (symbol + 48, 8),
+                144..=255 => (symbol - 144 + 400, 9),
+                256..=279 => (symbol - 256, 7),
+                _ => (symbol - 280 + 192, 8),
+            };
+            let reversed = code.reverse_bits() >> (32 - count);
+            for pending in 0..8 {
+                encoder.output.clear();
+                encoder.bits = (1 << pending) - 1;
+                encoder.count = pending;
+                encoder.symbol(symbol);
+                let bits = ((1u32 << pending) - 1) | (reversed << pending);
+                let total = count + pending;
+                let bytes = (total / 8) as usize;
+                assert_eq!(encoder.output, bits.to_le_bytes()[..bytes]);
+                assert_eq!(encoder.bits, bits >> (bytes * 8));
+                assert_eq!(encoder.count, total % 8);
+            }
+        }
+    }
+
+    #[test]
+    fn matches_find_every_termination_byte_and_overlapping_run() {
+        for maximum in 3..=258 {
+            for mismatch in 3..maximum {
+                let mut data = vec![19; 2 * 258];
+                data[258 + mismatch] = 37;
+                assert_eq!(match_length(&data, 0, 258, maximum), mismatch);
+            }
+            assert_eq!(match_length(&[19; 259], 0, 1, maximum), maximum);
+        }
+    }
+
+    #[test]
     fn references_preserve_rfc_bits_at_every_length_and_pending_offset() {
         let mut actual = Encoder::new(32).unwrap();
         let mut expected = Encoder::new(32).unwrap();

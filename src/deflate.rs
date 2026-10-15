@@ -1,6 +1,7 @@
 //! Private zlib/DEFLATE decoder; no PNG chunk or pixel knowledge.
 use crate::{Error as ResourceError, Work, checksum::Adler};
 use std::borrow::Cow;
+#[path = "deflate/encode.rs"]
 mod encode;
 pub(crate) use encode::{BLOCK, Encoder};
 
