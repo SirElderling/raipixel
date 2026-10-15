@@ -45,8 +45,8 @@ fn distance_code(distance: usize) -> usize {
     }
 }
 
-const fn fixed_codes() -> [(u16, u8); 286] {
-    let mut result = [(0, 0); 286];
+const fn fixed_codes() -> [u16; 286] {
+    let mut result = [0; 286];
     let mut symbol = 0;
     while symbol < result.len() {
         let (code, count) = match symbol {
@@ -55,7 +55,7 @@ const fn fixed_codes() -> [(u16, u8); 286] {
             256..=279 => (symbol as u16 - 256, 7),
             _ => (symbol as u16 - 280 + 192, 8),
         };
-        result[symbol] = (code.reverse_bits() >> (16 - count), count);
+        result[symbol] = (code.reverse_bits() >> (16 - count)) | ((count as u16) << 9);
         symbol += 1;
     }
     result
@@ -73,7 +73,8 @@ const fn length_codes() -> [u8; 256] {
     }
     result
 }
-static FIXED_CODES: [(u16, u8); 286] = fixed_codes();
+// Nine low bits hold the reversed code; the high bits hold its bit count.
+static FIXED_CODES: [u16; 286] = fixed_codes();
 static LENGTH_CODES: [u8; 256] = length_codes();
 
 impl Encoder {
@@ -111,13 +112,17 @@ impl Encoder {
         }
     }
     fn symbol(&mut self, symbol: u32) {
-        let (code, count) = FIXED_CODES[symbol as usize];
-        self.put(u32::from(code), u32::from(count));
+        let packed = FIXED_CODES[symbol as usize];
+        self.put(u32::from(packed & 511), u32::from(packed >> 9));
     }
     fn reference(&mut self, length: usize, distance: usize) {
-        let index = usize::from(LENGTH_CODES[length - 3]);
-        self.symbol(257 + index as u32);
-        self.put((length - LENGTH_BASE[index]) as u32, LENGTH_EXTRA[index]);
+        if length == 258 {
+            self.symbol(285);
+        } else {
+            let index = usize::from(LENGTH_CODES[length - 3]);
+            self.symbol(257 + index as u32);
+            self.put((length - LENGTH_BASE[index]) as u32, LENGTH_EXTRA[index]);
+        }
         let index = distance_code(distance);
         self.put((index as u32).reverse_bits() >> 27, 5);
         self.put(

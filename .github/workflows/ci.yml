@@ -62,3 +62,7 @@ jobs:
           ./png-filter-adler-trial.exe
           python tools/png_match_trial.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
           python tools/png_decoder_profile.py --recompress png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png
+      - name: Profile actual writer stages (informational)
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: python tools/png_writer_profile.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png
