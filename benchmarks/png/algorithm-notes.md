@@ -263,3 +263,11 @@ The initial native 25 ms pass improves noise/stored throughput but shows a
 macOS compressed-sheet regression amid large timing stalls. The follow-up
 raises the complete-codec minimum batch to 100 ms; both runs are retained in
 the decision record, and the initial regression is not discarded.
+
+The 100 ms repeat still gives mixed compact-input timings, including macOS
+icon and Windows sheet regressions. The next candidate retains the original
+eight-byte bulk loop for parts smaller than 4 KiB, using wider slicing for
+larger parts. This is a measured payload-size policy, not a format restriction:
+large stored/noise payloads benefit consistently, while small compressed IDAT
+parts do not justify the wider table working set. Tests cover both sides of the
+4 KiB crossover. Both unrestricted-width runs remain recorded.

@@ -35,7 +35,13 @@ pub(crate) fn crc32(parts: &[&[u8]]) -> u32 {
     for part in parts {
         // Wider groups shorten the dependent checksum chain. Keep eight-byte
         // groups for the remainder so short PNG chunks retain their fast path.
-        let (wide, tail) = part.as_chunks::<32>();
+        // Small compressed payloads keep the smaller table working set. The
+        // wider loop pays off on the large stored/noise payloads we measured.
+        let (wide, tail) = if part.len() >= 4096 {
+            part.as_chunks::<32>()
+        } else {
+            (&[][..], *part)
+        };
         for bytes in wide {
             let head = u32::from_le_bytes(bytes[..4].try_into().unwrap()) ^ crc;
             crc = CRC[31][(head & 255) as usize]
@@ -175,7 +181,7 @@ mod tests {
                 seed as u8
             })
             .collect();
-        for len in (0..=129).chain([255, 256, 257, 4096, 65_535, 65_536, 65_537]) {
+        for len in (0..=129).chain([255, 256, 257, 4095, 4096, 4097, 65_535, 65_536, 65_537]) {
             let mut expected = u32::MAX;
             for &byte in &data[..len] {
                 expected ^= u32::from(byte);
