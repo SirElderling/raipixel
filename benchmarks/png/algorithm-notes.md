@@ -135,3 +135,28 @@ existing bounded-window conceptual credit to Bille, Cording, Fischer and Gørtz
 continues to apply. A code/extra-bit packing experiment was measured and rejected;
 no additional literature algorithm was adopted. See the candidate and timing
 records for our measurements, independently of any published performance claims.
+
+
+## Lookup tables and measured alternatives
+
+The [lookup/stage experiment record](candidates/lookup-and-stage-tests.md)
+documents the encoder's compile-time fixed-code and length maps derived from
+Deutsch's RFC 1951, the independent XOR termination experiment, and exact tests.
+No comparison-crate source was used. Our dynamic decoder table construction is
+profiled, not redesigned; Nekritch's alternative remains reviewed-only.
+
+The filter/Adler prototype in `tools/png_filter_adler_trial.rs` partially uses
+the fusion concept discussed by Joglekar, Kounavis and Berry (FAST 2005, linked
+above). It adapts copy/CRC fusion to Up-filter generation and Adler32; this
+prototype is rejected after measurements, not retained in production. Its packed
+checksum recurrence still acknowledges Adler, Gailly and RFC 1950 as above.
+The guarded subtraction and checksum code were independently derived. Paper
+results are distinct from our own paired timings. The record links raw samples,
+source locations and adaptations as required by PR1's attribution guideline.
+
+The retained lookup version packs each reversed fixed code and bit count into
+one `u16` and preserves the original maximum-length shortcut. It is derived from
+our code and the RFC 1951 ranges, with 828 bytes of static data. Actual-stage
+instrumentation and token replay only analyze our own implementation; they add
+no algorithm attribution claim or production API. Full adaptations and evidence
+are in the lookup/stage decision record linked above.

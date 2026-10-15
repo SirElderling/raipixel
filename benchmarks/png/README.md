@@ -313,3 +313,32 @@ not proof of either improvement or absence of regression. The sheet gain is
 consistent across both native runs. No performance threshold or general parity
 claim is justified. The follow-up documentation commit repeats the native jobs
 with identical library and harness source so the variability remains visible.
+
+## Lookup-table tests and confirmed bottlenecks
+
+[The new decision record](candidates/lookup-and-stage-tests.md) covers all four
+proposed experiments, their exact checks, raw samples, creators and adaptations.
+The initial tuple-table version regressed on macOS and was superseded. Restoring
+the maximum-length shortcut and packing each fixed code/length into one `u16`
+now reduces paired complete sheet encoding time by 5–11%, texture by 10–13%,
+and noise by 9–18% across native Linux/macOS/Windows in run 38738287332. All
+61 core tests and both writers' output hashes pass. Benchmark executable growth
+is 768/144/512 bytes respectively. No production dependency or unsafe code is
+introduced. The reference harness now calibrates each operation to at least
+25 ms and retains raw samples, rather than relying on small fixed-count batches.
+
+Actual-writer instrumentation confirms the remaining sheet costs are roughly
+half DEFLATE, one-third Adler32, 10% filtering and 3% IDAT CRC/write. Separate
+emission replay supports prioritizing matching/hash work within DEFLATE; it is
+not an exact additive profile because cache/branch behavior differs. Dynamic
+Huffman setup is small on the measured inputs. Fusion is substantially slower,
+and XOR termination regresses on Windows, so both remain experiment-only.
+See [actual writer samples](writer-profile.json), [token replay](token-replay.json)
+and the native packed reports for measurement overhead/variance and limitations.
+
+The retained compact implementation's [final independent calibrated comparison](run-lookup-packed.json)
+measures original-sheet compressed encoding at 1.483 ms versus reference Fast
+0.813 ms (about 1.82× slower), with unchanged 52,549/53,405 bytes. The first
+lookup trial's 1.66× ratio came from a different run with reference Fast at
+0.910 ms; native paired controls provide the before/after evidence. All fourteen
+original writer hashes and the independent profile/noise sample checks pass.

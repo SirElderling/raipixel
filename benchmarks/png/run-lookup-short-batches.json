@@ -1,0 +1,368 @@
+{
+  "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "host": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "reference": "png 0.18.1, locked default features",
+  "raipixel_commit": "138ad84c2161cb5d2c3c4dd44b9c8c46cbd43e06",
+  "working_tree": " M .github/workflows/ci.yml\n M src/deflate/encode.rs\n M tools/png_timings.py\n?? tools/png_decoder_profile.py\n?? tools/png_filter_adler_trial.rs\n?? tools/png_match_trial.py\n",
+  "timing_order": [
+    "ours_decode",
+    "reference_decode",
+    "ours_encode",
+    "reference_no_compression",
+    "reference_fast",
+    "reference_balanced",
+    "ours_compressed_encode"
+  ],
+  "profile": [
+    {
+      "name": "color0-depth1-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth1-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth2-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth2-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth4-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth4-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth8-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth8-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color2-depth8-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color2-depth8-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth1-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth1-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth2-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth2-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth4-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth4-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth8-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth8-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color4-depth8-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color4-depth8-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color6-depth8-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color6-depth8-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "empty-and-split-IDAT",
+      "reference": "exact"
+    },
+    {
+      "name": "uninterpreted-color",
+      "reference": "exact"
+    },
+    {
+      "name": "skipped-ancillary",
+      "reference": "exact"
+    },
+    {
+      "name": "trailing-zlib-bytes",
+      "reference": "exact"
+    },
+    {
+      "name": "one-pixel-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "one-pixel-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "masked-tRNS-gray",
+      "reference": "pixels differ"
+    },
+    {
+      "name": "masked-tRNS-rgb",
+      "reference": "exact"
+    },
+    {
+      "name": "reserved-ancillary",
+      "reference": "exact"
+    }
+  ],
+  "measurements": [
+    {
+      "width": 16,
+      "height": 16,
+      "input_bytes": 187,
+      "iterations": 2000,
+      "us": [
+        1.1023,
+        2.0066,
+        1.0415,
+        0.9442,
+        1.775,
+        90.0371,
+        2.5431
+      ],
+      "bytes": {
+        "ours": 1132,
+        "none": 1108,
+        "fast": 279,
+        "default": 198,
+        "compressed": 228
+      },
+      "name": "icon-16",
+      "sha256": {
+        "ours": "02dc2a543292b884093363a513810df6f24b9e71770b62dfdb79bb7f9057831a",
+        "none": "2447a547ae6c07542ca0ead4894d0bc2f808667ce0ac7a8e460d3a70b5fab0c8",
+        "fast": "0d0eb4924d36e2b5795086c182b47f74d980640d91d48a75f4f01735727a27c7",
+        "default": "66efa8c1179739474f0a2ae4c30f4ae339bbaf4b839d75639f7eb7aa45d3f3e2",
+        "compressed": "574478a42322fb288ab0e78e6ba4181953a5c41bc038ed9d7220995f25844c70"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    },
+    {
+      "width": 32,
+      "height": 32,
+      "input_bytes": 214,
+      "iterations": 1000,
+      "us": [
+        3.2954,
+        2.9695,
+        3.3047,
+        1.4746,
+        2.7781,
+        112.1436,
+        4.24
+      ],
+      "bytes": {
+        "ours": 4220,
+        "none": 4196,
+        "fast": 355,
+        "default": 224,
+        "compressed": 300
+      },
+      "name": "icon-32",
+      "sha256": {
+        "ours": "b816f040483c4ef8c68bc7191c1b59cbe35f739c1b9e35c907452a79175b9c1a",
+        "none": "ee72cab0a2bb71486f84fb76bf63be4087310131fd37e7dd011f23da78e77988",
+        "fast": "9a6835fe234d3ad7f18c632d78d31e391eec7f159871e411291adc6e4374127c",
+        "default": "74bb716357ad6f3ca31e6708fa820dd0da69d138127b1b8e2a837cf83659bc13",
+        "compressed": "0aa10f258d4b8a14cdcbad5a962878bb41ad2a9427d0ce5d9f855f14ddebfa95"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    },
+    {
+      "width": 64,
+      "height": 64,
+      "input_bytes": 340,
+      "iterations": 500,
+      "us": [
+        8.3361,
+        8.7458,
+        11.3254,
+        2.9731,
+        5.5587,
+        134.615,
+        8.1065
+      ],
+      "bytes": {
+        "ours": 16540,
+        "none": 16516,
+        "fast": 470,
+        "default": 301,
+        "compressed": 479
+      },
+      "name": "icon-64",
+      "sha256": {
+        "ours": "58ece1207d873ff189dbb689ba216bf9ddf31aec8014c4d429b6de84dc0ba09d",
+        "none": "1ec25d604c61d92671e91b364fbec5af3e39eef74d4007b42683a029c74eb1b5",
+        "fast": "dd15b6102bbf403257993454e1a6824262b78926b20e46bde6966e0f5088cd71",
+        "default": "4d77f0166d9292b4ea43e6978c769898f96f58ee876210aafc7be8425a6f9f5d",
+        "compressed": "e1f60351615969e7c3e5ac5b525ca27827b6945fd68c64f9a36ddb50609efc4f"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    },
+    {
+      "width": 256,
+      "height": 256,
+      "input_bytes": 1549,
+      "iterations": 50,
+      "us": [
+        103.7503,
+        66.5572,
+        193.8206,
+        26.4255,
+        64.2541,
+        822.0087,
+        100.8507
+      ],
+      "bytes": {
+        "ours": 262560,
+        "none": 262488,
+        "fast": 3911,
+        "default": 1513,
+        "compressed": 3908
+      },
+      "name": "sheet-256",
+      "sha256": {
+        "ours": "164f2cdffbf1b73b658b313bd40364f33e239ab29d1069ab59569c465772b816",
+        "none": "cdf82bce49774f04e583bbc72f99fae7fc5436c57d0e38b2b807525a13747b6f",
+        "fast": "296442ae6c778ea3c58cfabdc61d319afe17fced1256a35a24a80aed65a8dfb9",
+        "default": "67fc8954fca3e4a3c1693a0df649d4ebd95d221463dfef0341f9678cd1c8dbc9",
+        "compressed": "51e49bbf9363d2aea6b552be1add6d48849d2b52c70da5e8ba8bbda36f97e8db"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    },
+    {
+      "width": 1024,
+      "height": 1024,
+      "input_bytes": 12203,
+      "iterations": 10,
+      "us": [
+        1696.6555,
+        926.8762,
+        3438.9669,
+        2548.8,
+        1025.2046,
+        9784.7039,
+        1836.187
+      ],
+      "bytes": {
+        "ours": 4196508,
+        "none": 4195716,
+        "fast": 53405,
+        "default": 11233,
+        "compressed": 52549
+      },
+      "name": "sheet-1024",
+      "sha256": {
+        "ours": "39903c94668ea6c6ca375de82f28e124faf133391ba22f0329ba383db97c0970",
+        "none": "f42293c3e2416ce34866068fe3cc1e6ce0893f03fe84c43509b2e943a2b66e8a",
+        "fast": "ecbbf78a9c65a59c9f5c8bfdd6ef264d9429a0356bea90626f45a9741a7914ae",
+        "default": "0206c72f8e9773128b56b3e79616631fd0901f5e5252e9cc4675191d49fa687d",
+        "compressed": "e4979657ab2fa46587ebc8e039fce81298899823193cfcae0337224b7569b3d7"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    },
+    {
+      "width": 256,
+      "height": 256,
+      "input_bytes": 1255,
+      "iterations": 50,
+      "us": [
+        66.4486,
+        120.8535,
+        195.6225,
+        25.8568,
+        364.7344,
+        891.0546,
+        115.4636
+      ],
+      "bytes": {
+        "ours": 262560,
+        "none": 262488,
+        "fast": 207670,
+        "default": 1241,
+        "compressed": 5734
+      },
+      "name": "texture-256",
+      "sha256": {
+        "ours": "eb8afe9f8b76ab895fd3fffabeadcebbf15c323a8ad4d234d752a83708bf003d",
+        "none": "790e8fd581e33658411e4fcf5e6bc8ef47ebd2469fcf436839845420395fb04b",
+        "fast": "d3304638ce8a71719afd24cd46a86540f64c44d121cff69e2182eaf856b8de7f",
+        "default": "5691b63e4e31b021888fbccfbe0099544d2eed26ef7bb73889b14720ffb2584d",
+        "compressed": "077fe46a862f07998cfd9e14b5b000aa1c43627ba1b4a93096b924d6d525eb9d"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    },
+    {
+      "width": 1024,
+      "height": 1024,
+      "input_bytes": 12551,
+      "iterations": 10,
+      "us": [
+        1065.1147,
+        2121.0107,
+        3248.078,
+        425.8895,
+        5906.4061,
+        10341.2775,
+        1696.35
+      ],
+      "bytes": {
+        "ours": 4196508,
+        "none": 4195716,
+        "fast": 3316027,
+        "default": 12533,
+        "compressed": 83186
+      },
+      "name": "texture-1024",
+      "sha256": {
+        "ours": "f6c6c012a78a81c97515b051e1884cfa60459b2d06643832ab23054feddd11a0",
+        "none": "feaff6282fe74b4aaa256966037f4398a5b1ab999c43cc57e011cf4c96a93977",
+        "fast": "0dcc422547369d8e4c582338e3e9e4c7b941a85516deb30be2cf640c3a1ebc56",
+        "default": "2397fe9f87434dca15b0fd3768d21ce2395a8533d844d39c894f1b792bb693a6",
+        "compressed": "f142fa1b01b46ac81fd1a41b2db15582a29c7f899dee33d33f8b19c8de6841b9"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    }
+  ]
+}

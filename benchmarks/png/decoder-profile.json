@@ -1,0 +1,72 @@
+{
+  "compiler": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "instrumentation_overhead_included": true,
+  "decoder_sha256": "e781706e1afeac51743058960b34dfbd8340a8afb0a83308673e0bab0fa8fea0",
+  "results": [
+    {
+      "input": "/workspace/scratch/9a02221c06fc/comparison-sheet-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "inflate_us": [
+        808.6720703125001,
+        780.9641796875,
+        761.6196875,
+        802.4458828125,
+        895.3377734375,
+        798.702375,
+        876.635546875
+      ],
+      "huffman_setup_us": [
+        1.9459296875,
+        2.0862890625,
+        1.8480859375,
+        1.9017265625,
+        3.7562890625,
+        1.948828125,
+        2.5024765625
+      ],
+      "tables_per_decode": [
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ]
+    },
+    {
+      "input": "/workspace/scratch/9a02221c06fc/comparison-texture-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "inflate_us": [
+        994.0626953125001,
+        1043.90859375,
+        1091.5722109375,
+        989.8704296875001,
+        947.6170781249999,
+        1122.3524843750001,
+        1082.69503125
+      ],
+      "huffman_setup_us": [
+        0.8644921875,
+        0.91071875,
+        0.8912265625,
+        0.874765625,
+        1.151921875,
+        0.9202421875,
+        0.9048984375
+      ],
+      "tables_per_decode": [
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ]
+    }
+  ]
+}

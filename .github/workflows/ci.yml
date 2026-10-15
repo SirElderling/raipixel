@@ -66,3 +66,7 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: stable
         run: python tools/png_writer_profile.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png
+      - name: Screen token emission separately from matching (informational)
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: python tools/png_token_replay.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png

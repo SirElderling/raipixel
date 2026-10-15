@@ -40,3 +40,34 @@ It records the resolved commits, working-tree state, Rust version/LLVM/target,
 OS/architecture, flags, driver/library SHA256 fingerprints and CI run ID. A nonempty working-tree field identifies a
 local experiment; published measurements must name the tested source change.
 No performance thresholds are enforced across heterogeneous machines.
+
+
+## Stage and candidate probes
+
+`cargo run --release --locked --offline --example png_stages -- INPUT.png`
+checks and measures filtering, Adler32, DEFLATE encode, IDAT CRC, inflate and
+whole-codec operations for trusted noninterlaced RGBA8 inputs. It reuses our
+private implementation source without public profiling APIs; its filter screen
+is checked against actual inflated writer bytes. Stage times are isolated and
+not additive. Native CI runs the same probe on generated sheet/texture files.
+
+`tools/png_match_trial.py`, `tools/png_filter_adler_trial.rs` and
+`tools/png_decoder_profile.py` reproduce the rejected/deferred experiments in
+temporary source copies or standalone executables. They add no root Cargo
+dependencies or application paths. The [decision record](candidates/lookup-and-stage-tests.md)
+describes validity checks, instrumentation limits and creator credits.
+
+The optional `tools/compare_png.py` reference harness now also calibrates each
+operation to 25 ms and records all seven samples/counts, in addition to exact
+output and independent decoding. `tools/png_timings.py` records both benchmark
+executable sizes so a speed change can be assessed against its footprint cost.
+
+`tools/png_writer_profile.py INPUT.png ...` times the actual public compressed
+writer stages in a temporary instrumented library and alternates it with the
+uninstrumented library. Exact bytes are checked first; timers run per block to
+limit perturbation. The report retains paired totals and stage samples so its
+instrumentation/layout overhead remains visible. It introduces no production
+profiling API. `tools/png_token_replay.py INPUT.png ...` captures real tokens
+untimed, verifies complete replay byte equality and times the same bit emitter.
+Replay has different memory/branch behavior, so subtraction is not an exact
+matching-time measurement. Both probes are now part of native CI.
