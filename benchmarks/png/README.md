@@ -252,3 +252,15 @@ repeat, versus 2.21 ms in the preceding run and 3.35 ms before the checksum
 change; shared-host timing varies. Both writer modes keep every recorded byte
 hash and all independent sample checks pass. No new allocation or format
 capability was introduced by either optimization.
+
+
+## Next candidate, not yet adopted
+
+[The candidate decision record](candidates/README.md) ranks run-first matching
+and direct distance-code mapping, supplies individual/combined reviewable
+patches, and records isolated Linux tests plus repeated full-writer timings.
+The combined trial reduces repeated 1024 sheet encoding from 2.24–2.34 to
+1.66–1.67 ms with identical PNG bytes. Production source remains at the current
+matcher; native full-writer comparison and a permanent mapping-domain test are
+the next adoption gates. Candidate timings must not be presented as shipped
+implementation performance.

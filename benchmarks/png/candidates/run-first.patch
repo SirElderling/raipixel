@@ -1,0 +1,37 @@
+--- a/src/deflate/encode.rs
++++ b/src/deflate/encode.rs
+@@ -102,19 +102,24 @@
+         let mut pos = 0;
+         while pos + 3 <= data.len() {
+             let slot = hash(data, pos);
+-            let mut prior = self.positions[slot] as usize;
++            let stored = self.positions[slot] as usize;
+             self.positions[slot] = pos as u32;
+             let maximum = (data.len() - pos).min(258);
+-            let mut length = match_length(data, prior, pos, maximum);
+-            // A second, constant-time candidate favors distance-one runs without
+-            // replacing useful dictionary entries or following a search chain.
+-            if pos > 0 && data[pos] == data[pos - 1] {
+-                let repeated = match_length(data, pos - 1, pos, maximum);
+-                if repeated >= 3 && repeated >= length {
+-                    prior = pos - 1;
+-                    length = repeated;
++            let repeated = if pos > 0 && data[pos] == data[pos - 1] {
++                match_length(data, pos - 1, pos, maximum)
++            } else {
++                0
++            };
++            let (prior, length) = if repeated == maximum {
++                (pos - 1, repeated)
++            } else {
++                let matched = match_length(data, stored, pos, maximum);
++                if repeated >= 3 && repeated >= matched {
++                    (pos - 1, repeated)
++                } else {
++                    (stored, matched)
+                 }
+-            }
++            };
+             if length >= 3 {
+                 self.reference(length, pos - prior);
+                 pos += length;
