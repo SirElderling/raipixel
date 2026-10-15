@@ -11,12 +11,12 @@ import tempfile
 import zlib
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
-source = (ROOT / 'src/deflate/encode.rs').read_text()
+source = (ROOT / 'src/deflate/encode.rs').read_text(encoding='utf-8')
 a = source.index('fn match_length(')
 annotation = '#[inline(always)]\n'
 if source[:a].endswith(annotation):
     a -= len(annotation)
-b = source.index('\nfn distance_code', a)
+b = source.index('\n#[inline(never)]\nfn matching_tail', a)
 candidate = source[:a] + '''fn match_length(data: &[u8], prior: usize, pos: usize, maximum: usize) -> usize {
     if prior >= pos || pos-prior > 32_768 || data[prior..prior+3] != data[pos..pos+3] { return 0; }
     let mut length = 3;
@@ -31,12 +31,12 @@ candidate = source[:a] + '''fn match_length(data: &[u8], prior: usize, pos: usiz
     length
 }
 ''' + source[b:]
-constants = (ROOT / 'src/deflate.rs').read_text()
+constants = (ROOT / 'src/deflate.rs').read_text(encoding='utf-8')
 constants = constants[constants.index('const LENGTH_BASE:'):constants.index('/// Decode one zlib stream')]
 with tempfile.TemporaryDirectory(prefix='raipixel-match-trial-') as temporary:
     temporary = Path(temporary)
-    (temporary / 'before.rs').write_text(source)
-    (temporary / 'after.rs').write_text(candidate)
+    (temporary / 'before.rs').write_text(source, encoding='utf-8')
+    (temporary / 'after.rs').write_text(candidate, encoding='utf-8')
     inputs = []
     for i, path in enumerate(sys.argv[1:]):
         data = Path(path).read_bytes()
@@ -70,7 +70,7 @@ let medians:Vec<_>=samples.iter().map(|s|{let mut v=s.clone();v.sort_by(f64::tot
 println!("{{\\"iterations\\":{:?},\\"median_us\\":{:?},\\"samples_us\\":{:?}}}",counts,medians,samples);
 }}
 '''
-    (temporary / 'main.rs').write_text(driver)
+    (temporary / 'main.rs').write_text(driver, encoding='utf-8')
     exe = temporary / ('trial.exe' if sys.platform == 'win32' else 'trial')
     subprocess.run(['rustc', '--edition=2024', '-O', str(temporary / 'main.rs'), '-o', str(exe)], check=True)
     rows = subprocess.check_output([str(exe), *[str(temporary / f'{i}.raw') for i in range(len(inputs))]], text=True).splitlines()
