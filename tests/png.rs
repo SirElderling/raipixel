@@ -213,3 +213,22 @@ fn writer_propagates_io_failure() {
         "E_IO"
     );
 }
+
+#[test]
+fn writer_retains_baseline_bytes_at_row_and_stored_block_boundaries() {
+    for (size, expected) in [
+        (1, include_bytes!("fixtures/writer-1.png").as_slice()),
+        (64, include_bytes!("fixtures/writer-64.png").as_slice()),
+        (128, include_bytes!("fixtures/writer-128.png").as_slice()),
+    ] {
+        let pixels: Vec<_> = (0..size * size)
+            .map(|i| [(i % 256) as u8, 17, 239, if i % 3 == 0 { 0 } else { 255 }])
+            .collect();
+        let image =
+            Image::from_pixels(size, size, &pixels, Limits::default(), &mut Work::default())
+                .unwrap();
+        let mut actual = Vec::new();
+        png::encode(&image, &mut actual, &mut Work::default()).unwrap();
+        assert_eq!(actual, expected, "{size}x{size}");
+    }
+}

@@ -1,4 +1,5 @@
 //! Small codec-only measurement tool; no benchmark framework or extra dependency.
+//! Includes output allocation and observes encoded bytes; excludes filesystem I/O.
 use raipixel::{Limits, Work, png};
 use std::{hint::black_box, num::NonZeroUsize, time::Instant};
 
@@ -23,11 +24,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let decode_us = start.elapsed().as_secs_f64() * 1_000_000.0 / count as f64;
     let start = Instant::now();
     for _ in 0..count {
-        png::encode(
-            black_box(&image),
-            &mut std::io::sink(),
-            &mut Work::default(),
-        )?;
+        let mut output = Vec::new();
+        png::encode(black_box(&image), &mut output, &mut Work::default())?;
+        black_box(output);
     }
     let encode_us = start.elapsed().as_secs_f64() * 1_000_000.0 / count as f64;
     println!(

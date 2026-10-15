@@ -18,6 +18,8 @@ only the library functions listed below are available today. The API is unstable
   and a cumulative caller-owned pixel-work budget.
 - Bounded UTF-8 JSON parsing and emission; complete number syntax, escapes and
   surrogate pairs. Duplicate decoded keys, BOM and unpaired surrogates are rejected.
+- Static PNG import/export, including the required DEFLATE, filter and Adam7
+  profile; see [codec coverage, architecture and measurements](png.md).
 - Exact signed/unsigned 64-bit integer conversion, including integral decimal
   and exponent forms, without floating-point rounding.
 
@@ -46,11 +48,11 @@ stamps additionally charge the source snapshot. Preflight errors do not modify
 destination pixels. Failed work charges leave the budget unchanged; allocation
 failure after a successful charge may consume work.
 
-These are local raster safeguards. Aggregate live memory, parser/codec work,
-project structure, shared cels, job rollback and file publication remain for the
-corresponding implementations. The library performs no file or process I/O.
-There is no CLI, typed job/schema validation, PNG support, layered frame renderer
-or persistence yet.
+These are local raster safeguards. JSON and PNG have their own charged work
+and local allocation checks. Aggregate live project memory, structural model,
+shared cels, job rollback and file publication remain for their implementations. The library performs no file or process I/O.
+There is no CLI, typed job/schema validation, layered frame renderer or
+persistence yet.
 
 ## Develop
 
@@ -67,8 +69,9 @@ expectations: transparent RGB, row order, selection preservation, copy alignment
 overlap, alpha rounding, bounds and the specified limits. One small exhaustive
 alpha/opacity check covers the byte-valued compositing domain. `tests/json.rs`
 adds 19 tests for the specified JSON syntax, Unicode, limits, exact integer
-ranges, emission and the real proposed command schema. All 41 tests need only
-the Rust toolchain and run offline.
+ranges, emission and the real proposed command schema. Six PNG tests and two
+DEFLATE unit tests add the independently generated codec corpus. All 49 tests
+need only the Rust toolchain and run offline.
 
 TDD history starts with tests against an empty library: `cargo test --offline`
 failed with unresolved raster API imports. The following implementation made
@@ -91,6 +94,6 @@ macOS ARM64 and Windows x86_64 MSVC. CI follows the latest stable Rust
 Toolchain installation uses the network; Cargo build/test commands run offline.
 The workflow runs on pull requests and pushes to main/feat branches.
 
-Next, implement the required PNG codec with its own tests, then typed job
-validation and the creation/import/edit/inspect/save/reopen/export workflow.
+Next, improve the measured codec throughput, then implement typed job validation
+and the creation/import/edit/inspect/save/reopen/export workflow.
 No extra backend abstraction or package split is needed for those additions.

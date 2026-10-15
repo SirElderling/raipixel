@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
-//! Deterministic raster primitives and bounded JSON. The agent interface is not implemented yet.
+//! Deterministic raster primitives, bounded JSON and static PNG.
+//! The typed agent interface is not implemented yet.
 
 mod checksum;
 mod deflate;
