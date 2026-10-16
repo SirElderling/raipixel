@@ -27,7 +27,7 @@ HISTORY = r'''
 impl Encoder {
     // Scratch only: retain 32 KiB of uncompressed input history across
     // consecutive DEFLATE blocks; encode the current block only.
-    fn block_history(&mut self, data: &[u8], last: bool) -> &[u8] {
+    pub(crate) fn block_history(&mut self, data: &[u8], last: bool) -> &[u8] {
         const DEPTH: usize = TRIAL_DEPTH;
         debug_assert!(data.len() <= BLOCK);
         let mut joined = Vec::with_capacity(self.history.len() + data.len());
