@@ -25,14 +25,24 @@ with tempfile.TemporaryDirectory(prefix='raipixel-writer-profile-') as temporary
     assert source.count(marker) == 1
     source = source.replace(marker, marker + '\n    profile_add(0, setup_start);')
     source = source.replace('        raw.resize(count, 0);', '        let filter_start = std::time::Instant::now();\n        raw.resize(count, 0);')
-    marker = '        adler.update(&raw);\n        write_chunk(output, b"IDAT", encoder.block(&raw, offset == raw_size))?;'
+    marker = '''        adler.update(&raw);
+        let deflate = if COMPACT {
+            encoder.block_compact(&raw, offset == raw_size)
+        } else {
+            encoder.block(&raw, offset == raw_size)
+        };
+        write_chunk(output, b"IDAT", deflate)?;'''
     assert source.count(marker) == 1
     source = source.replace(marker, '''        profile_add(1, filter_start);
         let adler_start = std::time::Instant::now();
         adler.update(&raw);
         profile_add(2, adler_start);
         let deflate_start = std::time::Instant::now();
-        let encoded = encoder.block(&raw, offset == raw_size);
+        let encoded = if COMPACT {
+            encoder.block_compact(&raw, offset == raw_size)
+        } else {
+            encoder.block(&raw, offset == raw_size)
+        };
         profile_add(3, deflate_start);
         let output_start = std::time::Instant::now();
         write_chunk(output, b"IDAT", encoded)?;
