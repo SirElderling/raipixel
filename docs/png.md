@@ -37,7 +37,9 @@ follows section 11.3.1.1.
 - Private `deflate` owns buffered bit input, canonical Huffman lookup tables,
   block parsing, history copies and the zlib wrapper. Its `encode` submodule
   owns bounded hash matching and fixed/stored block emission. It knows no PNG geometry.
-- Private `checksum` owns slicing-by-eight CRC32 tables and incremental Adler32.
+- Private `checksum` owns architecture-aware safe CRC32 slicing (32-byte
+  x86-64, 64-byte AArch64 and portable eight-byte fallback) and incremental
+  Adler32.
   Ordinary functions connect the modules; no backend traits or registry exist.
 
 Fixed Huffman lookup tables are constructed at compile time. Dynamic tables
@@ -81,10 +83,12 @@ under the [mandatory attribution rule](design/01-research.md#research-attributio
 
 ## Verification
 
-68 Rust tests run offline with no external executable or test library:
-22 raster tests, 19 JSON tests, ten PNG integration tests, two PNG filter unit tests, ten DEFLATE
-unit tests and five checksum unit tests. The PNG/DEFLATE cases include 31 accepted PNG files, 40 rejected-profile
-files and eight independent zlib streams. Cases cover the required profile
+Rust tests run offline with no external executable or test library,
+covering raster editing, JSON, PNG integration, row filters, DEFLATE and
+checksums. The PNG/DEFLATE cases include 31 accepted PNG files, 40
+rejected-profile files and eight independent zlib streams. The compact
+writer adds dedicated deterministic-output, RGBA round-trip and resource
+preflight coverage. Cases cover the required profile
 matrix and the malformed-input rules listed in the design, rather than
 speculative product capabilities.
 
