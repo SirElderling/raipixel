@@ -145,6 +145,33 @@ fn main() -> Result<(), AnyError> {
         );
         return Ok(());
     }
+    if mode == "verify-indexed" {
+        let input = std::fs::read(&args[2])?;
+        let decoded = raipixel::png::decode(&input, Limits::default(), &mut Work::default())?;
+        let mut data = Vec::new();
+        let written = raipixel::png::encode_indexed(
+            &decoded.image,
+            &mut data,
+            &mut Work::default(),
+        )?;
+        if written {
+            let (width, height, samples) = reference_decode(&data)?;
+            assert_eq!([width, height], decoded.image.size());
+            assert_eq!(samples, decoded.image.pixels().as_flattened());
+            let ours = raipixel::png::decode(&data, Limits::default(), &mut Work::default())?;
+            assert_eq!(ours.image.pixels(), decoded.image.pixels());
+            println!(
+                "{{\"supported\":true,\"bytes\":{},\"png_depth\":{},\"colors\":{},\"exact_rgba\":true}}",
+                data.len(),
+                data[24],
+                data[37] as usize / 3,
+            );
+        } else {
+            assert!(data.is_empty(), "unsupported palette emitted data");
+            println!("{{\"supported\":false,\"bytes\":0}}");
+        }
+        return Ok(());
+    }
     if mode == "verify-ours"
         || mode == "reencode-ours"
         || mode == "reencode-compressed"
