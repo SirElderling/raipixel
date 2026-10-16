@@ -245,7 +245,7 @@ fn main() -> Result<(), Failure> {
             println!("{{\"supported\":false,\"width\":{},\"height\":{}}}", width, height);
             continue;
         }
-        for mode in 0..4 {
+        for mode in 0..outputs.len() {
             assert_eq!(raipixel::png::decode(&outputs[mode], raipixel::Limits::default(),
                            &mut raipixel::Work::default())?.image, base,
                        "RGBA difference in mode {}", mode);
@@ -265,7 +265,7 @@ fn main() -> Result<(), Failure> {
             }
             Ok(out)
         };
-        for mode in 0..4 {
+        for mode in 0..outputs.len() {
             assert_eq!(once(mode)?, outputs[mode], "nondeterminism in mode {}", mode);
         }
         let batch = |mode: usize, count: usize| -> Result<Duration, Failure> {
