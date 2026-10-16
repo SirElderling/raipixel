@@ -60,6 +60,10 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_compression_ceiling.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+      - name: Measure own safe indexed-PNG writer against compact RGBA
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_palette_native_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
       - name: Compare fixed-Huffman match selection and compressed file sizes
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
