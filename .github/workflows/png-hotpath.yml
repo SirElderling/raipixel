@@ -56,6 +56,10 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_compact_filter_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+      - name: Recode exact raipixel LZ tokens with dynamic Huffman (informational)
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_dynamic_tokens_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
       - name: Measure dynamic DEFLATE and indexed-color size headroom
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
