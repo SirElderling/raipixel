@@ -29,9 +29,7 @@ with tempfile.TemporaryDirectory(prefix="raipixel-crc-threshold-") as path:
         (folder / (name + ".rs")).write_text(text, encoding="utf-8")
         variants[name] = hashlib.sha256(text.encode()).hexdigest()
     mods = "\n".join(f'#[path = "{name}.rs"] mod {name};' for name in NAMES)
-    driver = mods + r'''
-#![forbid(unsafe_code)]
-#![allow(dead_code)]
+    driver = '#![forbid(unsafe_code)]\n#![allow(dead_code)]\\n' + mods + r'''
 use std::{hint::black_box, time::{Duration, Instant}};
 fn bitwise(data: &[u8]) -> u32 {
     let mut crc = u32::MAX;
