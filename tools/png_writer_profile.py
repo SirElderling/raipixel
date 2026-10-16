@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory(prefix='raipixel-writer-profile-') as temporary
     temporary = Path(temporary)
     shutil.copytree(ROOT / 'src', temporary / 'src')
     source = (temporary / 'src/png.rs').read_text()
-    start = source.index('pub fn encode_compressed(')
+    start = source.index('fn encode_filtered<const COMPACT: bool>(')
     prefix, source = source[:start], source[start:]
     marker = '    let row_bytes = image.width as usize * 4;'
     assert source.count(marker) == 1
