@@ -420,9 +420,14 @@ fn indexed_writer_roundtrips_all_rgba_samples_at_every_palette_depth() {
                 ]
             })
             .collect();
-        let image =
-            Image::from_pixels(width, height, &pixels, Limits::default(), &mut Work::default())
-                .unwrap();
+        let image = Image::from_pixels(
+            width,
+            height,
+            &pixels,
+            Limits::default(),
+            &mut Work::default(),
+        )
+        .unwrap();
         let mut indexed = Vec::new();
         assert!(png::encode_indexed(&image, &mut indexed, &mut Work::default()).unwrap());
         let depth = match colors {
@@ -447,7 +452,10 @@ fn indexed_writer_roundtrips_all_rgba_samples_at_every_palette_depth() {
         if width == 1024 {
             let mut compact = Vec::new();
             png::encode_compact(&image, &mut compact, &mut Work::default()).unwrap();
-            assert!(indexed.len() < compact.len(), "indexed PNG on {width}x{height}");
+            assert!(
+                indexed.len() < compact.len(),
+                "indexed PNG on {width}x{height}"
+            );
         }
         let mut invalid = indexed;
         invalid[29] ^= 1;
@@ -480,4 +488,3 @@ fn indexed_writer_refuses_nonrepresentable_colors_without_writing() {
     );
     assert!(output.is_empty());
 }
-
