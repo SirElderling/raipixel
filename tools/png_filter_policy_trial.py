@@ -28,14 +28,15 @@ def once(text, old, new):
     return text.replace(old, new)
 
 def variant(policy):
-    # Modify ONLY the compressed writer; preserve stored encoder and decoder.
-    boundary = ORIGINAL.index("pub fn encode_compressed(")
+    # Modify ONLY the fast (COMPACT=false) filtered writer in scratch crates.
+    # Keep the indexed writer and compact mode unchanged.
+    boundary = ORIGINAL.index("fn encode_filtered<const COMPACT: bool>(")
     original_prefix, text = ORIGINAL[:boundary], ORIGINAL[boundary:]
     if policy == "all_sub":
         text = once(text, "raw[filled] = if row == 0 { 1 } else { 2 };",
-                    "raw[filled] = 1;")
+                    "raw[filled] = if COMPACT { if row == 0 { 1 } else { 2 } } else { 1 };")
         text = once(text, "if row == 0 {\n                    for (i, value)",
-                    "if true {\n                    for (i, value)")
+                    "if !COMPACT || row == 0 {\n                    for (i, value)")
     else:
         sample = 16 if policy == "sample_16" else 64
         helper = f"""
@@ -64,7 +65,7 @@ fn trial_choose_filter(row: usize, stride: usize, rgba: &[u8]) -> u8 {{
         text = once(text, "    let mut adler = Adler::new();\n    while offset < raw_size {",
                     "    let mut adler = Adler::new();\n    let mut row_filter = 1u8;\n    while offset < raw_size {")
         text = once(text, "raw[filled] = if row == 0 { 1 } else { 2 };",
-                    "row_filter = trial_choose_filter(row, row_bytes, rgba);\n                raw[filled] = row_filter;")
+                    "row_filter = if COMPACT { if row == 0 { 1 } else { 2 } } else { trial_choose_filter(row, row_bytes, rgba) };\n                raw[filled] = row_filter;")
         text = once(text, "if row == 0 {\n                    for (i, value)",
                     "if row_filter == 1 {\n                    for (i, value)")
     text = once(text, "if x < 4 { 0 } else { rgba[x - 4] }",
