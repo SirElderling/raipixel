@@ -47,6 +47,7 @@ jobs:
       - name: Restore independent mixed-filter corpus
         run: python -c "import json;from pathlib import Path;p=Path('png-original-inputs');p.mkdir(exist_ok=True);[(p / (c['name'] + '.png')).write_bytes(bytes.fromhex(c['png_hex'])) for c in json.loads(Path('benchmarks/png/original-inputs.json').read_text())['cases']]"
       - name: Match indexed PNG against png 0.18.1 public writer
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_indexed_reference.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
@@ -63,19 +64,27 @@ jobs:
         run: python tools/png_indexed_sub_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
 
       - name: Cross-block 32 KiB history and bounded 1/8/16-chain match screen
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_history_native_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
 
       - name: Test deeper 16/32/64 LZ history and mixed PNG filter choices (fully verified)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_quality_mix_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
 
       - name: Screen size-preserving cost-aware and lazy parsing against depth64 best
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_cost_parse_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Screen quality-first lazy PNG None Sub Up Paeth and best-of-seven
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_lazy_filter_bestof_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
 
       - name: Test frequency-ordered exact RGBA palettes against existing indexed writer
         if: github.event_name == 'workflow_dispatch'
