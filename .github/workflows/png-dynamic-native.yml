@@ -3,6 +3,8 @@ name: PNG dynamic Huffman native trial
 on:
   push:
     branches: [feat/raster-foundation]
+    paths-ignore:
+      - benchmarks/png/experiment-register.md
   workflow_dispatch:
 
 permissions:
@@ -60,6 +62,11 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_history_native_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Test deeper 16/32/64 LZ history and mixed PNG filter choices (fully verified)
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_quality_mix_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
 
       - name: Test frequency-ordered exact RGBA palettes against existing indexed writer
         env:
