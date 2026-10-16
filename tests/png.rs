@@ -326,10 +326,16 @@ fn compact_writer_preserves_all_samples_and_is_deterministic() {
             png::encode_compact(&image, &mut again, &mut Work::default()).unwrap();
             assert_eq!(compact, again, "compact bytes {size}x{size}, noise={noise}");
             let decoded = png::decode(&compact, Limits::default(), &mut Work::default()).unwrap();
-            assert_eq!(decoded.image, image, "compact pixels {size}x{size}, noise={noise}");
+            assert_eq!(
+                decoded.image, image,
+                "compact pixels {size}x{size}, noise={noise}"
+            );
             let mut stored = Vec::new();
             png::encode(&image, &mut stored, &mut Work::default()).unwrap();
-            assert!(compact.len() <= stored.len(), "{size}x{size}, noise={noise}");
+            assert!(
+                compact.len() <= stored.len(),
+                "{size}x{size}, noise={noise}"
+            );
         }
     }
     let image = Image::new(1, 1, Limits::default(), &mut Work::default()).unwrap();
