@@ -208,6 +208,15 @@ fn main() -> Result<(), AnyError> {
     );
     sizes.push(("compressed", compressed.len()));
     std::fs::write(folder.join("compressed.png"), compressed)?;
+    let mut compact = Vec::new();
+    raipixel::png::encode_compact(&ours.image, &mut compact, &mut Work::default())?;
+    assert_eq!(reference_decode(&compact)?.2, rgba);
+    assert_eq!(
+        raipixel::png::decode(&compact, Limits::default(), &mut Work::default())?.image,
+        ours.image
+    );
+    sizes.push(("compact", compact.len()));
+    std::fs::write(folder.join("compact.png"), compact)?;
     let operation = |index| -> Result<(), AnyError> {
         match index {
             0 => {
