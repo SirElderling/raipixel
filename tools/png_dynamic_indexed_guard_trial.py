@@ -10,7 +10,9 @@ implementation inspected.
 
 Usage: python tools/png_dynamic_indexed_guard_trial.py INPUT.png [INPUT.png ...]
 """
+import binascii
 import hashlib
+import zlib
 import json
 import os
 import platform
@@ -312,6 +314,36 @@ def modified(original):
     s = s.replace("if COMPACT {", "if trial_use {")
     return s+"\n"+HELPER
 
+def png_chunk(kind, data):
+    return (len(data).to_bytes(4, "big") + kind + data
+            + binascii.crc32(kind + data).to_bytes(4, "big"))
+
+def indexed_case(directory, colors, width, height):
+    """Independently encode RGBA PNGs with exact hidden RGB and variable rows.
+    The Rust indexed writer will choose 1/2/4/8-bit PNG for 1/3/5/256 colors.
+    """
+    pixels = bytearray()
+    for y in range(height):
+        for x in range(width):
+            index = (x * 7 + y * 11) % colors
+            pixels.extend((index, (index * 41 + 7) & 255,
+                           (index * 73 + 17) & 255,
+                           (0, 127, 255)[index % 3]))
+    stride = width * 4
+    raw = b"".join(
+        b"\x00" + pixels[y * stride:(y + 1) * stride]
+        for y in range(height)
+    )
+    ihdr = width.to_bytes(4, "big") + height.to_bytes(4, "big") + bytes((8,6,0,0,0))
+    data = (b"\x89PNG\r\n\x1a\n"
+            + png_chunk(b"IHDR", ihdr)
+            + png_chunk(b"IDAT", zlib.compress(raw, 6))
+            + png_chunk(b"IEND", b""))
+    path = directory / f"indexed-case-{colors}-{width}x{height}.png"
+    path.write_bytes(data)
+    (directory / (path.name + ".rgba")).write_bytes(pixels)
+    return str(path)
+
 with tempfile.TemporaryDirectory(prefix="raipixel-indexed-guard-") as temp:
     folder=Path(temp)
     scratch=folder/"candidate"
@@ -335,6 +367,10 @@ fn main()->Result<(),Box<dyn std::error::Error>>{
         let bytes=std::fs::read(&path)?;
         let base_image=raipixel::png::decode(&bytes,raipixel::Limits::default(),&mut raipixel::Work::default())?.image;
         let [w,h]=base_image.size();
+        if path.contains("indexed-case-") {
+            let expected=std::fs::read(format!("{path}.rgba"))?;
+            assert_eq!(base_image.pixels().as_flattened(),expected,"fixture RGBA mismatch");
+        }
         let test_image=candidate::Image::from_pixels(w,h,base_image.pixels(),candidate::Limits::default(),&mut candidate::Work::default())?;
         let mut accepted=Vec::new();
         let mut bwork=raipixel::Work::default();
@@ -392,10 +428,14 @@ fn main()->Result<(),Box<dyn std::error::Error>>{
     (folder/"src/main.rs").write_text(driver,encoding="utf-8")
     subprocess.run(["cargo","build","--release","--offline","--manifest-path",str(folder/"Cargo.toml")],check=True)
     exe=folder/"target/release"/("raipixel-indexed-guard-screen.exe" if sys.platform=="win32" else "raipixel-indexed-guard-screen")
-    lines=subprocess.check_output([str(exe),*sys.argv[1:]],text=True).splitlines()
-    assert len(lines)==len(sys.argv[1:])
+    inputs=list(sys.argv[1:])
+    inputs.extend(indexed_case(folder, colors, width, height) for colors, width, height in
+                  [(1, 7, 11), (3, 13, 11), (5, 17, 11),
+                   (256, 257, 7), (3, 1024, 300)])
+    lines=subprocess.check_output([str(exe),*inputs],text=True).splitlines()
+    assert len(lines)==len(inputs)
     cases=[]
-    for path,line in zip(sys.argv[1:],lines):
+    for path,line in zip(inputs,lines):
         case=json.loads(line)
         if case["supported"]:
             medians=[sorted(sample)[len(sample)//2] for sample in case["samples_us"]]
