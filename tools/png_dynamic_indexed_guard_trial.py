@@ -369,7 +369,7 @@ fn main()->Result<(),Box<dyn std::error::Error>>{
         let [w,h]=base_image.size();
         if path.contains("indexed-case-") {
             let expected=std::fs::read(format!("{path}.rgba"))?;
-            assert_eq!(base_image.pixels().as_flattened(),expected,"fixture RGBA mismatch");
+            assert_eq!(base_image.pixels().as_flattened(),expected.as_slice(),"fixture RGBA mismatch");
         }
         let test_image=candidate::Image::from_pixels(w,h,base_image.pixels(),candidate::Limits::default(),&mut candidate::Work::default())?;
         let mut accepted=Vec::new();
