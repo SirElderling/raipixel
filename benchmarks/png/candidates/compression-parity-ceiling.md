@@ -100,15 +100,38 @@ also used for exact indexed-output checking in the matched-profile CI.
 Its latest run must finish successfully before considering independent
 interoperability established; the reference's source code is never read.
 
-## Decoder parity ceiling
+## Decoder parity ceiling: direct CRC32 evidence
 
-PNG noise decode is dominated by CRC32 work on several prior native profiles.
-A further [`crc32fast` public-API screen](../../../tools/png_crc_reference_api.py)
-now measures our CRC against the exact `crc32fast 1.5.2` locked into the
-reference `png 0.18.1` dependency graph. This comparison uses a temporary
-package and **no implementation inspection**; it does not authorize a
-production dependency, intrinsics or unsafe Rust. Results are pending in
-the Rust 1.99.1 workflow. No claim of full decoder-speed parity is made.
+The [public-API CRC benchmark 38876671979](https://github.com/SirElderling/raipixel/actions/runs/38876671979)
+completed successfully on Linux x86-64, Windows x86-64 and macOS ARM64
+using rustc **1.99.1**, with the exact locked
+`crc32fast 1.5.2` reference from `png 0.18.1`. It verifies
+CRC polynomial, fragmented input and boundary lengths before nine rotating
+calibrated native batches. Both libraries return **identical checksums**.
+
+| Input length | Linux raipixel/crc32fast | Windows raipixel/crc32fast | macOS ARM64 raipixel/crc32fast |
+|---|---:|---:|---:|
+| 256 B | 2.43× | 2.93× | 3.22× |
+| 4 KiB | 10.39× | 6.10× | 2.20× |
+| 64 KiB | 14.61× | 6.80× | 4.90× |
+| 256 KiB | 14.99× | 6.90× | 5.65× |
+| 4 MiB | **15.21×** | **6.99×** | **6.42×** |
+
+The reference `crc32fast` crate's published docs describe SIMD/hardware
+acceleration on relevant CPUs. The benchmark validates performance of the
+public API, **not** which CPU instructions were selected. Its performance
+difference is far larger than the marginal changes seen in our prior safe-Rust
+CRC slicing-width, threshold and XOR-order screens. The high CRC share of
+noise PNG decoding means checksum work remains a major parity blocker on
+that input class.
+
+**Decision:** Do not introduce an `unsafe` intrinsic, assembly, an optional
+external crate or a checksum-validation bypass merely to chase the benchmark.
+No broad speed-parity claim is justified under the zero-dependency/safe-Rust
+constraints. Consider additional independently derived safe scalar/software
+checksum algorithms only after demonstrating a substantial *complete-decoder*
+benefit across all three CPUs, with the original polynomial and strict CRC
+validation preserved.
 
 ## Implementation priority after the screens
 
