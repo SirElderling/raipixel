@@ -666,13 +666,34 @@ pub fn encode_compressed(
     output: &mut impl std::io::Write,
     work: &mut Work,
 ) -> Result<(), Error> {
+    encode_filtered::<false>(image, output, work)
+}
+
+/// Size-focused fixed-Huffman PNG output with one-step lazy LZ matching.
+/// Uses the same bounded 65,535-byte blocks and Sub/Up filters as
+/// encode_compressed; may take longer but often emits fewer bytes.
+/// Does not change the deterministic fast/stored writer contracts.
+pub fn encode_compact(
+    image: &Image,
+    output: &mut impl std::io::Write,
+    work: &mut Work,
+) -> Result<(), Error> {
+    encode_filtered::<true>(image, output, work)
+}
+
+fn encode_filtered<const COMPACT: bool>(
+    image: &Image,
+    output: &mut impl std::io::Write,
+    work: &mut Work,
+) -> Result<(), Error> {
     let row_bytes = image.width as usize * 4;
     let stride = row_bytes + 1;
     let raw_size = stride * image.height as usize;
     let blocks = raw_size.div_ceil(crate::deflate::BLOCK);
-    // A linear budget for filtering, bounded matching, coding and checksums,
-    // plus the fixed hash-table reset for each block. No search chains exist.
-    work.charge((raw_size * 12 + blocks * (8192 + 64)) as u64)?;
+    // Size-focused lookahead adds bounded matching work, so reserve an
+    // increased linear budget before output. Both writers use fixed tables.
+    let cost_per_byte = if COMPACT { 14 } else { 12 };
+    work.charge((raw_size * cost_per_byte + blocks * (8192 + 64)) as u64)?;
     let capacity = raw_size.min(crate::deflate::BLOCK);
     let mut raw = Vec::new();
     raw.try_reserve_exact(capacity)
@@ -717,7 +738,12 @@ pub fn encode_compressed(
             }
         }
         adler.update(&raw);
-        write_chunk(output, b"IDAT", encoder.block(&raw, offset == raw_size))?;
+        let deflate = if COMPACT {
+            encoder.block_compact(&raw, offset == raw_size)
+        } else {
+            encoder.block(&raw, offset == raw_size)
+        };
+        write_chunk(output, b"IDAT", deflate)?;
     }
     write_chunk(output, b"IDAT", &adler.value().to_be_bytes())?;
     write_chunk(output, b"IEND", &[])
