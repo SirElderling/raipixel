@@ -304,15 +304,14 @@ mod tests {
             })
             .collect();
         for len in [
-            0, 1, 7, 8, 31, 32, 33, 63, 64, 65, 4095, 4096, 4097,
-            8191, 8192, 8193, 65_535, 65_536, 65_537,
+            0, 1, 7, 8, 31, 32, 33, 63, 64, 65, 4095, 4096, 4097, 8191, 8192, 8193, 65_535, 65_536,
+            65_537,
         ] {
             let mut expected = u32::MAX;
             for &byte in &data[..len] {
                 expected ^= u32::from(byte);
                 for _ in 0..8 {
-                    expected = (expected >> 1)
-                        ^ if expected & 1 != 0 { 0xedb8_8320 } else { 0 };
+                    expected = (expected >> 1) ^ if expected & 1 != 0 { 0xedb8_8320 } else { 0 };
                 }
             }
             for split in [0, 1, 7, 8, 31, 32, 63, 64, len / 2, len] {
