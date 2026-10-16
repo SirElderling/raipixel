@@ -164,7 +164,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for round in 0..9 {
             for offset in 0..4 {
                 let mode = (round + offset) % 4;
-                samples[mode].push(batch(mode, counts[mode]).as_secs_f64() * 1e6 / counts[mode] as f64);
+                samples[mode].push(batch(mode, counts[mode])?.as_secs_f64() * 1e6 / counts[mode] as f64);
             }
         }
         println!("{{\"width\":{},\"height\":{},\"bytes\":{:?},\"work_left\":{},\"iterations\":{:?},\"samples_us\":{:?}}}",
