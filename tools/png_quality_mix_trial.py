@@ -7,6 +7,8 @@ The additional match-chain and row-buffer memory is NOT yet charged as
 production work. Never promote this diagnostic code unchanged.
 Run: python tools/png_quality_mix_trial.py INPUT.png ...
 """
+import binascii
+import zlib
 import hashlib
 import json
 import os
@@ -232,6 +234,10 @@ fn main()->Result<(),E>{
         let source=std::fs::read(&path)?;
         let base=raipixel::png::decode(&source,raipixel::Limits::default(),&mut raipixel::Work::default())?.image;
         let [width,height]=base.size();
+        if path.contains("indexed-case-") {
+            let expected=std::fs::read(format!("{path}.rgba"))?;
+            assert_eq!(base.pixels().as_flattened(),expected.as_slice(),"independent input RGBA mismatch");
+        }
         let a=c16::Image::from_pixels(width,height,base.pixels(),c16::Limits::default(),&mut c16::Work::default())?;
         let b=c32::Image::from_pixels(width,height,base.pixels(),c32::Limits::default(),&mut c32::Work::default())?;
         let c=c64::Image::from_pixels(width,height,base.pixels(),c64::Limits::default(),&mut c64::Work::default())?;
@@ -305,6 +311,27 @@ fn main()->Result<(),E>{
 }
 '''
 
+
+def png_chunk(kind, data):
+    return len(data).to_bytes(4,"big")+kind+data+binascii.crc32(kind+data).to_bytes(4,"big")
+
+def independent_rgba_fixture(folder, colors, width, height):
+    rgba=bytearray()
+    for y in range(height):
+        for x in range(width):
+            index=(x*7+y*11)%colors
+            rgba.extend((index&255,(index*41+7)&255,(index*73+17)&255,
+                         (0,127,255)[index%3]))
+    stride=width*4
+    samples=b"".join(b"\x00"+rgba[y*stride:(y+1)*stride] for y in range(height))
+    ihdr=width.to_bytes(4,"big")+height.to_bytes(4,"big")+bytes((8,6,0,0,0))
+    content=(b"\x89PNG\r\n\x1a\n"+png_chunk(b"IHDR",ihdr)
+             +png_chunk(b"IDAT",zlib.compress(samples,6))+png_chunk(b"IEND",b""))
+    path=folder/f"indexed-case-{colors}-{width}x{height}.png"
+    path.write_bytes(content)
+    (folder/(path.name+".rgba")).write_bytes(rgba)
+    return str(path)
+
 with tempfile.TemporaryDirectory(prefix="raipixel-quality-mix-") as temp:
     folder=Path(temp)
     deps=['raipixel={path='+json.dumps(str(ROOT))+'}']
@@ -330,6 +357,9 @@ with tempfile.TemporaryDirectory(prefix="raipixel-quality-mix-") as temp:
     subprocess.run(["cargo","build","--release","--offline","--manifest-path",str(folder/"Cargo.toml")],check=True)
     exe=folder/"target/release"/("raipixel-quality-mix.exe" if sys.platform=="win32" else "raipixel-quality-mix")
     paths=list(sys.argv[1:])
+    paths.extend(independent_rgba_fixture(folder,colors,width,height)
+        for colors,width,height in [(1,7,11),(3,13,11),(5,17,11),
+                                    (256,257,7),(257,257,11),(3,1024,300)])
     lines=subprocess.check_output([str(exe),*paths],text=True).splitlines()
     if len(lines)!=len(paths):raise ValueError("lost benchmark output cases")
     cases=[]
