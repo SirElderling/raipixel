@@ -153,11 +153,58 @@ new_lookup = """                let mut slot = slot_for(sample);
 assert FAST.count(old_lookup) == 1
 FAST = FAST.replace(old_lookup, new_lookup)
 
+# Compare legal 1/2/4/8-bit indexed packing with the *same* deterministic
+# bounded lookup table and raipixel's own fixed-Huffman compact compressor.
+PACKED = FAST.replace("pub fn trial_encode_palette_fast(", "pub fn trial_encode_palette_packed(")
+anchor = """    let row_bytes = image.width as usize;
+    let stride = row_bytes + 1;"""
+assert PACKED.count(anchor) == 1
+PACKED = PACKED.replace(anchor, """    let width = image.width as usize;
+    let depth: usize = if colors.len() <= 2 { 1 } else if colors.len() <= 4 { 2 }
+        else if colors.len() <= 16 { 4 } else { 8 };
+    let row_bytes = (width * depth).div_ceil(8);
+    let stride = row_bytes + 1;""")
+assert PACKED.count("    ihdr[8] = 8;") == 1
+PACKED = PACKED.replace("    ihdr[8] = 8;", "    ihdr[8] = depth as u8;")
+old = """            if col != 0 {
+                let sample = pixels[row * row_bytes + col - 1];
+                let mut slot = slot_for(sample);
+                loop {
+                    let value = slots[slot];
+                    if value == u16::MAX { return Err(Error::Chunk); }
+                    if colors[usize::from(value)] == sample {
+                        *byte = value as u8;
+                        break;
+                    }
+                    slot = (slot + 1) & 4095;
+                }
+            }"""
+new = """            if col != 0 {
+                let samples_per_byte = 8 / depth;
+                let x0 = (col - 1) * samples_per_byte;
+                for j in 0..samples_per_byte {
+                    if x0 + j >= width { break; }
+                    let sample = pixels[row * width + x0 + j];
+                    let mut slot = slot_for(sample);
+                    loop {
+                        let value = slots[slot];
+                        if value == u16::MAX { return Err(Error::Chunk); }
+                        if colors[usize::from(value)] == sample {
+                            *byte |= (value as u8) << (8 - depth * (j + 1));
+                            break;
+                        }
+                        slot = (slot + 1) & 4095;
+                    }
+                }
+            }"""
+assert PACKED.count(old) == 1
+PACKED = PACKED.replace(old, new)
+
 with tempfile.TemporaryDirectory(prefix="raipixel-native-palette-") as directory:
     folder = Path(directory)
     scratch = folder / "trial"
     shutil.copytree(ROOT / "src", scratch / "src")
-    edited = SOURCE + "\n" + CANDIDATE + "\n" + FAST
+    edited = SOURCE + "\n" + CANDIDATE + "\n" + FAST + "\n" + PACKED
     (scratch / "src/png.rs").write_text(edited, encoding="utf-8")
     (scratch / "Cargo.toml").write_text(
         '[package]\nname="raipixel_native_palette"\nversion="0.0.0"\nedition="2024"\n'
@@ -186,9 +233,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut fast_palette = Vec::new();
         let possible_fast = candidate::png::trial_encode_palette_fast(
             &trial_image, &mut fast_palette, &mut candidate::Work::default())?;
+        let mut packed_palette = Vec::new();
+        let possible_packed = candidate::png::trial_encode_palette_packed(
+            &trial_image, &mut packed_palette, &mut candidate::Work::default())?;
         assert_eq!(possible, possible_fast);
-        assert_eq!(palette, fast_palette, "different indexed PNG bytes");
+        assert_eq!(possible, possible_packed);
+        assert_eq!(palette, fast_palette, "different indexed PNG8 bytes");
         if possible {
+            let packed_decoded = raipixel::png::decode(&packed_palette,
+                raipixel::Limits::default(), &mut raipixel::Work::default())?;
+            assert_eq!(packed_decoded.image, original, "packed index pixels mismatch");
+            assert!([1u8,2,4,8].contains(&packed_palette[24]), "illegal palette depth");
+
             let decoded = raipixel::png::decode(&palette, raipixel::Limits::default(), &mut raipixel::Work::default())?;
             assert_eq!(decoded.image, original);
             assert_eq!(decoded.image.pixels().as_flattened(), original.pixels().as_flattened());
@@ -205,7 +261,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &trial_image, &mut rejected, &mut candidate::Work::new(0)?) .is_err());
             assert!(rejected.is_empty());
         } else {
-            assert!(palette.is_empty(), "unsupported palette must not publish partial PNG");
+            assert!(palette.is_empty() && fast_palette.is_empty() && packed_palette.is_empty(),
+                "unsupported palette must not publish partial PNG");
         }
         let bench = |mode: usize, n: usize| -> Result<Duration, Box<dyn std::error::Error>> {
             let start = Instant::now();
@@ -218,6 +275,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         &mut out, &mut candidate::Work::default())?),
                     2 => assert!(candidate::png::trial_encode_palette_fast(black_box(&trial_image),
                         &mut out, &mut candidate::Work::default())?),
+                    3 => assert!(candidate::png::trial_encode_palette_packed(black_box(&trial_image),
+                        &mut out, &mut candidate::Work::default())?),
                     _ => unreachable!(),
                 }
                 black_box(out);
@@ -228,21 +287,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{{\"supported\":false,\"width\":{},\"height\":{},\"compact_bytes\":{}}}",w,h,accepted.len());
             continue;
         }
-        let mut counts = [1usize; 3];
+        let mut counts = [1usize; 4];
         for (mode,count) in counts.iter_mut().enumerate() {
             while bench(mode,*count)? < Duration::from_millis(25) {
                 *count = count.checked_mul(2).ok_or("benchmark overflow")?;
             }
         }
-        let mut samples = [Vec::new(),Vec::new(),Vec::new()];
+        let mut samples = [Vec::new(),Vec::new(),Vec::new(),Vec::new()];
         for round in 0..9 {
-            for offset in 0..3 {
-                let mode = (round + offset) % 3;
+            for offset in 0..4 {
+                let mode = (round + offset) % 4;
                 samples[mode].push(bench(mode,counts[mode])?.as_secs_f64()*1e6/counts[mode] as f64);
             }
         }
-        println!("{{\"supported\":true,\"width\":{},\"height\":{},\"compact_bytes\":{},\"palette_bytes\":{},\"samples_us\":{:?}}}",
-            w,h,accepted.len(),palette.len(),samples);
+        println!("{{\"supported\":true,\"width\":{},\"height\":{},\"compact_bytes\":{},\"palette_bytes\":{},\"packed_bytes\":{},\"packed_depth\":{},\"samples_us\":{:?}}}",
+            w,h,accepted.len(),palette.len(),packed_palette.len(),packed_palette[24],samples);
     }
     Ok(())
 }
@@ -263,8 +322,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             row["median_us"] = med
             row["time_over_compact"] = [value/med[0] for value in med]
             row["size_over_compact"] = row["palette_bytes"]/row["compact_bytes"]
+            row["packed_over_compact"] = row["packed_bytes"]/row["compact_bytes"]
         cases.append(row)
-    print(json.dumps({"experiment":"own_fixed_huffman_indexed_png8_hashmap_vs_fixed_table",
+    print(json.dumps({"experiment":"own_fixed_huffman_indexed_png8_vs_packed_depth",
                       "reference":"production encode_compact, same matching algorithm",
                       "candidate":"two temporary safe-Rust indexed writers, HashMap vs bounded 4096-slot table, exact RGBA",
                       "compiler":subprocess.check_output(["rustc","--version","--verbose"],text=True),
@@ -272,4 +332,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                       "source_sha256":hashlib.sha256(SOURCE.encode()).hexdigest(),
                       "candidate_sha256":hashlib.sha256(CANDIDATE.encode()).hexdigest(),
                       "fixed_table_sha256":hashlib.sha256(FAST.encode()).hexdigest(),
+                      "packed_sha256":hashlib.sha256(PACKED.encode()).hexdigest(),
                       "cases":cases}))
