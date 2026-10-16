@@ -231,6 +231,16 @@ impl Encoder {
     /// Block-local dictionary, with no match search chains or input-sized index.
     /// Fixed blocks keep bit continuity; only stored blocks/final output align.
     pub(crate) fn block(&mut self, data: &[u8], last: bool) -> &[u8] {
+        self.block_with::<false>(data, last)
+    }
+
+    /// A size-oriented parse using one lookahead per non-maximal match.
+    /// The fast writer retains its existing bitstream and work.
+    pub(crate) fn block_compact(&mut self, data: &[u8], last: bool) -> &[u8] {
+        self.block_with::<true>(data, last)
+    }
+
+    fn block_with<const COMPACT: bool>(&mut self, data: &[u8], last: bool) -> &[u8] {
         debug_assert!(data.len() <= BLOCK);
         let saved = (self.bits, self.count);
         self.output.clear();
@@ -266,6 +276,25 @@ impl Encoder {
                     (stored, matched)
                 }
             };
+            // One-step lazy parsing can emit a literal when the following
+            // position offers a strictly longer match. RFC 1951 coding and
+            // the 32 KiB history/distance limits are unchanged.
+            if COMPACT && length >= 3 && length < 258 && pos + 4 <= data.len() {
+                let next_pos = pos + 1;
+                let (next_slot, next_prefix) = hash(data, next_pos);
+                let next_length = match_candidate(
+                    data,
+                    self.dictionary[next_slot],
+                    next_prefix,
+                    next_pos,
+                    (data.len() - next_pos).min(258),
+                );
+                if next_length > length + 1 {
+                    self.symbol(u32::from(data[pos]));
+                    pos += 1;
+                    continue;
+                }
+            }
             if length >= 3 {
                 self.reference(length, pos - prior);
                 pos += length;
