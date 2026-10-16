@@ -44,20 +44,46 @@ def parse_idat(blob: bytes) -> bytes:
     assert pos == len(blob)
     return bytes(idat)
 
-def build_palette(width: int, height: int, rgba: bytes, level: int):
+def compress_zlib(data: bytes, level: int, strategy: int, reset_blocks=False) -> bytes:
+    compressor = zlib.compressobj(level=level, strategy=strategy)
+    if not reset_blocks:
+        return compressor.compress(data) + compressor.flush()
+    out = bytearray()
+    for pos in range(0, len(data), 65535):
+        out.extend(compressor.compress(data[pos:pos + 65535]))
+        if pos + 65535 < len(data):
+            # Diagnostic approximation to the encoder's block-local match
+            # history: flushes also insert extra DEFLATE framing.
+            out.extend(compressor.flush(zlib.Z_FULL_FLUSH))
+    out.extend(compressor.flush())
+    return bytes(out)
+
+def build_palette(width: int, height: int, rgba: bytes, level: int, depth: int = 8):
     # Dict order is first-occurrence order for fully deterministic, exact RGBA.
     rgba_colors = list(dict.fromkeys(rgba[i:i+4] for i in range(0, len(rgba), 4)))
     if len(rgba_colors) > 256:
         return None
     indices = {rgba: index for index, rgba in enumerate(rgba_colors)}
+    assert depth in (1, 2, 4, 8)
+    assert len(rgba_colors) <= 1 << depth
     data = bytearray()
     for y in range(height):
-        data.append(0)  # None row filter; no filtering confound.
+        data.append(0)  # None row filter; isolate palette from filtering.
         offset = y * width * 4
-        for i in range(offset, offset + width * 4, 4):
-            data.append(indices[rgba[i:i+4]])
+        if depth == 8:
+            for i in range(offset, offset + width * 4, 4):
+                data.append(indices[rgba[i:i+4]])
+        else:
+            samples_per_byte = 8 // depth
+            mask = (1 << depth) - 1
+            for x in range(0, width, samples_per_byte):
+                value = 0
+                for within in range(samples_per_byte):
+                    sample = indices[rgba[offset + 4 * (x + within):offset + 4 * (x + within + 1)]] if x + within < width else 0
+                    value |= (sample & mask) << (8 - depth * (within + 1))
+                data.append(value)
     ihdr = (width.to_bytes(4, "big") + height.to_bytes(4, "big") +
-            bytes([8, 3, 0, 0, 0]))
+            bytes([depth, 3, 0, 0, 0]))
     palette = b"".join(color[:3] for color in rgba_colors)
     alpha = bytes(color[3] for color in rgba_colors)
     trns = chunk(b"tRNS", alpha) if any(value != 255 for value in alpha) else b""
@@ -124,28 +150,40 @@ with tempfile.TemporaryDirectory(prefix="raipixel-compression-ceiling-") as fold
         assert len(filtered) == (dims["width"] * 4 + 1) * dims["height"]
         variants = []
         paths = []
-        for level in (1, 6, 9):
-            stream = zlib.compress(filtered, level)
+        strategies = [
+            ("zlib_level1", 1, zlib.Z_DEFAULT_STRATEGY, False),
+            ("zlib_level6", 6, zlib.Z_DEFAULT_STRATEGY, False),
+            ("zlib_level9", 9, zlib.Z_DEFAULT_STRATEGY, False),
+            ("zlib_fixed_level1", 1, zlib.Z_FIXED, False),
+            ("zlib_fixed_level6", 6, zlib.Z_FIXED, False),
+            ("zlib_fixed_level6_reset64k", 6, zlib.Z_FIXED, True),
+            ("zlib_dynamic_level6_reset64k", 6, zlib.Z_DEFAULT_STRATEGY, True),
+        ]
+        for label, level, strategy, reset in strategies:
+            stream = compress_zlib(filtered, level, strategy, reset)
             reconstructed = build_rgba(compact_data, stream)
             parsed = zlib.decompress(parse_idat(reconstructed))
             assert parsed == filtered
-            result = root / f"rgba-level-{level}-{n}.png"
+            result = root / f"rgba-{label}-{n}.png"
             result.write_bytes(reconstructed)
             paths.append(str(result))
-            variants.append({"mode": f"same_rgba_filters_zlib_level{level}",
+            variants.append({"mode": f"same_rgba_filters_{label}",
                              "bytes": len(reconstructed), "idat_bytes": len(stream)})
         palette_count = None
-        for level in (1, 6):
-            result = build_palette(dims["width"], dims["height"], pixels, level)
-            if result is None:
+        for depth in (8, 1, 2, 4):
+            if depth < 8 and len(set(pixels[i:i+4] for i in range(0, len(pixels), 4))) > 1 << depth:
                 continue
-            palette_count, encoded = result
-            result_path = root / f"palette-level-{level}-{n}.png"
-            result_path.write_bytes(encoded)
-            paths.append(str(result_path))
-            variants.append({"mode": f"indexed_rgba_exact_zlib_level{level}",
-                             "bytes": len(encoded),
-                             "idat_bytes": len(parse_idat(encoded))})
+            for level in (1, 6) if depth == 8 else (6,):
+                result = build_palette(dims["width"], dims["height"], pixels, level, depth)
+                if result is None:
+                    continue
+                palette_count, encoded = result
+                result_path = root / f"palette-depth{depth}-level{level}-{n}.png"
+                result_path.write_bytes(encoded)
+                paths.append(str(result_path))
+                variants.append({"mode": f"indexed_rgba_exact_depth{depth}_zlib_level{level}",
+                                 "bytes": len(encoded),
+                                 "idat_bytes": len(parse_idat(encoded))})
         # Verify *all* alternative PNG encodings in our existing Rust decoder.
         subprocess.run([str(exe), "verify", str(original), *paths],
                        check=True, capture_output=True)
