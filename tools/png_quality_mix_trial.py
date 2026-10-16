@@ -189,7 +189,12 @@ def candidate(depth, dynamic=True, filter_mode="none"):
             raise ValueError("unsupported filter")
         # These are indexed packed samples: PNG bytes-per-pixel is always 1.
         # Original packed bytes are saved row-by-row before prediction, even
-        # when a DEFLATE block boundary splits a scanline.
+        # when a DEFLATE block boundary splits a scanline. Scope anchors to
+        # the indexed writer, not the later RGBA encode_filtered writer.
+        before, separator, after = png.partition("\\nfn encode_filtered<")
+        if not separator:
+            raise ValueError("PNG indexed writer anchor missing")
+        png = before
         png = replace_once(
             png, "    let mut offset = 0;\n    let mut adler = Adler::new();",
             """    let mut offset = 0;
@@ -223,6 +228,7 @@ def candidate(depth, dynamic=True, filter_mode="none"):
             }
         }
         adler.update(&raw);""".replace("FILTER_MARKER", str(marker)))
+        png += separator + after
     return encoder, png
 
 DRIVER = r'''
