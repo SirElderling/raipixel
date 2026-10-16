@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory(prefix='raipixel-png-compare-') as temporary:
         assert ours[8:] == expected, case['name']
         reference = run('verify', source).stdout
         profile.append({'name': case['name'], 'reference': 'exact' if reference[8:] == expected else 'pixels differ'})
-        for writer in ['reencode-ours', 'reencode-compressed']:
+        for writer in ['reencode-ours', 'reencode-compressed', 'reencode-compact']:
             encoded = run(writer, source).stdout
             with Image.open(io.BytesIO(encoded)) as image:
                 image.load()
@@ -77,7 +77,7 @@ with tempfile.TemporaryDirectory(prefix='raipixel-png-compare-') as temporary:
         result = json.loads(run('bench', source, count, folder).stdout)
         result['name'] = name
         result['sha256'] = {}
-        for mode in ['ours', 'none', 'fast', 'default', 'compressed']:
+        for mode in ['ours', 'none', 'fast', 'default', 'compressed', 'compact']:
             encoded = (folder / (mode + '.png')).read_bytes()
             result['sha256'][mode] = hashlib.sha256(encoded).hexdigest()
             with Image.open(io.BytesIO(encoded)) as decoded:
@@ -123,7 +123,7 @@ with tempfile.TemporaryDirectory(prefix='raipixel-png-compare-') as temporary:
               'host': platform.platform(), 'reference': 'png 0.18.1, locked default features',
               'raipixel_commit': subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip(),
               'working_tree': subprocess.check_output(['git', '-C', str(ROOT), 'status', '--porcelain'], text=True),
-              'timing_order': baseline['timing_order'] + ['ours_compressed_encode'], 'profile': profile, 'measurements': measurements}
+              'timing_order': baseline['timing_order'] + ['ours_compressed_encode', 'ours_compact_encode'], 'profile': profile, 'measurements': measurements}
     if memory is not None:
         report['memory'] = memory
     args.output.parent.mkdir(parents=True, exist_ok=True)
