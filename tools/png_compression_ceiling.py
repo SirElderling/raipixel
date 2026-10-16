@@ -58,7 +58,59 @@ def compress_zlib(data: bytes, level: int, strategy: int, reset_blocks=False) ->
     out.extend(compressor.flush())
     return bytes(out)
 
-def build_palette(width: int, height: int, rgba: bytes, level: int, depth: int = 8):
+def filter_indexed_rows(raw: bytes, row_bytes: int, height: int, mode: str) -> bytes:
+    """Apply legal PNG filters to packed palette bytes without changing indices.
+
+    PNG's filter bytes-per-pixel is one for every indexed bit depth (1/2/4/8).
+    Adaptive mode uses signed-byte absolute sums only as a heuristic; actual
+    size is measured from the resulting level-6 zlib stream.
+    """
+    methods = {"none": 0, "sub": 1, "up": 2, "average": 3, "paeth": 4}
+    assert mode in (*methods, "adaptive")
+    stride = row_bytes + 1
+    assert len(raw) == height * stride
+    output = bytearray()
+    previous = bytes(row_bytes)
+
+    def filtered(row: bytes, number: int) -> bytes:
+        if number == 0:
+            return row
+        result = bytearray(row_bytes)
+        for x, value in enumerate(row):
+            left = row[x - 1] if x else 0
+            up = previous[x]
+            upper_left = previous[x - 1] if x else 0
+            if number == 1:
+                prediction = left
+            elif number == 2:
+                prediction = up
+            elif number == 3:
+                prediction = (left + up) // 2
+            else:
+                p = left + up - upper_left
+                da, db, dc = abs(p - left), abs(p - up), abs(p - upper_left)
+                prediction = left if da <= db and da <= dc else up if db <= dc else upper_left
+            result[x] = (value - prediction) & 255
+        return bytes(result)
+
+    for y in range(height):
+        begin = y * stride
+        assert raw[begin] == 0, "source indexed encoder no longer uses None filter"
+        current = bytes(raw[begin + 1:begin + stride])
+        if mode == "adaptive":
+            options = [(sum(min(value, 256 - value) for value in data), number, data)
+                       for number in range(5)
+                       for data in (filtered(current, number),)]
+            _, chosen, encoded = min(options)
+        else:
+            chosen = methods[mode]
+            encoded = filtered(current, chosen)
+        output.append(chosen)
+        output.extend(encoded)
+        previous = current
+    return bytes(output)
+
+def build_palette(width: int, height: int, rgba: bytes, level: int, depth: int = 8, filter_mode: str = "none"):
     # Dict order is first-occurrence order for fully deterministic, exact RGBA.
     rgba_colors = []
     indices = {}
@@ -87,6 +139,7 @@ def build_palette(width: int, height: int, rgba: bytes, level: int, depth: int =
                     sample = indices[rgba[offset + 4 * (x + within):offset + 4 * (x + within + 1)]] if x + within < width else 0
                     value |= (sample & mask) << (8 - depth * (within + 1))
                 data.append(value)
+    data = filter_indexed_rows(data, (width * depth + 7) // 8, height, filter_mode)
     ihdr = (width.to_bytes(4, "big") + height.to_bytes(4, "big") +
             bytes([depth, 3, 0, 0, 0]))
     palette = b"".join(color[:3] for color in rgba_colors)
@@ -197,6 +250,22 @@ with tempfile.TemporaryDirectory(prefix="raipixel-compression-ceiling-") as fold
                 variants.append({"mode": f"indexed_rgba_exact_depth{depth}_zlib_level{level}",
                                  "bytes": len(encoded),
                                  "idat_bytes": len(parse_idat(encoded))})
+        # Isolate indexed-row filtering from matching and Huffman selection.
+        # The same depth, palette, zlib level and complete RGBA pixels are
+        # used in all variants; only the packed-row filter bytes differ.
+        minimal_depth = next((d for d in (1, 2, 4, 8) if count <= 1 << d), 8)
+        for mode in ("sub", "up", "average", "paeth", "adaptive"):
+            result = build_palette(dims["width"], dims["height"], pixels,
+                                   level=6, depth=minimal_depth, filter_mode=mode)
+            if result is None:
+                continue
+            _, encoded = result
+            result_path = root / f"palette-filter-{mode}-{n}.png"
+            result_path.write_bytes(encoded)
+            paths.append(str(result_path))
+            variants.append({"mode": f"indexed_exact_depth{minimal_depth}_level6_filter_{mode}",
+                             "bytes": len(encoded),
+                             "idat_bytes": len(parse_idat(encoded))})
         # Verify *all* alternative PNG encodings in our existing Rust decoder.
         subprocess.run([str(exe), "verify", str(original), *paths],
                        check=True, capture_output=True)
@@ -210,7 +279,7 @@ with tempfile.TemporaryDirectory(prefix="raipixel-compression-ceiling-") as fold
     print(json.dumps({
         "experiment": "compression_strategy_and_palette_parity_headroom",
         "purpose": "Measure potential size gains, NOT equivalent Rust implementation speed",
-        "note": "zlib is Python stdlib diagnostic only; reference png crate source not inspected",
+        "note": "Indexed row filter ceiling uses identical palette/depth, Python stdlib zlib level 6, and Rust exact RGBA verification. It does not measure native Rust filtering CPU time; reference png crate source not inspected",
         "compiler": subprocess.check_output(["rustc", "--version", "--verbose"], text=True),
         "platform": platform.platform(),
         "python_zlib": zlib.ZLIB_RUNTIME_VERSION,
