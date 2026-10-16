@@ -1,8 +1,9 @@
 # Static PNG codec
 
 This implements the Foundation import profile in the design, not full PNG
-conformance or completion of S1. The library exposes `png::decode` and
-`png::encode` and optional `png::encode_compressed`; typed jobs, persistence and the CLI remain separate work.
+conformance or completion of S1. The library exposes `png::decode`, `png::encode`, `png::encode_compressed`,
+and the size-focused `png::encode_compact`; typed jobs, persistence and the
+CLI remain separate work.
 
 ## Format coverage
 
@@ -12,7 +13,7 @@ conformance or completion of S1. The library exposes `png::decode` and
 | Row encoding | All five filters; noninterlaced and Adam7, including empty passes and pass-local previous rows |
 | Transparency | Straight RGBA samples, hidden RGB, palette alpha and unscaled tRNS comparisons with unused high bits masked |
 | Compression input | Stored, fixed and dynamic Huffman DEFLATE; overlapping references and permitted degenerate alphabets |
-| Output | Deterministic noninterlaced RGBA8: original None/stored writer or optional Sub/Up, fixed Huffman LZ matches and stored fallback; bounded IDAT chunks |
+| Output | Deterministic noninterlaced RGBA8: original None/stored writer, fast Sub/Up fixed-Huffman compression, or size-focused one-step lazy matching; stored fallback and bounded IDAT chunks |
 | Integrity | Chunk CRC32, zlib header/Adler32, exact inflate length, required critical chunks/order, palette/sample constraints |
 | Metadata | Color/profile chunks flagged as uninterpreted; other ancillary chunks flagged as skipped; payloads CRC checked but never inflated or preserved |
 | Unsupported | 16-bit input and animation chunks explicitly rejected; unknown critical chunks rejected |
@@ -65,6 +66,14 @@ length/distance to 258/32,768, resets the dictionary per 65,535-byte block and
 uses stored fallback when fixed coding would expand a block. Sub on the first
 row and Up thereafter preserve every sample, including hidden RGB. No dynamic
 Huffman generation, match chains or input-sized index is introduced.
+
+The explicit `png::encode_compact` option uses the same filter, fixed-Huffman,
+stored-fallback and scratch-memory policies, but considers one next-position
+match before committing a non-maximal match. It precharges 14 work units per
+input byte instead of the fast writer's 12, then applies the same deterministic
+PNG integrity checks. The fast writer still emits exactly its prior bytes.
+Compact output is smaller on tested sprite-sheet and texture workloads, but
+can take longer to encode, so it is not silently selected by the fast API.
 
 Algorithm sources, creator acknowledgments and the exact partial influences
 are recorded in [the algorithm notes](../benchmarks/png/algorithm-notes.md),
