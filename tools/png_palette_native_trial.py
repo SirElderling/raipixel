@@ -80,7 +80,9 @@ pub fn trial_encode_palette(
             let position = offset + i;
             let row = position / stride;
             let col = position % stride;
-            if col != 0 {
+            if col == 0 {
+                *byte = 0;
+            } else {
                 let sample = pixels[row * row_bytes + col - 1];
                 *byte = indices[&sample];
             }
@@ -166,7 +168,9 @@ PACKED = PACKED.replace(anchor, """    let width = image.width as usize;
     let stride = row_bytes + 1;""")
 assert PACKED.count("    ihdr[8] = 8;") == 1
 PACKED = PACKED.replace("    ihdr[8] = 8;", "    ihdr[8] = depth as u8;")
-old = """            if col != 0 {
+old = """            if col == 0 {
+                *byte = 0;
+            } else {
                 let sample = pixels[row * row_bytes + col - 1];
                 let mut slot = slot_for(sample);
                 loop {
@@ -179,7 +183,9 @@ old = """            if col != 0 {
                     slot = (slot + 1) & 4095;
                 }
             }"""
-new = """            if col != 0 {
+new = """            if col == 0 {
+                *byte = 0;
+            } else {
                 let samples_per_byte = 8 / depth;
                 let x0 = (col - 1) * samples_per_byte;
                 for j in 0..samples_per_byte {
@@ -242,7 +248,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if possible {
             let packed_decoded = raipixel::png::decode(&packed_palette,
                 raipixel::Limits::default(), &mut raipixel::Work::default())?;
-            assert_eq!(packed_decoded.image, original, "packed index pixels mismatch");
+            assert_eq!(packed_decoded.image.size(), original.size());
+            let actual = packed_decoded.image.pixels().as_flattened();
+            let expected = original.pixels().as_flattened();
+            if actual != expected {
+                let mismatch = actual.iter().zip(expected).position(|(a,b)| a != b).unwrap();
+                panic!("packed PNG pixel byte {mismatch}: {} != {}",
+                    actual[mismatch], expected[mismatch]);
+            }
             assert!([1u8,2,4,8].contains(&packed_palette[24]), "illegal palette depth");
 
             let decoded = raipixel::png::decode(&palette, raipixel::Limits::default(), &mut raipixel::Work::default())?;
