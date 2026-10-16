@@ -306,11 +306,11 @@ def modified(original):
     # Avoid dynamic coding for small indexed chunks.
     # Retain the accepted compact bitstream on those chunks.
     s = one(s,
-            "        let saved = (self.bits, self.count);\\n        let mut trial_tokens = Vec::<u16>::new();",
-            "        let trial_use = COMPACT && data.len() >= 4096;\\n        let saved = (self.bits, self.count);\\n        let mut trial_tokens = Vec::<u16>::new();")
+            "        let saved = (self.bits, self.count);\n        let mut trial_tokens = Vec::<u16>::new();",
+            "        let trial_use = COMPACT && data.len() >= 4096;\n        let saved = (self.bits, self.count);\n        let mut trial_tokens = Vec::<u16>::new();")
     s = s.replace("if !COMPACT {", "if !trial_use {")
     s = s.replace("if COMPACT {", "if trial_use {")
-    return s+"\\n"+HELPER
+    return s+"\n"+HELPER
 
 with tempfile.TemporaryDirectory(prefix="raipixel-indexed-guard-") as temp:
     folder=Path(temp)
