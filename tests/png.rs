@@ -389,3 +389,95 @@ fn compressed_writer_preserves_samples_across_blocks_and_falls_back_for_noise() 
         }
     }
 }
+
+// An exact palette index represents the full RGBA tuple, not just visible RGB.
+// Exercise all legal index depths, row packing/padding, hash collisions and
+// scanlines straddling 65,535-byte DEFLATE block boundaries.
+#[test]
+fn indexed_writer_roundtrips_all_rgba_samples_at_every_palette_depth() {
+    for (colors, width, height) in [
+        (1usize, 7u32, 11u32),
+        (2, 9, 15),
+        (4, 17, 21),
+        (5, 1024, 270),
+        (16, 37, 31),
+        (17, 67, 53),
+        (256, 32, 32),
+        (4, 1024, 300),
+    ] {
+        let pixels: Vec<[u8; 4]> = (0..width as usize * height as usize)
+            .map(|i| {
+                let color = i % colors;
+                [
+                    color as u8,
+                    (color * 13 + 7) as u8,
+                    (color * 37 + 17) as u8,
+                    match color % 3 {
+                        0 => 0,
+                        1 => 127,
+                        _ => 255,
+                    },
+                ]
+            })
+            .collect();
+        let image =
+            Image::from_pixels(width, height, &pixels, Limits::default(), &mut Work::default())
+                .unwrap();
+        let mut indexed = Vec::new();
+        assert!(png::encode_indexed(&image, &mut indexed, &mut Work::default()).unwrap());
+        let depth = match colors {
+            1..=2 => 1,
+            3..=4 => 2,
+            5..=16 => 4,
+            _ => 8,
+        };
+        assert_eq!(indexed[24], depth, "palette depth for {colors} colors");
+        assert_eq!(indexed[25], 3);
+        assert_eq!(
+            png::decode(&indexed, Limits::default(), &mut Work::default())
+                .unwrap()
+                .image,
+            image,
+            "RGBA roundtrip for {colors} colors and {width}x{height}"
+        );
+        let mut repeated = Vec::new();
+        assert!(png::encode_indexed(&image, &mut repeated, &mut Work::default()).unwrap());
+        assert_eq!(indexed, repeated, "deterministic indexed bytes");
+
+        if width == 1024 {
+            let mut compact = Vec::new();
+            png::encode_compact(&image, &mut compact, &mut Work::default()).unwrap();
+            assert!(indexed.len() < compact.len(), "indexed PNG on {width}x{height}");
+        }
+        let mut invalid = indexed;
+        invalid[29] ^= 1;
+        assert_eq!(
+            png::decode(&invalid, Limits::default(), &mut Work::default())
+                .unwrap_err()
+                .code(),
+            "E_PNG_CRC"
+        );
+    }
+}
+
+#[test]
+fn indexed_writer_refuses_nonrepresentable_colors_without_writing() {
+    let pixels: Vec<[u8; 4]> = (0..17 * 17)
+        .map(|i| [i as u8, (i >> 8) as u8, 71, 0])
+        .collect();
+    let image =
+        Image::from_pixels(17, 17, &pixels, Limits::default(), &mut Work::default()).unwrap();
+    let mut output = Vec::new();
+    assert!(!png::encode_indexed(&image, &mut output, &mut Work::default()).unwrap());
+    assert!(output.is_empty());
+
+    let image = Image::new(1, 1, Limits::default(), &mut Work::default()).unwrap();
+    assert_eq!(
+        png::encode_indexed(&image, &mut output, &mut Work::new(0).unwrap())
+            .unwrap_err()
+            .code(),
+        "E_LIMIT"
+    );
+    assert!(output.is_empty());
+}
+
