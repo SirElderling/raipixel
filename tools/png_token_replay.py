@@ -23,7 +23,7 @@ traced = traced.replace('        let saved = (self.bits, self.count);\n        s
 if 'Self::probably_stored(data)' in source:
     traced = traced.replace(
         'if data.len() >= 16_384 && Self::probably_stored(data) {',
-        'if self.probably_stored(data) {\n            self.trace.push((u16::MAX, 0));',
+        'if data.len() >= 16_384 && Self::probably_stored(data) {\n            self.trace.push((u16::MAX, 0));',
         1,
     )
 traced = traced.replace('                self.reference(length, pos - prior);','                self.trace.push((length as u16,(pos-prior)as u16));\n                self.reference(length, pos - prior);',1)
