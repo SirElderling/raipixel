@@ -51,3 +51,45 @@ and code footprint. Avoid committing additional public modes or changing the
 stored/fast/compact byte contracts until the native candidate clears these
 gates. The reference `png 0.18.1` implementation remains black-box only,
 and no unsafe code/runtime crate dependencies are permitted.
+
+## Native Rust proof-of-concept: passed Linux and Windows
+
+A further [focused native Rust workflow](https://github.com/SirElderling/raipixel/actions/runs/38897607257)
+compiles [`tools/png_dynamic_native_trial.py`](../../../tools/png_dynamic_native_trial.py),
+which makes temporary, test-only copies of our **own** `src/deflate/encode.rs`.
+It records exactly the same literal, length and distance tokens already selected
+by raipixel, emits RFC 1951 dynamic Huffman blocks, and selects them only when
+smaller than the accepted fixed/stored block. Tree construction is bounded by
+DEFLATE's maximum bit lengths; otherwise it falls back. It does not add an
+external codec, runtime crate dependency, `unsafe` or new production mode.
+
+Validation before timing includes **exact RGBA image equality** via our accepted
+decoder, deterministic repeat-encoding bytes, work-budget parity, and CRC
+corruption rejection. Nine rotating calibrated batches time whole PNG encoding
+including allocation and token buffering.
+
+| Workload | Accepted bytes | Native dynamic bytes | Windows encode time | Linux encode time |
+|---|---:|---:|---:|---:|
+| Icon 64 | 326 | 289 | 2.25× | 2.19× |
+| Generated sheet 1024 | 33,463 | **12,949** | **1.70×** | **1.71×** |
+| Original mixed-filter sheet | 38,788 | **19,449** | **1.90×** | **1.91×** |
+| Texture 1024 | 77,133 | **55,766** | **1.95×** | **1.89×** |
+| Noise 256 | 262,560 | 262,560 | 1.37× | 1.32× |
+
+Relative times above **1.0× mean slower**. Linux and Windows passed with rustc
+1.99.1. The ARM64 job was queued at time of writing and is not included in
+this conclusion.
+
+The native PNG output is 792 bytes larger than the single-IDAT Python diagnostic
+on the 1024px images because it retains the existing multi-IDAT chunk framing;
+the DEFLATE content is otherwise comparably compact. This is intentional
+for the bounded streaming-style writer.
+
+**Decision:** Dynamic coding is feasible with our *actual matcher*, but the
+naive scratch strategy re-encodes a fixed block before building the dynamic
+alternative, and repeatedly sorts Huffman nodes. Its **70–95% more CPU on
+structured images** and 30% more CPU on incompressible noise do not justify
+replacing the existing fast or compact encoders. Keep this prototype isolated
+and evaluate a **single-pass token-buffered dynamic writer** (or explicit
+size-focused mode), measuring code size, scratch memory and end-to-end time
+before any production integration. Existing output byte contracts remain intact.
