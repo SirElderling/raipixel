@@ -279,7 +279,7 @@ impl Encoder {
             // One-step lazy parsing can emit a literal when the following
             // position offers a strictly longer match. RFC 1951 coding and
             // the 32 KiB history/distance limits are unchanged.
-            if COMPACT && length >= 3 && length < 258 && pos + 4 <= data.len() {
+            if COMPACT && (3..258).contains(&length) && pos + 4 <= data.len() {
                 let next_pos = pos + 1;
                 let (next_slot, next_prefix) = hash(data, next_pos);
                 let next_length = match_candidate(
