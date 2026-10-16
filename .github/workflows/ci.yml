@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   native:
-    name: Stable / ${{ matrix.os }}
+    name: Rust 1.99.1 / ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -31,68 +31,68 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Install stable Rust
-        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy --target ${{ matrix.target }}
+      - name: Install Rust 1.99.1
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy --target ${{ matrix.target }}
       - name: Toolchain details
-        run: rustc +stable --version --verbose
+        run: rustc +1.99.1 --version --verbose
       - name: Format
-        run: cargo +stable fmt --all -- --check
+        run: cargo +1.99.1 fmt --all -- --check
       - name: Test natively
-        run: cargo +stable test --locked --offline --target ${{ matrix.target }}
+        run: cargo +1.99.1 test --locked --offline --target ${{ matrix.target }}
       - name: Clippy
-        run: cargo +stable clippy --locked --offline --all-targets --target ${{ matrix.target }} -- -D warnings
+        run: cargo +1.99.1 clippy --locked --offline --all-targets --target ${{ matrix.target }} -- -D warnings
       - name: Compare checksum throughput (informational)
         run: |
-          rustc +stable --edition=2024 -O tools/png_checksum_bench.rs -o png-checksum-bench.exe
+          rustc +1.99.1 --edition=2024 -O tools/png_checksum_bench.rs -o png-checksum-bench.exe
           ./png-checksum-bench.exe
       - name: Paired full-codec timings and exact output comparison (informational)
         env:
-          RUSTUP_TOOLCHAIN: stable
+          RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_timings.py --baseline 9122259844497a57149dbe6ba7fa0ef708398c46 --batch-ms 100 --output png-timings.json
       - name: Paired candidate-versus-accepted PNG timings (informational)
         env:
-          RUSTUP_TOOLCHAIN: stable
+          RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_timings.py --baseline 7717618f3c56c244283c773425eae1b68c3d1d16 --batch-ms 100 --output png-candidate-timings.json
       - name: Isolate target-specific CRC from the unchanged encoder (informational)
         env:
-          RUSTUP_TOOLCHAIN: stable
+          RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_timings.py --baseline 9734e8102eb3624fb7324561e32031112c0e838c --batch-ms 25 --output png-arch-crc-timings.json
       - name: Compare original mixed-filter corpus, samples, flags and work (informational)
         env:
-          RUSTUP_TOOLCHAIN: stable
+          RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_timings.py --baseline 9122259844497a57149dbe6ba7fa0ef708398c46 --corpus benchmarks/png/original-inputs.json --batch-ms 100 --output png-original-timings.json
       - name: Restore recorded original PNG inputs
         run: python -c "import json;from pathlib import Path;p=Path('png-original-inputs');p.mkdir(exist_ok=True);[(p / (c['name'] + '.png')).write_bytes(bytes.fromhex(c['png_hex'])) for c in json.loads(Path('benchmarks/png/original-inputs.json').read_text())['cases']]"
       - name: Codec stage probes (informational)
         run: |
-          cargo +stable run --release --locked --offline --example png_bench -- --export png-stage-inputs
-          cargo +stable run --release --locked --offline --example png_stages -- png-stage-inputs/sheet-1024-compressed.png
-          cargo +stable run --release --locked --offline --example png_stages -- png-stage-inputs/texture-1024-compressed.png
+          cargo +1.99.1 run --release --locked --offline --example png_bench -- --export png-stage-inputs
+          cargo +1.99.1 run --release --locked --offline --example png_stages -- png-stage-inputs/sheet-1024-compressed.png
+          cargo +1.99.1 run --release --locked --offline --example png_stages -- png-stage-inputs/texture-1024-compressed.png
       - name: Screen CRC headroom and Paeth decode candidates (informational)
         env:
-          RUSTUP_TOOLCHAIN: stable
+          RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_hotpath_trial.py png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
       - name: Profile actual decoder stages (informational)
         env:
-          RUSTUP_TOOLCHAIN: stable
+          RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_decode_stages.py png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
       - name: Screen safe CRC slicing widths (informational)
         env:
-          RUSTUP_TOOLCHAIN: stable
+          RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_crc_trial.py
       - name: Profile actual writer stages (informational)
         env:
-          RUSTUP_TOOLCHAIN: stable
+          RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_writer_profile.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png
       - name: Screen token emission separately from matching (informational)
         env:
-          RUSTUP_TOOLCHAIN: stable
+          RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_token_replay.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
       - name: Compare matching and Adler stages against baseline (informational)
         env:
-          RUSTUP_TOOLCHAIN: stable
+          RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_bottleneck_compare.py --baseline 27243e606e9c5c3ef6fddc0c645255570be75be7 png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
       - name: Compare complete codecs under matched build profiles (informational)
         env:
-          RUSTUP_TOOLCHAIN: stable
+          RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_build_profiles.py --output png-build-profiles.json png-stage-inputs/icon-64-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
