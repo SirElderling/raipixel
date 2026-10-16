@@ -27,7 +27,7 @@ profiles = dict(default=dict(codegen_units=16, lto='false'),
                 thin=dict(codegen_units=1, lto='thin'))
 order = args.profiles + list(reversed(args.profiles))
 operations = ['ours_decode', 'reference_decode', 'ours_stored', 'reference_none',
-              'reference_fast', 'reference_balanced', 'ours_compressed']
+              'reference_fast', 'reference_balanced', 'ours_compressed', 'ours_compact']
 
 
 def run(command, **kwargs):
@@ -81,6 +81,7 @@ with tempfile.TemporaryDirectory(prefix='raipixel-build-profiles-') as folder:
                       for i in range(len(operations))]
             results[label] = dict(median_us=dict(zip(operations, values)),
                                   compressed_over_fast=values[6] / values[4],
+                                  compact_over_fast=values[7] / values[4],
                                   decode_over_reference=values[0] / values[1])
         summary.append(dict(input=str(path), profiles=results))
     report = dict(experiment='complete_codec_build_profiles',
