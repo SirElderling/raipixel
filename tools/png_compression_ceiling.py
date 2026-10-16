@@ -60,10 +60,15 @@ def compress_zlib(data: bytes, level: int, strategy: int, reset_blocks=False) ->
 
 def build_palette(width: int, height: int, rgba: bytes, level: int, depth: int = 8):
     # Dict order is first-occurrence order for fully deterministic, exact RGBA.
-    rgba_colors = list(dict.fromkeys(rgba[i:i+4] for i in range(0, len(rgba), 4)))
-    if len(rgba_colors) > 256:
-        return None
-    indices = {rgba: index for index, rgba in enumerate(rgba_colors)}
+    rgba_colors = []
+    indices = {}
+    for i in range(0, len(rgba), 4):
+        sample = rgba[i:i+4]
+        if sample not in indices:
+            if len(rgba_colors) == 256:
+                return None
+            indices[sample] = len(rgba_colors)
+            rgba_colors.append(sample)
     assert depth in (1, 2, 4, 8)
     assert len(rgba_colors) <= 1 << depth
     data = bytearray()
@@ -170,8 +175,16 @@ with tempfile.TemporaryDirectory(prefix="raipixel-compression-ceiling-") as fold
             variants.append({"mode": f"same_rgba_filters_{label}",
                              "bytes": len(reconstructed), "idat_bytes": len(stream)})
         palette_count = None
+        limited_palette = {}
+        for i in range(0, len(pixels), 4):
+            color = pixels[i:i+4]
+            if color not in limited_palette:
+                if len(limited_palette) == 256:
+                    break
+                limited_palette[color] = len(limited_palette)
+        count = len(limited_palette)
         for depth in (8, 1, 2, 4):
-            if depth < 8 and len(set(pixels[i:i+4] for i in range(0, len(pixels), 4))) > 1 << depth:
+            if depth < 8 and count > 1 << depth:
                 continue
             for level in (1, 6) if depth == 8 else (6,):
                 result = build_palette(dims["width"], dims["height"], pixels, level, depth)
