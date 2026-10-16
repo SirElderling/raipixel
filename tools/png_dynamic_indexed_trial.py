@@ -384,7 +384,7 @@ fn main()->Result<(),Box<dyn std::error::Error>>{
 '''
     (folder/"src/main.rs").write_text(driver,encoding="utf-8")
     subprocess.run(["cargo","build","--release","--offline","--manifest-path",str(folder/"Cargo.toml")],check=True)
-    exe=folder/"target/release"/("raipixel-packed-dynamic-screen.exe" if sys.platform=="win32" else "raipixel-packed-dynamic-screen")
+    exe=folder/"target/release"/("raipixel-indexed-dynamic-screen.exe" if sys.platform=="win32" else "raipixel-indexed-dynamic-screen")
     lines=subprocess.check_output([str(exe),*sys.argv[1:]],text=True).splitlines()
     assert len(lines)==len(sys.argv[1:])
     cases=[]
