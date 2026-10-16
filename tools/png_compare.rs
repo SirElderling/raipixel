@@ -229,12 +229,18 @@ fn main() -> Result<(), AnyError> {
             1 => {
                 black_box(reference_decode(black_box(&input))?);
             }
-            2 | 6 => {
+            2 | 6 | 7 => {
                 let mut out = Vec::new();
                 if index == 2 {
                     raipixel::png::encode(black_box(&ours.image), &mut out, &mut Work::default())?;
-                } else {
+                } else if index == 6 {
                     raipixel::png::encode_compressed(
+                        black_box(&ours.image),
+                        &mut out,
+                        &mut Work::default(),
+                    )?;
+                } else {
+                    raipixel::png::encode_compact(
                         black_box(&ours.image),
                         &mut out,
                         &mut Work::default(),
@@ -252,17 +258,17 @@ fn main() -> Result<(), AnyError> {
         }
         Ok(())
     };
-    let mut counts = [iterations.max(1); 7];
+    let mut counts = [iterations.max(1); 8];
     for (index, count) in counts.iter_mut().enumerate() {
         while measure(|| operation(index), *count)? * (*count as f64) < 25_000.0 {
             *count = count.checked_mul(2).ok_or("iteration overflow")?;
         }
     }
-    let mut timings: Vec<Vec<f64>> = (0..7).map(|_| Vec::new()).collect();
+    let mut timings: Vec<Vec<f64>> = (0..8).map(|_| Vec::new()).collect();
     // Warm/calibrate before seven rotating batches, matching our native driver.
-    for round in 0..7 {
-        for n in 0..7 {
-            let index = (n + round) % 7;
+    for round in 0..8 {
+        for n in 0..8 {
+            let index = (n + round) % 8;
             timings[index].push(measure(|| operation(index), counts[index])?);
         }
     }
