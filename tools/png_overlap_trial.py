@@ -161,9 +161,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         byte_count = 4 * width + 1
         literal_prefix = bytes([0]) + (b"AB" if distance == 2 else b"ABCD")
         assert (byte_count - len(literal_prefix)) % 258 == 0
-        raw = literal_prefix + (b"AB" if distance == 2 else b"ABCD") * (
-            (byte_count - len(literal_prefix)) // (2 if distance == 2 else 4) // 258 * 258
-        )
+        remaining = byte_count - len(literal_prefix)
+        pattern = b"AB" if distance == 2 else b"ABCD"
+        raw = literal_prefix + (pattern * ((remaining + len(pattern) - 1) // len(pattern)))[:remaining]
         assert len(raw) == byte_count
         bits = []
 
