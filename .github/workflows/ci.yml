@@ -53,6 +53,10 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: stable
         run: python tools/png_timings.py --baseline 7717618f3c56c244283c773425eae1b68c3d1d16 --batch-ms 100 --output png-candidate-timings.json
+      - name: Isolate target-specific CRC from the unchanged encoder (informational)
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: python tools/png_timings.py --baseline 9734e8102eb3624fb7324561e32031112c0e838c --batch-ms 25 --output png-arch-crc-timings.json
       - name: Compare original mixed-filter corpus, samples, flags and work (informational)
         env:
           RUSTUP_TOOLCHAIN: stable
