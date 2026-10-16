@@ -157,7 +157,7 @@ fn main() -> Result<(), AnyError> {
         if written {
             let (width, height, samples) = reference_decode(&data)?;
             assert_eq!([width, height], decoded.image.size());
-            assert_eq!(samples, decoded.image.pixels().as_flattened());
+            assert_eq!(samples.as_slice(), decoded.image.pixels().as_flattened());
             let ours = raipixel::png::decode(&data, Limits::default(), &mut Work::default())?;
             assert_eq!(ours.image.pixels(), decoded.image.pixels());
             println!(
