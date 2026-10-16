@@ -59,10 +59,14 @@ with tempfile.TemporaryDirectory(prefix='raipixel-build-profiles-') as folder:
         builds[label] = dict(**settings, opt_level=3, incremental=False,
                              executable_bytes=exe.stat().st_size,
                              executable_sha256=hashlib.sha256(exe.read_bytes()).hexdigest())
-    records, hashes, inputs = [], {}, []
+    records, hashes, inputs, indexed_checks = [], {}, [], []
     for index, path in enumerate(args.inputs):
         path = path.resolve()
         inputs.append(dict(input=str(path), sha256=hashlib.sha256(path.read_bytes()).hexdigest()))
+        # Public png 0.18.1 EXPAND decoder checks exact RGBA, including hidden
+        # RGB under alpha zero, for our optimal-depth indexed PNG output.
+        indexed = json.loads(run([str(executables['default']), 'verify-indexed', str(path)]))
+        indexed_checks.append(dict(input_index=index, **indexed))
         for sequence, label in enumerate(order):
             output = folder / f'outputs-{index}-{sequence}'
             row = json.loads(run([str(executables[label]), 'bench', str(path), '1', str(output)]))
@@ -95,7 +99,7 @@ with tempfile.TemporaryDirectory(prefix='raipixel-build-profiles-') as folder:
                   source_sha256={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                                  for p in sorted(ROOT.glob('src/**/*.rs'))},
                   operations=operations, process_order=order, builds=builds,
-                  inputs=inputs, output_sha256=hashes, summary=summary, runs=records)
+                  inputs=inputs, indexed_reference_validation=indexed_checks, output_sha256=hashes, summary=summary, runs=records)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(report))
