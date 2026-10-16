@@ -34,6 +34,10 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_crc_reduction_trial.py
+      - name: Screen wide CRC transition thresholds (informational)
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_crc_threshold_trial.py
       - name: Export deterministic PNG inputs
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
