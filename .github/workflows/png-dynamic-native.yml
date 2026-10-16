@@ -8,6 +8,11 @@ on:
 permissions:
   contents: read
 
+# Only the newest branch revision should run resource-intensive scratch trials.
+concurrency:
+  group: png-native-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   native:
     name: Dynamic Huffman / ${{ matrix.os }}
