@@ -51,3 +51,8 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_dynamic_heap_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+
+      - name: Test compact 16-bit tokens with heap Huffman construction (informational)
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_dynamic_packed_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
