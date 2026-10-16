@@ -191,7 +191,7 @@ def candidate(depth, dynamic=True, filter_mode="none"):
         # Original packed bytes are saved row-by-row before prediction, even
         # when a DEFLATE block boundary splits a scanline. Scope anchors to
         # the indexed writer, not the later RGBA encode_filtered writer.
-        before, separator, after = png.partition("\\nfn encode_filtered<")
+        before, separator, after = png.partition("\nfn encode_filtered<")
         if not separator:
             raise ValueError("PNG indexed writer anchor missing")
         png = before
