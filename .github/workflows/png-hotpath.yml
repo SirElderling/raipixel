@@ -48,6 +48,10 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_crc_threshold_fullcodec.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+      - name: Compare PNG compressed-writer Sub/Up policy (informational)
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_filter_policy_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
       - name: Compare CRC headroom and Paeth variants
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
