@@ -186,6 +186,9 @@ old = """            if col == 0 {
 new = """            if col == 0 {
                 *byte = 0;
             } else {
+                // OR-packing must start with a zeroed byte, including when
+                // a DEFLATE block reuses the same scratch buffer allocation.
+                *byte = 0;
                 let samples_per_byte = 8 / depth;
                 let x0 = (col - 1) * samples_per_byte;
                 for j in 0..samples_per_byte {
