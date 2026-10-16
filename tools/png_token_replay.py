@@ -27,7 +27,10 @@ if 'Self::probably_stored(data)' in source:
         1,
     )
 traced = traced.replace('                self.reference(length, pos - prior);','                self.trace.push((length as u16,(pos-prior)as u16));\n                self.reference(length, pos - prior);',1)
-traced = traced.replace('                self.symbol(u32::from(data[pos]));','                self.trace.push((0,u16::from(data[pos])));\n                self.symbol(u32::from(data[pos]));',1)
+# The optional compact lookahead emits its own literal. Instrument the
+# normal fast literal fallback instead; the fast mode never takes lookahead.
+traced = traced.replace('            } else {\n                self.symbol(u32::from(data[pos]));',
+                        '            } else {\n                self.trace.push((0,u16::from(data[pos])));\n                self.symbol(u32::from(data[pos]));',1)
 traced = traced.replace('            self.symbol(u32::from(byte));','            self.trace.push((0,u16::from(byte)));\n            self.symbol(u32::from(byte));',1)
 fallback = source[source.index('        if self.output.len() > data.len() + 5 {'):source.index('\n#[cfg(test)]')]
 # Preserve the complete original fallback and closing method/impl braces.
