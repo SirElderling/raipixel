@@ -64,19 +64,41 @@ is larger on this corpus.
 | Texture 1024, >256 RGBA colors | 77,133 | Not representable | Not representable |
 | Noise 256, >256 RGBA colors | 262,560 | Not representable | Not representable |
 
-**Decision:** Indexed PNG output is highly relevant to pixel art, but
-it must be **conditional and lossless**: reject/fall back when more than
-256 exact RGBA colors occur; never quantize away hidden RGB values. Palette
-indexing, 1/2/4/8-bit packing and tRNS require independent interoperability
-checks and a realistic encoding time measurement.
+**Accepted in PR #2:** The public `png::encode_indexed` writer is now an
+**explicit opt-in**, preserving all four RGBA channels, including hidden RGB
+under alpha zero, with the minimal 1/2/4/8-bit legal index depth. It uses
+the existing bounded, fixed-Huffman lazy encoder, a deterministic, bounded
+4096-slot palette lookup and the same checksum validation. An image with
+more than 256 distinct RGBA values returns `Ok(false)` without writing,
+rather than silently quantizing. The existing `encode`, `encode_compressed`
+and `encode_compact` byte contracts remain unchanged.
 
-[`tools/png_palette_native_trial.py`](../../../tools/png_palette_native_trial.py)
-therefore builds a temporary **safe Rust** indexed writer using **our own**
-`deflate::Encoder::block_compact` (not Python zlib) and compares complete
-file size/encoding time, sample equality, CRC validation, deterministic
-output, and budget failure against accepted compact RGBA output.
-Its [native run 38870381490](https://github.com/SirElderling/raipixel/actions/runs/38870381490)
-is queued; no native indexed production change has been accepted.
+A native [three-platform scratch screen 38872957346](https://github.com/SirElderling/raipixel/actions/runs/38872957346)
+demonstrated the real fixed-Huffman palette ceiling, without borrowing
+Python zlib:
+
+| PNG input | Current compact RGBA bytes | Own fixed-Huffman optimal indexed bytes | Indexed / compact |
+|---|---:|---:|---:|
+| Icon 64 | 326 | **172** | 0.528 |
+| Sheet 1024 | 33,463 | **4,396** | 0.131 |
+| Original mixed-filter sheet 1024 | 38,788 | **9,912** | 0.256 |
+
+The indexed prototype with bounded fixed-table lookup took approximately
+3–4.6 times as long as `encode_compact` for the two sheets across Linux,
+Windows and ARM64. These are **scratch candidate times**, not a claim about
+later production measurements. Palette conversion is a deliberate
+compression-size versus CPU tradeoff, not a new universal default.
+In particular, a 9,912-byte fixed-Huffman indexed sheet remains larger
+than a 3,525-byte zlib-compressed indexed diagnostic: **dynamic Huffman
+encoding still has meaningful upside even after palette conversion**.
+
+Production tests cover 1/2/4/8-bit palettes, RGBA values with hidden RGB,
+deterministic exact output, 65,535-byte block boundaries, invalid checksums,
+too many colors, and failed work preflight. The independent
+[`png 0.18.1` public decoder](../../../tools/png_compare.rs) is now
+also used for exact indexed-output checking in the matched-profile CI.
+Its latest run must finish successfully before considering independent
+interoperability established; the reference's source code is never read.
 
 ## Decoder parity ceiling
 
@@ -90,10 +112,9 @@ the Rust 1.99.1 workflow. No claim of full decoder-speed parity is made.
 
 ## Implementation priority after the screens
 
-1. If the independent native indexed writer has meaningful size savings at
-   acceptable time/memory cost, promote a narrowly scoped **opt-in exact
-   indexed PNG writer** with minimal legal bit depth. Keep the existing
-   RGBA8 stored/fast/compact output contracts untouched.
+1. Verify the accepted **opt-in exact indexed PNG writer** with the
+   independent reference decoder, and measure its native CPU/memory cost.
+   Keep existing RGBA8 stored/fast/compact output contracts untouched.
 2. Prototype a standalone **dynamic-Huffman DEFLATE writer** as an isolated
    RFC 1951 component, benchmarked against our compact writer and the locked
    public reference. Reject if build size, complexity, speed or correctness
