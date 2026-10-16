@@ -164,7 +164,7 @@ fn main() -> Result<(), AnyError> {
                 "{{\"supported\":true,\"bytes\":{},\"png_depth\":{},\"colors\":{},\"exact_rgba\":true}}",
                 data.len(),
                 data[24],
-                data[37] as usize / 3,
+                u32::from_be_bytes(data[33..37].try_into().unwrap()) as usize / 3,
             );
         } else {
             assert!(data.is_empty(), "unsupported palette emitted data");
