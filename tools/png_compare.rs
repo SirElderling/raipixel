@@ -145,12 +145,18 @@ fn main() -> Result<(), AnyError> {
         );
         return Ok(());
     }
-    if mode == "verify-ours" || mode == "reencode-ours" || mode == "reencode-compressed" {
+    if mode == "verify-ours"
+        || mode == "reencode-ours"
+        || mode == "reencode-compressed"
+        || mode == "reencode-compact"
+    {
         let input = std::fs::read(&args[2])?;
         let decoded = raipixel::png::decode(&input, Limits::default(), &mut Work::default())?;
         let mut out = std::io::stdout().lock();
         if mode == "reencode-compressed" {
             raipixel::png::encode_compressed(&decoded.image, &mut out, &mut Work::default())?;
+        } else if mode == "reencode-compact" {
+            raipixel::png::encode_compact(&decoded.image, &mut out, &mut Work::default())?;
         } else if mode == "reencode-ours" {
             raipixel::png::encode(&decoded.image, &mut out, &mut Work::default())?;
         } else {
