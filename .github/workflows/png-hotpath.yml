@@ -44,6 +44,10 @@ jobs:
         run: cargo run --release --locked --offline --example png_bench -- --export png-stage-inputs
       - name: Restore independent mixed-filter inputs
         run: python -c "import json;from pathlib import Path;p=Path('png-original-inputs');p.mkdir(exist_ok=True);[(p / (c['name'] + '.png')).write_bytes(bytes.fromhex(c['png_hex'])) for c in json.loads(Path('benchmarks/png/original-inputs.json').read_text())['cases']]"
+      - name: Compare valid full-PNG decoding across CRC thresholds
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_crc_threshold_fullcodec.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
       - name: Compare CRC headroom and Paeth variants
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
