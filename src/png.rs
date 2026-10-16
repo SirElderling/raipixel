@@ -681,6 +681,132 @@ pub fn encode_compact(
     encode_filtered::<true>(image, output, work)
 }
 
+/// Encode an exact-color PNG palette when the image has at most 256 distinct
+/// RGBA values. The smallest legal 1/2/4/8-bit depth is selected, preserving
+/// RGB even when alpha is zero. Returns `Ok(false)` without writing anything
+/// when the image cannot be represented without losing colors.
+/// Uses the bounded compact DEFLATE writer and a deterministic palette order.
+/// More expensive than `encode_compact` on some images; opt in explicitly.
+/// Work is charged before any output. I/O failures may leave partial output.
+pub fn encode_indexed(
+    image: &Image,
+    output: &mut impl std::io::Write,
+    work: &mut Work,
+) -> Result<bool, Error> {
+    let pixels = image.pixels();
+    work.charge(pixels.len() as u64)?;
+    let mut colors = Vec::<[u8; 4]>::new();
+    let mut slots = [u16::MAX; 4096];
+    let slot_for = |sample: [u8; 4]| -> usize {
+        (u32::from_le_bytes(sample).wrapping_mul(0x9e37_79b1) >> 20) as usize
+    };
+    for &sample in pixels {
+        let mut slot = slot_for(sample);
+        loop {
+            let value = slots[slot];
+            if value == u16::MAX {
+                if colors.len() == 256 {
+                    return Ok(false);
+                }
+                slots[slot] = colors.len() as u16;
+                colors.push(sample);
+                break;
+            }
+            if colors[usize::from(value)] == sample {
+                break;
+            }
+            slot = (slot + 1) & 4095;
+        }
+    }
+
+    let width = image.width as usize;
+    let depth: usize = match colors.len() {
+        0..=2 => 1,
+        3..=4 => 2,
+        5..=16 => 4,
+        _ => 8,
+    };
+    let row_bytes = (width * depth).div_ceil(8);
+    let stride = row_bytes + 1;
+    let raw_size = stride * image.height as usize;
+    let blocks = raw_size.div_ceil(crate::deflate::BLOCK);
+    work.charge((raw_size * 16 + blocks * (8192 + 64)) as u64)?;
+    let capacity = raw_size.min(crate::deflate::BLOCK);
+    let mut raw = Vec::new();
+    raw.try_reserve_exact(capacity)
+        .map_err(|_| crate::Error::Allocation)?;
+    let mut encoder = crate::deflate::Encoder::new(capacity)?;
+    let mut palette = Vec::new();
+    palette
+        .try_reserve_exact(colors.len() * 3)
+        .map_err(|_| crate::Error::Allocation)?;
+    let mut alpha = Vec::new();
+    alpha
+        .try_reserve_exact(colors.len())
+        .map_err(|_| crate::Error::Allocation)?;
+    for color in &colors {
+        palette.extend_from_slice(&color[..3]);
+        alpha.push(color[3]);
+    }
+
+    let mut ihdr = [0u8; 13];
+    ihdr[..4].copy_from_slice(&image.width.to_be_bytes());
+    ihdr[4..8].copy_from_slice(&image.height.to_be_bytes());
+    ihdr[8] = depth as u8;
+    ihdr[9] = 3;
+    output.write_all(SIGNATURE)?;
+    write_chunk(output, b"IHDR", &ihdr)?;
+    write_chunk(output, b"PLTE", &palette)?;
+    if alpha.iter().any(|&value| value != 255) {
+        write_chunk(output, b"tRNS", &alpha)?;
+    }
+    write_chunk(output, b"IDAT", &[0x78, 0x01])?;
+
+    let mut offset = 0;
+    let mut adler = Adler::new();
+    while offset < raw_size {
+        let len = (raw_size - offset).min(capacity);
+        raw.resize(len, 0);
+        for (i, byte) in raw.iter_mut().enumerate() {
+            let position = offset + i;
+            let row = position / stride;
+            let col = position % stride;
+            // Both filter markers and packed bytes must be reset across
+            // DEFLATE blocks, since resize can reuse the same scratch bytes.
+            *byte = 0;
+            if col != 0 {
+                let per_byte = 8 / depth;
+                let first_pixel = (col - 1) * per_byte;
+                for j in 0..per_byte {
+                    if first_pixel + j >= width {
+                        break;
+                    }
+                    let sample = pixels[row * width + first_pixel + j];
+                    let mut slot = slot_for(sample);
+                    loop {
+                        let value = slots[slot];
+                        if value == u16::MAX {
+                            return Err(Error::Chunk);
+                        }
+                        if colors[usize::from(value)] == sample {
+                            *byte |= (value as u8) << (8 - depth * (j + 1));
+                            break;
+                        }
+                        slot = (slot + 1) & 4095;
+                    }
+                }
+            }
+        }
+        adler.update(&raw);
+        let compressed = encoder.block_compact(&raw, offset + len == raw_size);
+        write_chunk(output, b"IDAT", compressed)?;
+        offset += len;
+    }
+    write_chunk(output, b"IDAT", &adler.value().to_be_bytes())?;
+    write_chunk(output, b"IEND", &[])?;
+    Ok(true)
+}
+
 fn encode_filtered<const COMPACT: bool>(
     image: &Image,
     output: &mut impl std::io::Write,
