@@ -157,14 +157,29 @@ fn main() -> Result<(), Failure> {
         let mut budgets = [0u64; 4];
         let mut supported = [false; 4];
         for mode in 0..4 {
-            let mut work = raipixel::Work::default();
-            supported[mode] = match mode {
-                0 => raipixel::png::encode_indexed(&base, &mut outputs[mode], &mut work)?,
-                1 => history1::png::encode_indexed(&a, &mut outputs[mode], &mut work)?,
-                2 => history8::png::encode_indexed(&b, &mut outputs[mode], &mut work)?,
-                _ => history16::png::encode_indexed(&c, &mut outputs[mode], &mut work)?,
+            let remaining = match mode {
+                0 => {
+                    let mut work = raipixel::Work::default();
+                    supported[mode] = raipixel::png::encode_indexed(&base, &mut outputs[mode], &mut work)?;
+                    work.remaining()
+                }
+                1 => {
+                    let mut work = history1::Work::default();
+                    supported[mode] = history1::png::encode_indexed(&a, &mut outputs[mode], &mut work)?;
+                    work.remaining()
+                }
+                2 => {
+                    let mut work = history8::Work::default();
+                    supported[mode] = history8::png::encode_indexed(&b, &mut outputs[mode], &mut work)?;
+                    work.remaining()
+                }
+                _ => {
+                    let mut work = history16::Work::default();
+                    supported[mode] = history16::png::encode_indexed(&c, &mut outputs[mode], &mut work)?;
+                    work.remaining()
+                }
             };
-            budgets[mode] = work.remaining();
+            budgets[mode] = remaining;
         }
         assert!(supported.iter().all(|&v| v == supported[0]), "different palette support");
         assert!(budgets.iter().all(|&v| v == budgets[0]), "changed work charge");
@@ -184,12 +199,11 @@ fn main() -> Result<(), Failure> {
         }
         let once = |mode: usize| -> Result<Vec<u8>, Failure> {
             let mut out = Vec::new();
-            let mut work = raipixel::Work::default();
             match mode {
-                0 => { assert!(raipixel::png::encode_indexed(black_box(&base), &mut out, &mut work)?); }
-                1 => { assert!(history1::png::encode_indexed(black_box(&a), &mut out, &mut work)?); }
-                2 => { assert!(history8::png::encode_indexed(black_box(&b), &mut out, &mut work)?); }
-                _ => { assert!(history16::png::encode_indexed(black_box(&c), &mut out, &mut work)?); }
+                0 => { assert!(raipixel::png::encode_indexed(black_box(&base), &mut out, &mut raipixel::Work::default())?); }
+                1 => { assert!(history1::png::encode_indexed(black_box(&a), &mut out, &mut history1::Work::default())?); }
+                2 => { assert!(history8::png::encode_indexed(black_box(&b), &mut out, &mut history8::Work::default())?); }
+                _ => { assert!(history16::png::encode_indexed(black_box(&c), &mut out, &mut history16::Work::default())?); }
             }
             Ok(out)
         };
