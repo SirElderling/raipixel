@@ -51,6 +51,11 @@ jobs:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_indexed_sub_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
 
+      - name: Cross-block 32 KiB history and bounded 1/8/16-chain match screen
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_history_native_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
       - name: Native safe Rust dynamic-Huffman size, speed and correctness
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
