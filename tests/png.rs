@@ -294,6 +294,56 @@ fn compressed_writer_matches_independent_fixed_huffman_bytes() {
 }
 
 #[test]
+fn compact_writer_preserves_all_samples_and_is_deterministic() {
+    for size in [1, 17, 64, 128, 256] {
+        for noise in [false, true] {
+            let mut state = 0x72ac_11e5u32;
+            let pixels: Vec<_> = (0..size * size)
+                .map(|i| {
+                    if noise {
+                        std::array::from_fn(|_| {
+                            state ^= state << 13;
+                            state ^= state >> 17;
+                            state ^= state << 5;
+                            (state >> 16) as u8
+                        })
+                    } else {
+                        [
+                            (i % 17) as u8,
+                            ((i / size) % 13) as u8,
+                            59,
+                            if i % 3 == 0 { 0 } else { 255 },
+                        ]
+                    }
+                })
+                .collect();
+            let image =
+                Image::from_pixels(size, size, &pixels, Limits::default(), &mut Work::default())
+                    .unwrap();
+            let mut compact = Vec::new();
+            png::encode_compact(&image, &mut compact, &mut Work::default()).unwrap();
+            let mut again = Vec::new();
+            png::encode_compact(&image, &mut again, &mut Work::default()).unwrap();
+            assert_eq!(compact, again, "compact bytes {size}x{size}, noise={noise}");
+            let decoded = png::decode(&compact, Limits::default(), &mut Work::default()).unwrap();
+            assert_eq!(decoded.image, image, "compact pixels {size}x{size}, noise={noise}");
+            let mut stored = Vec::new();
+            png::encode(&image, &mut stored, &mut Work::default()).unwrap();
+            assert!(compact.len() <= stored.len(), "{size}x{size}, noise={noise}");
+        }
+    }
+    let image = Image::new(1, 1, Limits::default(), &mut Work::default()).unwrap();
+    let mut output = Vec::new();
+    assert_eq!(
+        png::encode_compact(&image, &mut output, &mut Work::new(0).unwrap())
+            .unwrap_err()
+            .code(),
+        "E_LIMIT"
+    );
+    assert!(output.is_empty());
+}
+
+#[test]
 fn compressed_writer_preserves_samples_across_blocks_and_falls_back_for_noise() {
     for size in [1, 17, 128, 256] {
         for noise in [false, true] {
