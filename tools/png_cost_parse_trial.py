@@ -451,6 +451,22 @@ with tempfile.TemporaryDirectory(prefix="raipixel-quality-mix-") as temp:
         case["input"]=path
         case["input_sha256"]=hashlib.sha256(Path(path).read_bytes()).hexdigest()
         if case["supported"]:
+            case["best_bytes"]=min(case["bytes"])
+            case["best_mode"]=(["accepted-indexed","depth16","depth32","depth64","cost64","lazy64","costlazy64"]
+                               [case["bytes"].index(case["best_bytes"])])
+            fixed_floor={"sheet-1024-compressed.png":1668,
+                         "comparison-sheet-1024.png":3629,
+                         "icon-64-compressed.png":157,
+                         "indexed-case-256-257x7.png":1175,
+                         "indexed-case-3-1024x300.png":729}
+            # The last two require the previously vetted Sub candidate,
+            # which is NOT rerun in this experiment. Thus only compare
+            # size floors for cases actually present here.
+            tracked=Path(path).name
+            if tracked in ("sheet-1024-compressed.png","comparison-sheet-1024.png","icon-64-compressed.png"):
+                assert case["best_bytes"] <= fixed_floor[tracked], (
+                    f"best-known fallback regressed for {tracked}: "
+                    f"{case['best_bytes']} > {fixed_floor[tracked]}")
             medians=[sorted(a)[len(a)//2] for a in case["samples_us"]]
             case["median_us"]=medians
             case["size_over_indexed"]=[a/case["bytes"][0] for a in case["bytes"]]
