@@ -832,14 +832,16 @@ pub fn encode_indexed_staged(
 ) -> Result<bool, Error> {
     let width = image.width as usize;
     let height = image.height as usize;
-    let max_raw = width.checked_add(1)
+    let max_raw = width
+        .checked_add(1)
         .and_then(|stride| stride.checked_mul(height))
         .ok_or(crate::Error::Limit(crate::Resource::Bytes))?;
     let blocks = max_raw.div_ceil(crate::deflate::BLOCK);
     // 8-bit indexed input is the largest packed palette representation.
     // Stored DEFLATE needs 5 extra bytes per block, IDAT adds 12;
     // 2048 covers header, palette, transparency, zlib, Adler and IEND.
-    let max_output = blocks.checked_mul(17)
+    let max_output = blocks
+        .checked_mul(17)
         .and_then(|v| v.checked_add(max_raw))
         .and_then(|v| v.checked_add(2048))
         .ok_or(crate::Error::Limit(crate::Resource::Bytes))?;
@@ -854,7 +856,10 @@ pub fn encode_indexed_staged(
     }
     impl std::io::Write for Stage {
         fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
-            if self.bytes.len().checked_add(data.len())
+            if self
+                .bytes
+                .len()
+                .checked_add(data.len())
                 .is_none_or(|n| n > self.max)
             {
                 self.exhausted = true;
@@ -867,7 +872,9 @@ pub fn encode_indexed_staged(
             self.bytes.extend_from_slice(data);
             Ok(data.len())
         }
-        fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
     }
     let mut stage = Stage {
         bytes: Vec::new(),
@@ -881,12 +888,8 @@ pub fn encode_indexed_staged(
             output.write_all(&stage.bytes)?;
             Ok(true)
         }
-        Err(_) if stage.allocation_failed => {
-            Err(crate::Error::Allocation.into())
-        }
-        Err(_) if stage.exhausted => {
-            Err(crate::Error::Limit(crate::Resource::Bytes).into())
-        }
+        Err(_) if stage.allocation_failed => Err(crate::Error::Allocation.into()),
+        Err(_) if stage.exhausted => Err(crate::Error::Limit(crate::Resource::Bytes).into()),
         Err(error) => Err(error),
     }
 }
