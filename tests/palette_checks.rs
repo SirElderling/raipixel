@@ -1,6 +1,6 @@
 //! Exact visible-palette constraints; hidden RGB is never silently rewritten.
 use raipixel::{Error, Image, Limits, Resource, Work};
-use std::{fs, path::PathBuf, process::Command};
+use std::{fs, process::Command};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
