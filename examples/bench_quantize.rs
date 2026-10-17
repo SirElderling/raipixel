@@ -178,7 +178,7 @@ fn run_case(width: u32, height: u32, colors: usize, varied: bool, reps: usize) {
     let mut full_a = Vec::new();
     let mut full_b = Vec::new();
     for round in 0..7 {
-        let mut completed = |cache: bool| {
+        let completed = |cache: bool| {
             let pixels = if cache {
                 cached(&input, &palette)
             } else {
