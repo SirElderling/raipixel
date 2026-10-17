@@ -40,6 +40,10 @@ one cel**, with a matching canvas and stored cel size. It supports:
   ignored for extraction. Empty or over-limit palettes fail explicitly;
   extraction never quantizes or truncates colors.
 - Single-target `frame` exports with nearest-neighbor scale 1–16.
+  Scaled previews now allocate one RGBA output buffer rather than a second
+  full-size temporary copy. Exact pixels, work and PNG bytes were compared
+  against the earlier two-buffer path on all native CI platforms; see
+  [scaling decision](../benchmarks/scaling-decision.md).
 - `--project` reopening **only** the exact schema subset written by this tool;
   source snapshot paths remain unchanged. The new output contains a native
   `project.json`, `images/000000.png`, and

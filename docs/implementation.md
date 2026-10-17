@@ -15,6 +15,8 @@ only the library functions listed below are available today. The API is unstable
 - Integer alpha/opacity rounding as specified in the architecture.
 - Exact, simultaneous RGB/RGBA recolor using bounded fixed-size lookup, alpha
   key and threshold operations that preserve all underlying RGB samples.
+- Deterministic integer nearest-neighbor scaling with one output allocation,
+  bounded dimensions/work and hidden-RGB exactness.
 - Exact bounded RGBA histogram, alpha statistics, visibility bounding box and
   optional region pixel inspection (raw region <=4096 pixels).
 - Typed errors with interface-compatible category codes; no structured CLI errors yet.
@@ -75,6 +77,9 @@ creates no output. This is not a certified cross-process no-clobber protocol,
 and the CLI still lacks complete typed diagnostics, documented exit-code
 categories, a standalone validation command and the full S1 project model.
 Aggregate live project memory and process-wide RSS remain unverified.
+Nearest-neighbor scaled PNG export uses a measured single-output-buffer
+algorithm, preserving identical PNG bytes and halving the logical scaled-RGBA
+buffers versus the previous approach; see [three-platform scaling comparison](../benchmarks/scaling-decision.md).
 Color-mapping kernel variants are compared in a native benchmark-only
 workflow; timing results must be recorded before changing the production
 algorithm. No performance superiority is assumed from algorithm selection.
