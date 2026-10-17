@@ -7,10 +7,22 @@ fn fixture(width: u32, height: u32) -> Image {
     let samples: Vec<Pixel> = (0..width * height)
         .map(|i| {
             let k = i.wrapping_mul(0x9E37_79B9).rotate_left(7);
-            [(k & 255) as u8, ((k >> 8) & 255) as u8, (k >> 16) as u8, if i % 7 == 0 { 0 } else { 255 }]
+            [
+                (k & 255) as u8,
+                ((k >> 8) & 255) as u8,
+                (k >> 16) as u8,
+                if i % 7 == 0 { 0 } else { 255 },
+            ]
         })
         .collect();
-    Image::from_pixels(width, height, &samples, Limits::default(), &mut Work::default()).unwrap()
+    Image::from_pixels(
+        width,
+        height,
+        &samples,
+        Limits::default(),
+        &mut Work::default(),
+    )
+    .unwrap()
 }
 
 /// B: build a new image by mapping every output position back to the input.
@@ -20,7 +32,9 @@ fn copy_map(input: &Image, kind: Transform, work: &mut Work) -> Result<Image, Er
     let count = width as usize * height as usize;
     work.charge(count as u64)?;
     let mut samples = Vec::new();
-    samples.try_reserve_exact(count).map_err(|_| Error::Allocation)?;
+    samples
+        .try_reserve_exact(count)
+        .map_err(|_| Error::Allocation)?;
     for y in 0..height {
         for x in 0..width {
             let (sx, sy) = match kind {
@@ -33,7 +47,13 @@ fn copy_map(input: &Image, kind: Transform, work: &mut Work) -> Result<Image, Er
     }
     // Internal image creation is part of measured CPU and allocations.
     // The equal external work charge represents the same output pixel visits.
-    Image::from_pixels(width, height, &samples, Limits::default(), &mut Work::default())
+    Image::from_pixels(
+        width,
+        height,
+        &samples,
+        Limits::default(),
+        &mut Work::default(),
+    )
 }
 
 fn round_trip(image: &Image) -> Vec<u8> {

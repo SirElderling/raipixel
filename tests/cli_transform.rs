@@ -33,7 +33,11 @@ fn json_transform_round_trip_and_rejected_kind_preserve_source() {
     )
     .unwrap();
     let first = run(&root, &["run", "create.json", "--out", "first"]);
-    assert!(first.status.success(), "{}", String::from_utf8_lossy(&first.stderr));
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
     fs::write(
         root.join("edit.json"),
         r#"{"interface":1,"semantics":"1.0","ops":[
@@ -46,7 +50,11 @@ fn json_transform_round_trip_and_rejected_kind_preserve_source() {
         &root,
         &["run", "edit.json", "--project", "first", "--out", "second"],
     );
-    assert!(second.status.success(), "{}", String::from_utf8_lossy(&second.stderr));
+    assert!(
+        second.status.success(),
+        "{}",
+        String::from_utf8_lossy(&second.stderr)
+    );
     let source = png::decode(
         &fs::read(root.join("first/images/000000.png")).unwrap(),
         Limits::default(),
@@ -63,8 +71,14 @@ fn json_transform_round_trip_and_rejected_kind_preserve_source() {
     .image;
     assert_eq!(
         output.pixels(),
-        &[[16, 32, 48, 254], [221, 238, 255, 1], [170, 187, 204, 0],
-          [119, 136, 153, 128], [68, 85, 102, 255], [17, 34, 51, 0]]
+        &[
+            [16, 32, 48, 254],
+            [221, 238, 255, 1],
+            [170, 187, 204, 0],
+            [119, 136, 153, 128],
+            [68, 85, 102, 255],
+            [17, 34, 51, 0]
+        ]
     );
     assert_eq!(source.pixel(0, 0), Some([17, 34, 51, 0]));
 

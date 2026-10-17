@@ -49,10 +49,16 @@ fn transformations_are_involutions_and_composition_equals_rotation() {
             assert_eq!(canvas, original, "{kind:?} {width}x{height}");
         }
         let mut flips = original.try_copy(&mut Work::default()).unwrap();
-        flips.transform(Transform::FlipX, &mut Work::default()).unwrap();
-        flips.transform(Transform::FlipY, &mut Work::default()).unwrap();
+        flips
+            .transform(Transform::FlipX, &mut Work::default())
+            .unwrap();
+        flips
+            .transform(Transform::FlipY, &mut Work::default())
+            .unwrap();
         let mut rotated = original.try_copy(&mut Work::default()).unwrap();
-        rotated.transform(Transform::Rotate180, &mut Work::default()).unwrap();
+        rotated
+            .transform(Transform::Rotate180, &mut Work::default())
+            .unwrap();
         assert_eq!(flips, rotated);
     }
 }
