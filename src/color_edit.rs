@@ -1,6 +1,9 @@
 //! Exact deterministic color edits with bounded, allocation-free lookups.
 use crate::{Error, Image, Pixel, Rect, Work};
 
+/// Coordinate and exact RGB of the first out-of-palette visible pixel.
+pub type PaletteMismatch = ([u32; 2], [u8; 3]);
+
 impl Image {
     /// Apply up to 256 simultaneous exact mappings to original pixels.
     ///
@@ -136,7 +139,7 @@ impl Image {
         &self,
         allowed_rgb: &[[u8; 3]],
         work: &mut Work,
-    ) -> Result<Option<([u32; 2], [u8; 3])>, Error> {
+    ) -> Result<Option<PaletteMismatch>, Error> {
         if allowed_rgb.is_empty() || allowed_rgb.len() > 256 {
             return Err(Error::PixelCount);
         }

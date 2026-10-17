@@ -14,6 +14,7 @@ pub mod png;
 mod raster;
 pub mod render;
 
+pub use color_edit::PaletteMismatch;
 pub use error::{Error, Resource};
 pub use limits::{Limits, Work};
 pub use model::{Image, Pixel, Rect};

@@ -821,7 +821,7 @@ fn build_outputs(
 fn visible_palette_violation(
     document: &Document,
     work: &mut Work,
-) -> Result<Option<([u32; 2], [u8; 3])>> {
+) -> Result<Option<raipixel::PaletteMismatch>> {
     let Some(selected) = document.palette_ref.as_ref() else {
         return Ok(None);
     };
