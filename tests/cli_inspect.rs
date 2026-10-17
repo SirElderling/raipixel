@@ -144,7 +144,6 @@ fn inspect_rejects_invalid_targets_regions_and_unimplemented_features() {
         r#"{"target":"missing/layer/frame"}"#,
         r#"{"target":"test/paint/base","region":[-1,0,1,1]}"#,
         r#"{"target":"test/paint/base","histogram_limit":0}"#,
-        r#"{"target":"test/paint/base","symbols":true}"#,
         r#"{"target":"test/paint/base","unrecognized":true}"#,
         r#"{"pixels":true}"#,
     ]
@@ -157,4 +156,91 @@ fn inspect_rejects_invalid_targets_regions_and_unimplemented_features() {
         assert!(result.stdout.is_empty(), "failed query wrote stdout");
         assert!(String::from_utf8_lossy(&result.stderr).contains(r#""ok":false"#));
     }
+}
+
+#[test]
+fn symbols_encode_rgba_sorted_legend_and_escape_quoted_characters() {
+    let root = Scratch::new();
+    root.project();
+    fs::write(
+        root.file("query.json"),
+        r#"{"target":"test/paint/base","symbols":true}"#,
+    )
+    .unwrap();
+    let result = root.run(&["inspect", "project", "--query", "query.json"]);
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let value = parsed(&result.stdout);
+    let stats = object(object(&value).get("result").unwrap());
+    assert!(!stats.contains_key("pixels"), "raw pixels were not requested");
+    let symbols = object(stats.get("symbols").unwrap());
+    let rows = array(symbols.get("rows").unwrap());
+    assert_eq!(rows, [
+        json::Value::String("#$!".into()),
+        json::Value::String("\"#$".into())
+    ]);
+    let legend = array(symbols.get("legend").unwrap());
+    assert_eq!(legend.len(), 4);
+    assert_eq!(
+        object(&legend[0]).get("symbol"),
+        Some(&json::Value::String("!".into()))
+    );
+    assert_eq!(
+        object(&legend[1]).get("symbol"),
+        Some(&json::Value::String("\"".into()))
+    );
+    assert_eq!(
+        array(object(&legend[1]).get("rgba").unwrap())
+            .iter()
+            .map(number)
+            .collect::<Vec<_>>(),
+        [4, 5, 6, 128]
+    );
+}
+
+#[test]
+fn symbols_reject_more_than_94_exact_samples_without_emitting_output() {
+    use raipixel::{Image, Limits, png};
+
+    let root = Scratch::new();
+    let colors: Vec<_> = (0..95u8).map(|v| [v, 0, 0, 255]).collect();
+    let image = Image::from_pixels(
+        95,
+        1,
+        &colors,
+        Limits::default(),
+        &mut Work::default(),
+    )
+    .unwrap();
+    let mut bytes = Vec::new();
+    png::encode(&image, &mut bytes, &mut Work::default()).unwrap();
+    fs::write(root.file("input.png"), bytes).unwrap();
+    fs::write(
+        root.file("author.json"),
+        r#"{"interface":1,"semantics":"1.0","ops":[
+          {"op":"asset.create","name":"many","size":[95,1]},
+          {"op":"layer.create","asset":"many","name":"paint"},
+          {"op":"frame.create","asset":"many","name":"base"},
+          {"op":"png.import","target":"many/paint/base","file":"input.png"}
+        ]}"#,
+    )
+    .unwrap();
+    let created = root.run(&["run", "author.json", "--out", "project"]);
+    assert!(
+        created.status.success(),
+        "{}",
+        String::from_utf8_lossy(&created.stderr)
+    );
+    fs::write(
+        root.file("query.json"),
+        r#"{"target":"many/paint/base","symbols":true}"#,
+    )
+    .unwrap();
+    let result = root.run(&["inspect", "project", "--query", "query.json"]);
+    assert!(!result.status.success());
+    assert!(result.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("E_LIMIT"));
 }
