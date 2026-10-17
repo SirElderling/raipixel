@@ -906,7 +906,13 @@ fn run_job(
     if document.image.is_none() {
         return argument("missing editable cel");
     }
-    if require_palette {
+    // Snapshot-only jobs may keep deliberately incomplete artwork with
+    // checks=["structure"]. A game PNG export must never silently violate
+    // the asset's declared visible-color palette.
+    let exporting = job.get("exports").is_some_and(|value| {
+        matches!(value, json::Value::Array(exports) if !exports.is_empty())
+    });
+    if require_palette || exporting {
         enforce_visible_palette(&document, &mut work)?;
     }
     let manifest = document.manifest()?;
