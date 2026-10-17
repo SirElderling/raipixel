@@ -22,6 +22,8 @@ fn encode_mode(
     let pixels = image.pixels();
     work.charge(pixels.len() as u64)?;
     let mut colors = Vec::<[u8; 4]>::new();
+    // No implicit growth in the at-most-256-entry exact-RGBA palette.
+    colors.try_reserve_exact(256).map_err(|_| crate::Error::Allocation)?;
     let mut slots = [u16::MAX; 4096];
     let slot_for = |sample: [u8; 4]| -> usize {
         (u32::from_le_bytes(sample).wrapping_mul(0x9e37_79b1) >> 20) as usize
@@ -288,10 +290,12 @@ struct Stage {
     max: usize,
     allocation_failed: bool,
     exhausted: bool,
+    // Private deterministic fault injection, never exposed via public API.
+    fail_next_reserve: bool,
 }
 impl Stage {
-    fn new(max: usize) -> Self {
-        Self { bytes: Vec::new(), max, allocation_failed: false, exhausted: false }
+    fn new(max: usize, fail_next_reserve: bool) -> Self {
+        Self { bytes: Vec::new(), max, allocation_failed: false, exhausted: false, fail_next_reserve }
     }
 }
 impl std::io::Write for Stage {
@@ -299,6 +303,13 @@ impl std::io::Write for Stage {
         if self.bytes.len().checked_add(data.len()).is_none_or(|n| n > self.max) {
             self.exhausted = true;
             return Err(std::io::Error::other("balanced PNG staging limit"));
+        }
+        // A forced failure exercises the same error plumbing as try_reserve,
+        // but is not a substitute for process-level allocator fault injection.
+        if self.fail_next_reserve {
+            self.fail_next_reserve = false;
+            self.allocation_failed = true;
+            return Err(std::io::Error::other("injected PNG staging allocation failure"));
         }
         if self.bytes.try_reserve(data.len()).is_err() {
             self.allocation_failed = true;
@@ -328,6 +339,16 @@ pub fn encode_indexed_balanced(
     output: &mut impl std::io::Write,
     work: &mut Work,
 ) -> Result<bool, Error> {
+    encode_balanced_inner(image, output, work, None)
+}
+
+// Private only: fault injection never leaks into the public encoding surface.
+fn encode_balanced_inner(
+    image: &Image,
+    output: &mut impl std::io::Write,
+    work: &mut Work,
+    injected_allocation_pass: Option<usize>,
+) -> Result<bool, Error> {
     let width = image.width as usize;
     let height = image.height as usize;
     let raw = width.checked_add(1).and_then(|x|x.checked_mul(height))
@@ -341,8 +362,8 @@ pub fn encode_indexed_balanced(
     image.limits.check_buffer(staging_max as u64)?;
 
     let mut best: Option<Vec<u8>> = None;
-    for mode in [Filter::None, Filter::Sub, Filter::Auto64] {
-        let mut current = Stage::new(ceiling);
+    for (pass, mode) in [Filter::None, Filter::Sub, Filter::Auto64].into_iter().enumerate() {
+        let mut current = Stage::new(ceiling, injected_allocation_pass == Some(pass));
         let supported = match encode_mode(image, &mut current, work, mode) {
             Ok(value) => value,
             Err(_) if current.allocation_failed => {
@@ -363,5 +384,50 @@ pub fn encode_indexed_balanced(
         Ok(true)
     } else {
         Err(Error::Chunk)
+    }
+}
+
+#[cfg(test)]
+mod fault_injection_tests {
+    use super::*;
+
+    #[test]
+    fn every_staging_allocation_failure_is_a_resource_error_without_publication() {
+        let pixels: Vec<[u8; 4]> = (0..(32 * 32))
+            .map(|i| {
+                let color = (i % 7) as u8;
+                [color, color.wrapping_mul(17), color.wrapping_mul(31), 0]
+            })
+            .collect();
+        let image = Image::from_pixels(
+            32,
+            32,
+            &pixels,
+            crate::Limits::default(),
+            &mut Work::default(),
+        ).unwrap();
+        for pass in 0..3 {
+            let mut caller = vec![0xa5, 0x5d];
+            let error = encode_balanced_inner(
+                &image,
+                &mut caller,
+                &mut Work::default(),
+                Some(pass),
+            ).unwrap_err();
+            assert_eq!(error.code(), "E_ALLOC", "allocation fault at pass {pass}");
+            assert_eq!(caller, [0xa5, 0x5d], "pass {pass} published partial output");
+        }
+        let mut normal = Vec::new();
+        assert!(encode_balanced_inner(
+            &image, &mut normal, &mut Work::default(), None
+        ).unwrap());
+        assert_eq!(
+            crate::png::decode(
+                &normal,
+                crate::Limits::default(),
+                &mut Work::default()
+            ).unwrap().image,
+            image
+        );
     }
 }
