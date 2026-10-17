@@ -24,7 +24,7 @@ fn agent_quantization_is_exact_and_saved_palette_remains_editable() {
             {"op":"palette.set","name":"ramp","entries":[
                 {"name":"dark","rgb":"#000000"},
                 {"name":"light","rgb":"#0A0000"}]},
-            {"op":"asset.create","name":"icon","size":[3,2],"palette":"ramp"},
+            {"op":"asset.create","name":"icon","size":[3,2]},
             {"op":"layer.create","asset":"icon","name":"paint"},
             {"op":"frame.create","asset":"icon","name":"base"},
             {"op":"cel.create","target":"icon/paint/base"},
