@@ -1,0 +1,41 @@
+name: Exact transform A/B
+
+on:
+  push:
+    branches: ['feat/**']
+    paths:
+      - 'src/transform.rs'
+      - 'examples/bench_transform.rs'
+      - '.github/workflows/transform-compare.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    name: Transform / ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Linux x86_64
+            runner: ubuntu-24.04
+          - os: macOS ARM64
+            runner: macos-15
+          - os: Windows MSVC
+            runner: windows-2022
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt
+      - name: Toolchain details
+        run: rustc +1.99.1 --version --verbose
+      - name: Format check
+        run: cargo +1.99.1 fmt --all -- --check
+      - name: Compare exact pixel permutations and PNG output
+        run: cargo +1.99.1 run --release --locked --offline --example bench_transform

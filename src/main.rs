@@ -1,6 +1,6 @@
 //! Minimal executable Foundation vertical slice: one editable cel and frame.
 //! Deliberately rejects unsupported v1 structures instead of dropping state.
-use raipixel::{Blend, Image, Limits, Pixel, Rect, Work, json, png};
+use raipixel::{Transform, Blend, Image, Limits, Pixel, Rect, Work, json, png};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
@@ -579,6 +579,20 @@ impl Document {
                     self.image_mut(&target)?
                         .stamp_within(source, at, mode, 255, clip, work),
                 )?;
+                Ok(())
+            }
+            "transform" => {
+                allowed(operation, &["op", "targets", "kind"])?;
+                let target = single_target(operation)?;
+                let kind = match text(operation, "kind")? {
+                    "flip-x" => Transform::FlipX,
+                    "flip-y" => Transform::FlipY,
+                    "rotate-180" => Transform::Rotate180,
+                    other => {
+                        return capability(format!("unsupported transform kind: {other}"));
+                    }
+                };
+                raster(self.image_mut(&target)?.transform(kind, work))?;
                 Ok(())
             }
             "palette.map" => {

@@ -16,9 +16,11 @@ pub mod png;
 mod raster;
 pub mod render;
 mod scale;
+mod transform;
 
 pub use color_edit::PaletteMismatch;
 pub use error::{Error, Resource};
 pub use limits::{Limits, Work};
 pub use model::{Image, Pixel, Rect};
 pub use raster::{Blend, blend};
+pub use transform::Transform;
