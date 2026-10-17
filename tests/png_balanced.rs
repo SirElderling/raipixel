@@ -190,23 +190,16 @@ fn balanced_handles_maximum_side_and_odd_indexed_rows() {
         )
         .unwrap();
         let mut encoded = Vec::new();
-        assert!(png::encode_indexed_balanced(
-            &image,
-            &mut encoded,
-            &mut Work::default()
-        )
-        .unwrap());
+        assert!(png::encode_indexed_balanced(&image, &mut encoded, &mut Work::default()).unwrap());
         let restored = png::decode(&encoded, Limits::default(), &mut Work::default())
             .unwrap()
             .image;
-        assert_eq!(restored, image, "indexed roundtrip failed at {width}x{height}");
+        assert_eq!(
+            restored, image,
+            "indexed roundtrip failed at {width}x{height}"
+        );
         let mut second = Vec::new();
-        assert!(png::encode_indexed_balanced(
-            &image,
-            &mut second,
-            &mut Work::default()
-        )
-        .unwrap());
+        assert!(png::encode_indexed_balanced(&image, &mut second, &mut Work::default()).unwrap());
         assert_eq!(second, encoded, "non-deterministic PNG at {width}x{height}");
     }
 }
@@ -216,14 +209,7 @@ fn balanced_rejects_max_width_memory_shortfall_before_work() {
     let pixels = vec![[11, 29, 41, 0]; 4096];
     // The RGBA input fits in 64 KiB. The 3-mode encoder workspace does not.
     let bounds = Limits::new(4096, 4096, 64 * 1024).unwrap();
-    let image = Image::from_pixels(
-        4096,
-        1,
-        &pixels,
-        bounds,
-        &mut Work::default(),
-    )
-    .unwrap();
+    let image = Image::from_pixels(4096, 1, &pixels, bounds, &mut Work::default()).unwrap();
     let mut out = vec![0x5d, 0xfa];
     let mut work = Work::default();
     let before = work.remaining();
@@ -237,21 +223,11 @@ fn balanced_rejects_max_width_memory_shortfall_before_work() {
 fn balanced_outputs_are_crc_protected() {
     let image = patterned_image(13, 11, 3);
     let mut output = Vec::new();
-    assert!(png::encode_indexed_balanced(
-        &image,
-        &mut output,
-        &mut Work::default()
-    )
-    .unwrap());
+    assert!(png::encode_indexed_balanced(&image, &mut output, &mut Work::default()).unwrap());
     // Signature (8) + IHDR (25) + PLTE chunk header (8) = 41.
     assert_eq!(&output[37..41], b"PLTE");
     let mut corrupted = output;
     corrupted[41] ^= 1;
-    let err = png::decode(
-        &corrupted,
-        Limits::default(),
-        &mut Work::default(),
-    )
-    .unwrap_err();
+    let err = png::decode(&corrupted, Limits::default(), &mut Work::default()).unwrap_err();
     assert_eq!(err.code(), "E_PNG_CRC");
 }
