@@ -59,13 +59,15 @@ results for 256², 64 colors are:
 |---|---:|---:|
 | Linux x86-64 | 4.857 / 0.391 / 0.387 | 6.299 / 6.921 / 6.232 |
 | Windows MSVC | 4.348 / 0.545 / 0.539 | 5.474 / 5.727 / 5.457 |
-| macOS ARM64 | Pending native run | Pending native run |
+| macOS ARM64 | 1.786 / 0.229 / 0.237 | 2.874 / 3.095 / 2.826 |
 
 [Adaptive native A/B/C run](https://github.com/SirElderling/raipixel/actions/runs/39073528648).
-The macOS runner is still queued as of this decision record; the adaptive
-cross-platform gate is not yet fully closed. The Linux and Windows quantize
-tests, exact PNG comparisons and native CI passed on the implementation
-commit; final Mac verification must be checked before unqualified acceptance.
+The adaptive A/B/C workflow completed successfully on all three native
+targets. Exact pixels, canonical PNG bytes and caller work remaining agreed
+for all workloads. [Native Rust CI](https://github.com/SirElderling/raipixel/actions/runs/39073531591)
+passed formatting, tests and all-target Clippy on Linux x86-64, macOS ARM64
+and Windows MSVC at the measured implementation commit. The subsequent
+documentation revision does not change Rust source or benchmark inputs.
 
 A also remains the selected fast path for tiny sprites, where C's sampling
 would cost more than the saved comparisons. At 64² with 16 repeated colors,
