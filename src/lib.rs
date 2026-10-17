@@ -9,8 +9,8 @@ pub mod json;
 mod limits;
 mod model;
 pub mod png;
-pub mod render;
 mod raster;
+pub mod render;
 
 pub use error::{Error, Resource};
 pub use limits::{Limits, Work};
