@@ -1076,11 +1076,6 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
             code: "E_INTERNAL",
             message: "symbol query missing bounded pixels".into(),
         })?;
-        work.charge((raw_pixels.len() as u64).saturating_mul(8))
-            .map_err(|e| Fault {
-                code: e.code(),
-                message: e.to_string(),
-            })?;
         let mut colors = Vec::new();
         colors.try_reserve_exact(raw_pixels.len()).map_err(|_| Fault {
             code: "E_ALLOC",
