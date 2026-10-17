@@ -106,6 +106,7 @@ fn fixture(width: u32, height: u32, colors: usize, varied: bool) -> (Vec<Pixel>,
     (input, palette)
 }
 
+// Both algorithms allocate exactly one RGBA result; the cache adds fixed stack scratch.
 fn run_case(width: u32, height: u32, colors: usize, varied: bool, reps: usize) {
     let (input, palette) = fixture(width, height, colors, varied);
     let expected = direct(&input, &palette);
