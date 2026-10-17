@@ -15,6 +15,8 @@ pub enum Error {
     Dimensions,
     Rectangle,
     PixelCount,
+    PaletteEmpty,
+    PaletteTooMany { limit: u16, distinct: u32 },
     Bounds,
     Limit(Resource),
     Allocation,
@@ -24,6 +26,8 @@ impl Error {
     pub fn code(self) -> &'static str {
         match self {
             Self::Dimensions | Self::Rectangle | Self::PixelCount => "E_ARGUMENT",
+            Self::PaletteEmpty => "E_PALETTE_EMPTY",
+            Self::PaletteTooMany { .. } => "E_PALETTE_TOO_MANY",
             Self::Bounds => "E_BOUNDS",
             Self::Limit(_) => "E_LIMIT",
             Self::Allocation => "E_ALLOC",
@@ -37,6 +41,11 @@ impl fmt::Display for Error {
             Self::Dimensions => f.write_str("Image dimensions must be positive"),
             Self::Rectangle => f.write_str("Rectangle dimensions must be positive"),
             Self::PixelCount => f.write_str("Pixel count does not match image dimensions"),
+            Self::PaletteEmpty => f.write_str("No visible colors are available for extraction"),
+            Self::PaletteTooMany { limit, distinct } => write!(
+                f,
+                "Found {distinct} visible RGB colors, exceeding maximum {limit}",
+            ),
             Self::Bounds => f.write_str("Rectangle exceeds image bounds"),
             Self::Limit(resource) => write!(f, "{resource:?} limit exceeded"),
             Self::Allocation => f.write_str("Unable to reserve image memory"),

@@ -11,6 +11,7 @@ pub mod json;
 mod limits;
 mod model;
 pub mod png;
+pub mod palette;
 mod raster;
 pub mod render;
 
