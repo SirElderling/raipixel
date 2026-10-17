@@ -565,7 +565,7 @@ mod tests {
 impl Encoder {
     // Scratch only: retain 32 KiB of uncompressed input history across
     // consecutive DEFLATE blocks; encode the current block only.
-    pub(crate) fn block_history(&mut self, data: &[u8], last: bool) -> Result<&[u8], Error> {
+    pub(crate) fn block_history(&mut self, data: &[u8], last: bool, work: &mut crate::Work) -> Result<&[u8], Error> {
         const DEPTH: usize = 64;
         debug_assert!(data.len() <= BLOCK);
         let mut joined = std::mem::take(&mut self.trial_joined);
@@ -582,6 +582,7 @@ impl Encoder {
         links.clear();
         assert!(links.capacity() >= joined.len());
         links.resize(joined.len(), u32::MAX);
+        work.charge(start as u64)?;
         for pos in 0..start {
             if pos + 3 > joined.len() { break; }
             let (slot, _) = hash(&joined, pos);
@@ -595,6 +596,7 @@ impl Encoder {
         self.output.clear();
         let mut pos = start;
         while pos + 3 <= joined.len() {
+            work.charge(4)?;
             let (slot, _) = hash(&joined, pos);
             let maximum = (joined.len() - pos).min(258);
             let mut best = 0usize;
@@ -604,11 +606,13 @@ impl Encoder {
                 if prior == u32::MAX { break; }
                 let candidate = prior as usize;
                 if pos - candidate > 32_768 { break; }
+                work.charge(4)?;
                 if joined[candidate..candidate + 3] == joined[pos..pos + 3] {
                     let length = 3 + matching_tail(
                         &joined[candidate + 3..candidate + maximum],
                         &joined[pos + 3..pos + maximum],
                     );
+                    work.charge((length + 16) as u64)?;
                     if length > best {
                         best = length;
                         best_pos = candidate;
@@ -619,7 +623,9 @@ impl Encoder {
             }
             links[pos] = heads[slot];
             heads[slot] = pos as u32;
+            work.charge(1)?;
             if pos > 0 && joined[pos] == joined[pos - 1] {
+                work.charge(maximum as u64)?;
                 let length = repeated_length(&joined, pos - 1, pos, maximum);
                 if length >= best {
                     best = length;
@@ -627,6 +633,7 @@ impl Encoder {
                 }
             }
             if best >= 3 && best < 258 && pos + 4 <= joined.len() {
+                work.charge(4)?;
                 let next = pos + 1;
                 let (next_slot, _) = hash(&joined, next);
                 let mut node = heads[next_slot];
@@ -636,11 +643,13 @@ impl Encoder {
                     if node == u32::MAX { break; }
                     let candidate = node as usize;
                     if next - candidate > 32_768 { break; }
+                    work.charge(4)?;
                     if joined[candidate..candidate+3] == joined[next..next+3] {
                         let length = 3 + matching_tail(
                             &joined[candidate+3..candidate+max_next],
                             &joined[next+3..next+max_next],
                         );
+                        work.charge((length + 16) as u64)?;
                         next_best = next_best.max(length);
                     }
                     node = links[candidate];
@@ -656,6 +665,7 @@ impl Encoder {
                 tokens.push(256 + (best - 3) as u16);
                 tokens.push((pos - best_pos) as u16);
                 let end = pos + best;
+                work.charge((best - 1) as u64)?;
                 pos += 1;
                 while pos < end {
                     if pos + 3 <= joined.len() {
