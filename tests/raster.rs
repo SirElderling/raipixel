@@ -610,7 +610,8 @@ fn symbolic_grid_preserves_skips_and_transparent_rgb_exactly() {
 #[test]
 fn symbolic_grid_rejects_invalid_inputs_before_spending_work_or_writing() {
     let mut actual = image(4, 4);
-    let cases: [(&[&str], &[(u8, Option<[u8; 4]>)]; 6] = [
+    type BadGrid<'a> = (&'a [&'a str], &'a [(u8, Option<[u8; 4]>)]);
+    let cases: [BadGrid<'_>; 6] = [
         (&[], &[(b'a', Some(RED))]),
         (&["aa", "a"], &[(b'a', Some(RED))]),
         (&["a?"], &[(b'a', Some(RED))]),
