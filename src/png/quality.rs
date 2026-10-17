@@ -13,28 +13,31 @@ enum Filter {
     Auto64,
 }
 
-fn encode_mode(
-    image: &Image,
-    output: &mut impl std::io::Write,
-    work: &mut Work,
-    mode: Filter,
-) -> Result<bool, Error> {
+// The exact-RGBA palette and its lookup slots do not depend on the row
+// filter. Reuse both for every trial instead of scanning the image three
+// times; preserve encounter order so PLTE/tRNS/packed indices are identical.
+struct ExactPalette {
+    colors: Vec<[u8; 4]>,
+    slots: [u16; 4096],
+}
+
+fn palette_slot(sample: [u8; 4]) -> usize {
+    (u32::from_le_bytes(sample).wrapping_mul(0x9e37_79b1) >> 20) as usize
+}
+
+fn discover_palette(image: &Image, work: &mut Work) -> Result<Option<ExactPalette>, Error> {
     let pixels = image.pixels();
     work.charge(pixels.len() as u64)?;
     let mut colors = Vec::<[u8; 4]>::new();
-    // No implicit growth in the at-most-256-entry exact-RGBA palette.
     colors.try_reserve_exact(256).map_err(|_| crate::Error::Allocation)?;
     let mut slots = [u16::MAX; 4096];
-    let slot_for = |sample: [u8; 4]| -> usize {
-        (u32::from_le_bytes(sample).wrapping_mul(0x9e37_79b1) >> 20) as usize
-    };
     for &sample in pixels {
-        let mut slot = slot_for(sample);
+        let mut slot = palette_slot(sample);
         loop {
             let value = slots[slot];
             if value == u16::MAX {
                 if colors.len() == 256 {
-                    return Ok(false);
+                    return Ok(None);
                 }
                 slots[slot] = colors.len() as u16;
                 colors.push(sample);
@@ -46,7 +49,19 @@ fn encode_mode(
             slot = (slot + 1) & 4095;
         }
     }
+    Ok(Some(ExactPalette { colors, slots }))
+}
 
+fn encode_mode(
+    image: &Image,
+    output: &mut impl std::io::Write,
+    work: &mut Work,
+    mode: Filter,
+    exact: &ExactPalette,
+) -> Result<bool, Error> {
+    let pixels = image.pixels();
+    let colors = &exact.colors;
+    let slots = &exact.slots;
     let width = image.width as usize;
     let depth: usize = match colors.len() {
         0..=2 => 1,
@@ -120,7 +135,7 @@ fn encode_mode(
                         break;
                     }
                     let sample = pixels[row * width + first_pixel + j];
-                    let mut slot = slot_for(sample);
+                    let mut slot = palette_slot(sample);
                     loop {
                         let value = slots[slot];
                         if value == u16::MAX {
@@ -414,10 +429,15 @@ fn encode_balanced_inner(
     // touching output. Conservative planning is not RSS certification.
     checked_balanced_memory_plan(image, raw, ceiling)?;
 
+    // An unsupported palette is declined before any compression allocations
+    // and before publishing output; palette discovery is charged once.
+    let Some(exact) = discover_palette(image, work)? else {
+        return Ok(false);
+    };
     let mut best: Option<Vec<u8>> = None;
     for (pass, mode) in [Filter::None, Filter::Sub, Filter::Auto64].into_iter().enumerate() {
         let mut current = Stage::new(ceiling, injected_allocation_pass == Some(pass));
-        let supported = match encode_mode(image, &mut current, work, mode) {
+        let supported = match encode_mode(image, &mut current, work, mode, &exact) {
             Ok(value) => value,
             Err(_) if current.allocation_failed => {
                 return Err(crate::Error::Allocation.into());
