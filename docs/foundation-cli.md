@@ -33,6 +33,11 @@ one cel**, with a matching canvas and stored cel size. It supports:
   optional explicit replacement, and asset palette reference. `palette.map`
   performs simultaneous RGB/RGBA recoloring; `alpha` supports exact color
   keying and thresholding. Palette replacement never silently recolors pixels.
+  `palette.extract` builds a named palette from exact visible RGB values of
+  an editable cel; entries `c000`, `c001`, etc. are ordered by decreasing
+  frequency and RGB ascending on ties. Hidden RGB remains unchanged and is
+  ignored for extraction. Empty or over-limit palettes fail explicitly;
+  extraction never quantizes or truncates colors.
 - Single-target `frame` exports with nearest-neighbor scale 1–16.
 - `--project` reopening **only** the exact schema subset written by this tool;
   source snapshot paths remain unchanged. The new output contains a native
@@ -81,7 +86,8 @@ full Foundation publication guarantee is **not** accepted.
 ## Tests and missing scope
 
 `tests/foundation_cli.rs`, `tests/cli_color_edit.rs`, `tests/cli_palettes.rs`,
-`tests/cli_inspect.rs`, `tests/cli_stamp.rs` and `tests/palette_checks.rs` exercise new artwork, palette references,
+`tests/cli_inspect.rs`, `tests/cli_stamp.rs`, `tests/cli_palette_extract.rs`
+and `tests/palette_checks.rs` exercise new artwork, palette references,
 recoloring, alpha cleanup, read-only inspection, hidden transparent RGB,
 PNG import, independent decoded pixel expectations, snapshot reopen and
 correction without mutating its source, dry-run, unsupported snapshot content,
