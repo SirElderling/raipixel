@@ -1,5 +1,5 @@
 //! End-to-end executable Foundation regressions. No external test dependencies.
-use raipixel::{png, Image, Limits, Work};
+use raipixel::{Image, Limits, Work, png};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -11,9 +11,7 @@ struct Scratch(PathBuf);
 impl Scratch {
     fn new() -> Self {
         let id = NEXT.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "raipixel-cli-{}-{id}", std::process::id()
-        ));
+        let path = std::env::temp_dir().join(format!("raipixel-cli-{}-{id}", std::process::id()));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir(&path).unwrap();
         Self(path)
@@ -66,9 +64,19 @@ fn single_cel_can_be_authored_saved_reopened_and_corrected_without_changing_sour
     )
     .unwrap();
     let result = run(&[word("run"), job.as_path(), word("--out"), out.as_path()]);
-    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
-    assert_eq!(decode(&out.join("images/000000.png")).pixel(0, 0), Some([18, 0, 52, 0]));
-    assert_eq!(decode(&out.join("images/000000.png")).pixel(2, 0), Some([171, 205, 239, 128]));
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(
+        decode(&out.join("images/000000.png")).pixel(0, 0),
+        Some([18, 0, 52, 0])
+    );
+    assert_eq!(
+        decode(&out.join("images/000000.png")).pixel(2, 0),
+        Some([171, 205, 239, 128])
+    );
     let preview = decode(&out.join("artifacts/preview/image.png"));
     assert_eq!(preview.size(), [8, 6]);
     assert_eq!(preview.pixel(5, 0), Some([171, 205, 239, 128]));
@@ -84,10 +92,18 @@ fn single_cel_can_be_authored_saved_reopened_and_corrected_without_changing_sour
     )
     .unwrap();
     let result = run(&[
-        word("run"), changed_job.as_path(), word("--project"), out.as_path(),
-        word("--out"), second.as_path(),
+        word("run"),
+        changed_job.as_path(),
+        word("--project"),
+        out.as_path(),
+        word("--out"),
+        second.as_path(),
     ]);
-    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
     let original = decode(&out.join("images/000000.png"));
     let edited = decode(&second.join("images/000000.png"));
     assert_eq!(original.pixel(1, 0), Some([17, 34, 51, 255]));
@@ -102,7 +118,9 @@ fn single_cel_can_be_authored_saved_reopened_and_corrected_without_changing_sour
     let manifest = fs::read(second.join("project.json")).unwrap();
     assert!(manifest.ends_with(b"\n"));
     let parsed = raipixel::json::parse(
-        &manifest, raipixel::json::Limits::default(), &mut Work::default()
+        &manifest,
+        raipixel::json::Limits::default(),
+        &mut Work::default(),
     );
     assert!(parsed.is_ok());
 }
@@ -136,9 +154,17 @@ fn input_failure_or_dry_run_does_not_publish_a_directory() {
     )
     .unwrap();
     let dry = run(&[
-        word("run"), job.as_path(), word("--out"), out.as_path(), word("--dry-run")
+        word("run"),
+        job.as_path(),
+        word("--out"),
+        out.as_path(),
+        word("--dry-run"),
     ]);
-    assert!(dry.status.success(), "{}", String::from_utf8_lossy(&dry.stderr));
+    assert!(
+        dry.status.success(),
+        "{}",
+        String::from_utf8_lossy(&dry.stderr)
+    );
     assert!(!out.exists());
 }
 
@@ -171,7 +197,11 @@ fn external_png_import_retains_transparent_rgb_and_only_replaces_requested_sampl
     .unwrap();
     let out = scratch.path("output");
     let result = run(&[word("run"), job.as_path(), word("--out"), out.as_path()]);
-    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
     let edited = decode(&out.join("images/000000.png"));
     assert_eq!(edited.pixel(0, 0), Some([91, 82, 73, 0]));
     assert_eq!(edited.pixel(1, 0), Some([222, 173, 190, 239]));
@@ -182,21 +212,40 @@ fn unsupported_snapshot_content_is_rejected_instead_of_discarded() {
     let scratch = Scratch::new();
     let job = scratch.path("initial.json");
     let first = scratch.path("first");
-    fs::write(&job, r#"{"interface":1,"semantics":"1.0","ops":[
+    fs::write(
+        &job,
+        r#"{"interface":1,"semantics":"1.0","ops":[
         {"op":"asset.create","name":"x","size":[1,1]},
         {"op":"layer.create","asset":"x","name":"l"},
         {"op":"frame.create","asset":"x","name":"f"},
         {"op":"cel.create","target":"x/l/f"}
-    ]}"#).unwrap();
-    assert!(run(&[word("run"), job.as_path(), word("--out"), first.as_path()]).status.success());
+    ]}"#,
+    )
+    .unwrap();
+    assert!(
+        run(&[word("run"), job.as_path(), word("--out"), first.as_path()])
+            .status
+            .success()
+    );
     let manifest = first.join("project.json");
     let content = fs::read_to_string(&manifest).unwrap();
-    fs::write(&manifest, content.replace(r#""palettes":[]"#, r#""palettes":[{"name":"keep","entries":[]}]"#)).unwrap();
+    fs::write(
+        &manifest,
+        content.replace(
+            r#""palettes":[]"#,
+            r#""palettes":[{"name":"keep","entries":[]}]"#,
+        ),
+    )
+    .unwrap();
     let next = scratch.path("next");
     fs::write(&job, r#"{"interface":1,"semantics":"1.0","ops":[]}"#).unwrap();
     let result = run(&[
-        word("run"), job.as_path(), word("--project"), first.as_path(),
-        word("--out"), next.as_path()
+        word("run"),
+        job.as_path(),
+        word("--project"),
+        first.as_path(),
+        word("--out"),
+        next.as_path(),
     ]);
     assert!(!result.status.success());
     assert!(String::from_utf8_lossy(&result.stderr).contains("E_CAPABILITY"));
