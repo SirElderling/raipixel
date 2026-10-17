@@ -10,6 +10,8 @@ raster and PNG libraries. It is **not** the complete proposed v1 interface.
 cargo run -- run art.json --out art-v1
 cargo run -- run edit.json --project art-v1 --out art-v2
 cargo run -- run art.json --out ignored --dry-run
+cargo run -- inspect art-v1
+cargo run -- inspect art-v1 --query region.json
 cargo run -- help
 ```
 
@@ -20,16 +22,30 @@ one cel**, with a matching canvas and stored cel size. It supports:
 - `asset.create` (name, size, optional pivot), `layer.create`, `frame.create`,
   `cel.create`, and `png.import` when the cel does not yet exist.
 - `draw` with `pixel`, filled `rect`, or canonical `line`; `grid` with
-  literal hexadecimal colors and optional skip; and exact-RGBA `fill`.
+  literal hexadecimal colors, `@palette/entry` references and optional skip;
+  and exact-RGBA flood `fill`.
+- `palette.set` with 1–256 ordered named RGB colors (up to 256 palettes),
+  optional explicit replacement, and asset palette reference. `palette.map`
+  performs simultaneous RGB/RGBA recoloring; `alpha` supports exact color
+  keying and thresholding. Palette replacement never silently recolors pixels.
 - Single-target `frame` exports with nearest-neighbor scale 1–16.
 - `--project` reopening **only** the exact schema subset written by this tool;
   source snapshot paths remain unchanged. The new output contains a native
   `project.json`, `images/000000.png`, and
   `artifacts/EXPORT_NAME/image.png` for requested frame exports.
 - `--dry-run` computes the edits and PNG bytes without creating an output.
+- `inspect SNAPSHOT` reports bounded project structure. With `--query`, it can
+  report exact alpha counts, nontransparent bounds, distinct RGBA count and a
+  histogram of the selected cel/frame or image-local region. `pixels:true`
+  returns row-major samples for at most 4,096 pixels; `symbols:true` returns
+  character rows and a stable RGBA-sorted legend for at most 94 unique colors.
+  Histograms are limited to 1–256 entries, sorted by descending count and
+  ascending RGBA on ties; truncation is reported. Unsupported comparison
+  queries are rejected rather than approximated.
 
-Unknown fields, unsupported job operations, extra assets/layers/frames, palette
-references, changed snapshot metadata, and formats outside this subset fail
+Unknown fields, unsupported job operations, extra assets/layers/frames,
+unknown palette references, changed snapshot metadata, and formats outside
+this subset fail
 explicitly (`E_CAPABILITY` or another typed error). They are **never** silently
 discarded or rewritten. Import filenames are resolved under the job directory,
 and snapshot image paths are fixed; parent traversal and paths escaping their
@@ -51,7 +67,9 @@ full Foundation publication guarantee is **not** accepted.
 
 ## Tests and missing scope
 
-`tests/foundation_cli.rs` exercises new artwork, hidden transparent RGB,
+`tests/foundation_cli.rs`, `tests/cli_color_edit.rs`, `tests/cli_palettes.rs`
+and `tests/cli_inspect.rs` exercise new artwork, palette references,
+recoloring, alpha cleanup, read-only inspection, hidden transparent RGB,
 PNG import, independent decoded pixel expectations, snapshot reopen and
 correction without mutating its source, dry-run, unsupported snapshot content,
 and failure without destination creation. These tests require only the pinned
@@ -61,6 +79,6 @@ Next complete the job/manifest validator and build the general project model,
 including multiple layered cels and frame rendering, before claiming scenarios
 A–E or full S1 acceptance. Persist and validate unknown-but-supported Core
 fields without dropping them. Implement atomic no-clobber publication and
-read-only `inspect`/`validate`; add broader CLI malformed/path/concurrency
+read-only `validate` and remaining inspection comparisons; add broader CLI malformed/path/concurrency
 tests and native CI confirmation. Do not treat this executable as production-safe
 for adversarial concurrent filesystem mutation.
