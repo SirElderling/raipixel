@@ -142,9 +142,15 @@ jobs:
         run: python tools/png_shared_work_budget_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
 
       - name: Paired native complete PNG quality encoding vs png 0.18.1 default and Fast
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_quality_vs_reference_speed_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Benchmark three-mode balanced PNG vs six-mode and public png 0.18.1
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_balanced_three_speed_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
 
       - name: Test frequency-ordered exact RGBA palettes against existing indexed writer
         if: github.event_name == 'workflow_dispatch'
