@@ -415,9 +415,7 @@ fn bounded_line_matches_independent_canonical_bresenham_in_all_octants() {
                     let mut actual = image(7, 7);
                     let mut budget = Work::new(reference.len() as u64).unwrap();
                     assert_eq!(
-                        actual
-                            .line(start, end, color, true, &mut budget)
-                            .unwrap(),
+                        actual.line(start, end, color, true, &mut budget).unwrap(),
                         reference.len() as u64 - kept,
                         "{start:?} to {end:?}"
                     );
@@ -425,9 +423,7 @@ fn bounded_line_matches_independent_canonical_bresenham_in_all_octants() {
                     assert_eq!(actual.pixels(), expected, "{start:?} to {end:?}");
 
                     let mut reversed = image(7, 7);
-                    reversed
-                        .line(end, start, color, true, &mut work())
-                        .unwrap();
+                    reversed.line(end, start, color, true, &mut work()).unwrap();
                     assert_eq!(reversed, actual, "endpoint order changed pixels");
                 }
             }
