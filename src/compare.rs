@@ -54,9 +54,7 @@ impl Image {
                 if a[3] != b[3] {
                     changed_alpha += 1;
                 }
-                if (a[3] == 0) != (b[3] == 0)
-                    || ((a[3] != 0 || b[3] != 0) && a[..3] != b[..3])
-                {
+                if (a[3] == 0) != (b[3] == 0) || ((a[3] != 0 || b[3] != 0) && a[..3] != b[..3]) {
                     changed_visible_colors += 1;
                 }
                 let x = x0 + column as u32;

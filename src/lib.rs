@@ -3,8 +3,8 @@
 //! The typed agent interface is not implemented yet.
 
 mod checksum;
-pub mod compare;
 mod color_edit;
+pub mod compare;
 mod deflate;
 mod error;
 pub mod inspect;

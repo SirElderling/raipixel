@@ -14,7 +14,9 @@ fn row_skip(
     }
     let [w, h] = left.size();
     let [x, y, rw, rh] = region.unwrap_or([0, 0, w, h]);
-    if rw == 0 || rh == 0 || u64::from(x) + u64::from(rw) > u64::from(w)
+    if rw == 0
+        || rh == 0
+        || u64::from(x) + u64::from(rw) > u64::from(w)
         || u64::from(y) + u64::from(rh) > u64::from(h)
     {
         return Err(Error::Bounds);
@@ -54,8 +56,12 @@ fn row_skip(
         changed_samples,
         changed_visible_colors,
         changed_alpha,
-        changed_bbox: (changed_samples != 0)
-            .then_some([min_x, min_y, max_x - min_x + 1, max_y - min_y + 1]),
+        changed_bbox: (changed_samples != 0).then_some([
+            min_x,
+            min_y,
+            max_x - min_x + 1,
+            max_y - min_y + 1,
+        ]),
     })
 }
 
@@ -88,10 +94,8 @@ fn fixture(side: u32, changed: usize, hidden_only: bool) -> (Image, Image) {
         second.push(after);
     }
     (
-        Image::from_pixels(side, side, &first, Limits::default(), &mut Work::default())
-            .unwrap(),
-        Image::from_pixels(side, side, &second, Limits::default(), &mut Work::default())
-            .unwrap(),
+        Image::from_pixels(side, side, &first, Limits::default(), &mut Work::default()).unwrap(),
+        Image::from_pixels(side, side, &second, Limits::default(), &mut Work::default()).unwrap(),
     )
 }
 
@@ -119,7 +123,11 @@ fn case(name: &str, side: u32, changed: usize, hidden_only: bool, partial: bool)
     let a_result = left.compare(&right, rect, &mut a_work);
     let b_result = row_skip(&left, &right, region, &mut b_work);
     assert_eq!(a_result, b_result, "{name}: exact result");
-    assert_eq!(a_work.remaining(), b_work.remaining(), "{name}: charge parity");
+    assert_eq!(
+        a_work.remaining(),
+        b_work.remaining(),
+        "{name}: charge parity"
+    );
     let iterations = match side {
         0..=16 => 7000,
         17..=64 => 1000,
@@ -130,16 +138,10 @@ fn case(name: &str, side: u32, changed: usize, hidden_only: bool, partial: bool)
     let mut b_times = Vec::new();
     for round in 0..7 {
         let a = || {
-            black_box(
-                left.compare(&right, rect, &mut Work::default())
-                    .unwrap(),
-            );
+            black_box(left.compare(&right, rect, &mut Work::default()).unwrap());
         };
         let b = || {
-            black_box(
-                row_skip(&left, &right, region, &mut Work::default())
-                    .unwrap(),
-            );
+            black_box(row_skip(&left, &right, region, &mut Work::default()).unwrap());
         };
         if round % 2 == 0 {
             a_times.push(nanos_per_iteration(a, iterations));
@@ -177,10 +179,7 @@ fn main() {
     for changed in [0usize, 1, 2, 3, 7, 31, 97] {
         for size in [16, 32, 64, 128] {
             let (left, right) = fixture(size, changed, changed % 2 == 1);
-            for region in [
-                None,
-                Some([size / 4, size / 4, size / 2, size / 2]),
-            ] {
+            for region in [None, Some([size / 4, size / 4, size / 2, size / 2])] {
                 let rect = region.map(|[x, y, w, h]| Rect::new(x as i32, y as i32, w, h).unwrap());
                 assert_eq!(
                     left.compare(&right, rect, &mut Work::default()),

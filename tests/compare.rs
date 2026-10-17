@@ -45,7 +45,13 @@ fn compare_distinguishes_hidden_rgb_visible_color_and_alpha() {
     assert_eq!(result.changed_alpha, 2);
     assert_eq!(result.changed_bbox, Some([0, 0, 3, 2]));
     assert_eq!(work.remaining(), 0);
-    assert_eq!(first.compare(&first, None, &mut Work::default()).unwrap().changed_bbox, None);
+    assert_eq!(
+        first
+            .compare(&first, None, &mut Work::default())
+            .unwrap()
+            .changed_bbox,
+        None
+    );
 }
 
 #[test]
@@ -73,13 +79,12 @@ fn compare_preflight_error_leaves_work_and_inputs_unchanged() {
     let first = image(2, 2, &[[0; 4]; 4]);
     let different_size = image(1, 2, &[[0; 4]; 2]);
     let mut work = Work::new(3).unwrap();
-    assert_eq!(first.compare(&different_size, None, &mut work), Err(Error::Dimensions));
     assert_eq!(
-        first.compare(
-            &first,
-            Some(Rect::new(-1, 0, 1, 1).unwrap()),
-            &mut work
-        ),
+        first.compare(&different_size, None, &mut work),
+        Err(Error::Dimensions)
+    );
+    assert_eq!(
+        first.compare(&first, Some(Rect::new(-1, 0, 1, 1).unwrap()), &mut work),
         Err(Error::Bounds)
     );
     assert_eq!(
