@@ -269,7 +269,7 @@ impl Document {
                 }
                 let _ = write!(
                     json,
-                    r#"{{"name":"{name}","rgb":"#{:02X}{:02X}{:02X}"}}"#,
+                    r##"{{"name":"{name}","rgb":"#{:02X}{:02X}{:02X}"}}"##,
                     rgb[0], rgb[1], rgb[2]
                 );
             }
