@@ -1,4 +1,4 @@
-//! Exact and deterministic color edits. No heap lookup table or color-space conversion.
+//! Exact deterministic color edits with bounded, allocation-free lookups.
 use crate::{Error, Image, Pixel, Rect, Work};
 
 impl Image {
@@ -6,7 +6,7 @@ impl Image {
     ///
     /// When preserving alpha, only RGB is compared and changed; input alpha
     /// is ignored. Otherwise all four samples participate in matching and
-    /// replacement. Lookup sorting is local and never changes pair priority.
+    /// replacement. Lookup order is deterministic and never changes pair priority.
     /// Duplicate source colors and invalid regions fail before any mutation.
     /// Returns the number of actually changed pixels, not matched pixels.
     pub fn map_colors(
@@ -35,11 +35,54 @@ impl Image {
             return Err(Error::PixelCount);
         }
 
+        // Bounded open addressing is measurably faster on the native sprite
+        // corpus than repeated comparisons or binary search. Keep the sorted
+        // table as a guaranteed worst-case fallback for adversarial collisions.
+        const SLOTS: usize = 2048;
+        const PROBES: usize = 16;
+        let mut lookup = [None::<(Pixel, Pixel)>; SLOTS];
+        let mut fast_path = true;
+        for &(from, to) in table.iter() {
+            let mut slot = (u32::from_be_bytes(from).wrapping_mul(0x9E37_79B1) as usize)
+                & (SLOTS - 1);
+            let mut inserted = false;
+            for _ in 0..PROBES {
+                if lookup[slot].is_none() {
+                    lookup[slot] = Some((from, to));
+                    inserted = true;
+                    break;
+                }
+                slot = (slot + 1) & (SLOTS - 1);
+            }
+            if !inserted {
+                fast_path = false;
+                break;
+            }
+        }
+
         self.edit_region(region, work, |sample| {
             let mut key = sample;
             if preserve_alpha {
                 key[3] = 0;
             }
+            if fast_path {
+                let mut slot = (u32::from_be_bytes(key).wrapping_mul(0x9E37_79B1) as usize)
+                    & (SLOTS - 1);
+                for _ in 0..PROBES {
+                    match lookup[slot] {
+                        Some((from, mut to)) if from == key => {
+                            if preserve_alpha {
+                                to[3] = sample[3];
+                            }
+                            return to;
+                        }
+                        None => return sample,
+                        _ => slot = (slot + 1) & (SLOTS - 1),
+                    }
+                }
+            }
+            // Any missing hash key or overlong collision chain uses the exact
+            // fallback; no input can force an unbounded pixel-level search.
             match table.binary_search_by_key(&key, |(from, _)| *from) {
                 Ok(index) => {
                     let mut output = table[index].1;
