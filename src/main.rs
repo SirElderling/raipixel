@@ -141,6 +141,13 @@ fn color(value: &json::Value) -> Result<Pixel> {
     }
     Ok(rgba)
 }
+fn color_literal(value: &json::Value, rgb_only: bool) -> Result<Pixel> {
+    let literal = string(value)?;
+    if rgb_only && (literal.len() != 7 || !literal.starts_with('#')) {
+        return argument("RGB recolor mappings require #RRGGBB literals");
+    }
+    color(value)
+}
 fn allowed(map: &Map, names: &[&str]) -> Result<()> {
     for key in map.keys() {
         if !names.contains(&key.as_str()) {
@@ -384,6 +391,81 @@ impl Document {
                 let region = operation.get("region").map(rect).transpose()?;
                 let pixel = color(field(operation, "color")?)?;
                 raster(self.image_mut(&target)?.flood_fill(at, pixel, region, work))?;
+                Ok(())
+            }
+            "palette.map" => {
+                allowed(
+                    operation,
+                    &["op", "targets", "region", "pairs", "preserve_alpha"],
+                )?;
+                let target = single_target(operation)?;
+                let region = operation.get("region").map(rect).transpose()?;
+                let preserve_alpha = boolean(operation, "preserve_alpha", true)?;
+                let values = arr(field(operation, "pairs")?)?;
+                if values.is_empty() || values.len() > 256 {
+                    return argument("recolor needs 1..256 color pairs");
+                }
+                let mut pairs = Vec::new();
+                pairs.try_reserve_exact(values.len()).map_err(|_| Fault {
+                    code: "E_ALLOC",
+                    message: "color pair allocation".into(),
+                })?;
+                for value in values {
+                    let colors = arr(value)?;
+                    if colors.len() != 2 {
+                        return argument("each recolor pair requires two colors");
+                    }
+                    pairs.push((
+                        color_literal(&colors[0], preserve_alpha)?,
+                        color_literal(&colors[1], preserve_alpha)?,
+                    ));
+                }
+                raster(
+                    self.image_mut(&target)?
+                        .map_colors(&pairs, preserve_alpha, region, work),
+                )?;
+                Ok(())
+            }
+            "alpha" => {
+                allowed(
+                    operation,
+                    &["op", "targets", "kind", "color", "match", "threshold", "region"],
+                )?;
+                let target = single_target(operation)?;
+                let region = operation.get("region").map(rect).transpose()?;
+                match text(operation, "kind")? {
+                    "key" => {
+                        if operation.contains_key("threshold") {
+                            return argument("alpha key does not accept threshold");
+                        }
+                        let match_alpha = match operation.get("match") {
+                            None => false,
+                            Some(v) if string(v)? == "rgb" => false,
+                            Some(v) if string(v)? == "rgba" => true,
+                            _ => return argument("alpha match must be rgb or rgba"),
+                        };
+                        let key = color(field(operation, "color")?)?;
+                        raster(
+                            self.image_mut(&target)?
+                                .alpha_key(key, match_alpha, region, work),
+                        )?;
+                    }
+                    "threshold" => {
+                        if operation.contains_key("color") || operation.contains_key("match") {
+                            return argument("alpha threshold cannot accept key color or match");
+                        }
+                        let threshold = u8::try_from(unsigned(field(operation, "threshold")?)?)
+                            .map_err(|_| Fault {
+                                code: "E_ARGUMENT",
+                                message: "threshold must be 0..255".into(),
+                            })?;
+                        raster(
+                            self.image_mut(&target)?
+                                .alpha_threshold(threshold, region, work),
+                        )?;
+                    }
+                    other => return capability(format!("unsupported alpha operation: {other}")),
+                }
                 Ok(())
             }
             other => capability(format!("unsupported operation: {other}")),
