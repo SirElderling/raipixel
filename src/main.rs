@@ -242,12 +242,14 @@ impl Document {
         if raw.starts_with('#') {
             return color(value);
         }
-        let Some((palette, entry)) = raw.strip_prefix('@').and_then(|s| s.split_once('/'))
-        else {
+        let Some((palette, entry)) = raw.strip_prefix('@').and_then(|s| s.split_once('/')) else {
             return argument("color must be a literal or @palette/entry");
         };
         let rgb = self.palettes.get(palette).and_then(|entries| {
-            entries.iter().find(|(name, _)| name == entry).map(|(_, rgb)| rgb)
+            entries
+                .iter()
+                .find(|(name, _)| name == entry)
+                .map(|(_, rgb)| rgb)
         });
         match rgb {
             Some(&[r, g, b]) => Ok([r, g, b, 255]),
@@ -708,7 +710,11 @@ fn load_snapshot(dir: &Path, work: &mut Work) -> Result<Document> {
         palettes,
         image: None,
     };
-    if document.palette_ref.as_ref().is_some_and(|selected| !document.palettes.contains_key(selected)) {
+    if document
+        .palette_ref
+        .as_ref()
+        .is_some_and(|selected| !document.palettes.contains_key(selected))
+    {
         return fail("E_REFERENCE", "snapshot refers to an unknown palette");
     }
     // Round-trip only snapshots whose complete semantic structure is supported.

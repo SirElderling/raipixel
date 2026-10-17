@@ -40,8 +40,17 @@ fn symbolic_colors_survive_snapshot_reopen_and_palette_replace_does_not_recolor(
     ],"exports":[{"name":"preview","kind":"frame","targets":["weapon/base"]}]}"##;
     fs::write(dir.join("first.json"), first).unwrap();
     let output = run(&dir, &["run", "first.json", "--out", "first"]);
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    let expected = [[1, 2, 3, 255], [170, 187, 204, 255], [0, 0, 0, 0], [0, 0, 0, 0]];
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let expected = [
+        [1, 2, 3, 255],
+        [170, 187, 204, 255],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+    ];
     assert_eq!(rgba(&dir, "first/artifacts/preview/image.png"), expected);
     let manifest = fs::read_to_string(dir.join("first/project.json")).unwrap();
     assert!(manifest.contains(r#""palette":"metal""#));
@@ -54,9 +63,20 @@ fn symbolic_colors_survive_snapshot_reopen_and_palette_replace_does_not_recolor(
     fs::write(dir.join("change.json"), change).unwrap();
     let output = run(
         &dir,
-        &["run", "change.json", "--project", "first", "--out", "second"],
+        &[
+            "run",
+            "change.json",
+            "--project",
+            "first",
+            "--out",
+            "second",
+        ],
     );
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert_eq!(rgba(&dir, "second/artifacts/unchanged/image.png"), expected);
     let draw = r##"{"interface":1,"semantics":"1.0","ops":[
       {"op":"draw","targets":["weapon/blade/base"],"shape":"pixel",
@@ -67,7 +87,11 @@ fn symbolic_colors_survive_snapshot_reopen_and_palette_replace_does_not_recolor(
         &dir,
         &["run", "draw.json", "--project", "second", "--out", "third"],
     );
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let mut updated = expected;
     updated[2] = [9, 8, 7, 255];
     assert_eq!(rgba(&dir, "third/artifacts/modified/image.png"), updated);
@@ -79,7 +103,14 @@ fn symbolic_colors_survive_snapshot_reopen_and_palette_replace_does_not_recolor(
     fs::write(dir.join("error.json"), error).unwrap();
     let output = run(
         &dir,
-        &["run", "error.json", "--project", "third", "--out", "invalid"],
+        &[
+            "run",
+            "error.json",
+            "--project",
+            "third",
+            "--out",
+            "invalid",
+        ],
     );
     assert!(!output.status.success());
     assert!(!dir.join("invalid").exists());

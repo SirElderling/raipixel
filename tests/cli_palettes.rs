@@ -11,10 +11,8 @@ struct Scratch(PathBuf);
 impl Scratch {
     fn new() -> Self {
         let next = NEXT.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "raipixel-palette-{}-{next}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("raipixel-palette-{}-{next}", std::process::id()));
         fs::create_dir(&path).unwrap();
         Self(path)
     }
@@ -88,7 +86,10 @@ fn named_palette_resolves_opaque_colors_and_survives_native_round_trip() {
         decode(&scratch.file("original/artifacts/game/image.png")),
         expected
     );
-    assert_eq!(decode(&scratch.file("original/images/000000.png")), expected);
+    assert_eq!(
+        decode(&scratch.file("original/images/000000.png")),
+        expected
+    );
     let snapshot_before = fs::read(scratch.file("original/project.json")).unwrap();
     let snapshot_text = String::from_utf8_lossy(&snapshot_before);
     assert!(snapshot_text.contains(r#""name":"metal""#));
@@ -108,7 +109,12 @@ fn named_palette_resolves_opaque_colors_and_survives_native_round_trip() {
     )
     .unwrap();
     let next = scratch.run(&[
-        "run", "replace.json", "--project", "original", "--out", "revised",
+        "run",
+        "replace.json",
+        "--project",
+        "original",
+        "--out",
+        "revised",
     ]);
     assert!(
         next.status.success(),
@@ -135,7 +141,12 @@ fn named_palette_resolves_opaque_colors_and_survives_native_round_trip() {
     )
     .unwrap();
     let reopened = scratch.run(&[
-        "run", "reopen.json", "--project", "revised", "--out", "reopened",
+        "run",
+        "reopen.json",
+        "--project",
+        "revised",
+        "--out",
+        "reopened",
     ]);
     assert!(
         reopened.status.success(),
