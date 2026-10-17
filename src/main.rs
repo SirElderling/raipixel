@@ -1,6 +1,6 @@
 //! Minimal executable Foundation vertical slice: one editable cel and frame.
 //! Deliberately rejects unsupported v1 structures instead of dropping state.
-use raipixel::{json, png, Image, Limits, Pixel, Rect, Work};
+use raipixel::{Image, Limits, Pixel, Rect, Work, json, png};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
@@ -15,7 +15,10 @@ struct Fault {
     message: String,
 }
 fn fail<T>(code: &'static str, message: impl Into<String>) -> Result<T> {
-    Err(Fault { code, message: message.into() })
+    Err(Fault {
+        code,
+        message: message.into(),
+    })
 }
 fn argument<T>(message: impl Into<String>) -> Result<T> {
     fail("E_ARGUMENT", message)
@@ -27,16 +30,31 @@ fn io<T>(error: std::io::Error) -> Result<T> {
     fail("E_IO", error.to_string())
 }
 fn obj(value: &json::Value) -> Result<&Map> {
-    if let json::Value::Object(object) = value { Ok(object) } else { argument("expected object") }
+    if let json::Value::Object(object) = value {
+        Ok(object)
+    } else {
+        argument("expected object")
+    }
 }
 fn arr(value: &json::Value) -> Result<&[json::Value]> {
-    if let json::Value::Array(array) = value { Ok(array) } else { argument("expected array") }
+    if let json::Value::Array(array) = value {
+        Ok(array)
+    } else {
+        argument("expected array")
+    }
 }
 fn string(value: &json::Value) -> Result<&str> {
-    if let json::Value::String(s) = value { Ok(s) } else { argument("expected string") }
+    if let json::Value::String(s) = value {
+        Ok(s)
+    } else {
+        argument("expected string")
+    }
 }
 fn field<'a>(object: &'a Map, key: &str) -> Result<&'a json::Value> {
-    object.get(key).ok_or_else(|| Fault { code: "E_ARGUMENT", message: format!("missing {key}") })
+    object.get(key).ok_or_else(|| Fault {
+        code: "E_ARGUMENT",
+        message: format!("missing {key}"),
+    })
 }
 fn text<'a>(object: &'a Map, key: &str) -> Result<&'a str> {
     string(field(object, key)?)
@@ -59,25 +77,44 @@ fn signed(value: &json::Value) -> Result<i32> {
 }
 fn point(value: &json::Value) -> Result<[i32; 2]> {
     let pair = arr(value)?;
-    if pair.len() != 2 { return argument("expected coordinate pair"); }
+    if pair.len() != 2 {
+        return argument("expected coordinate pair");
+    }
     Ok([signed(&pair[0])?, signed(&pair[1])?])
 }
 fn size(value: &json::Value) -> Result<[u32; 2]> {
     let pair = arr(value)?;
-    if pair.len() != 2 { return argument("expected size pair"); }
+    if pair.len() != 2 {
+        return argument("expected size pair");
+    }
     let result = [unsigned(&pair[0])?, unsigned(&pair[1])?];
-    if result.contains(&0) { return argument("zero dimension"); }
+    if result.contains(&0) {
+        return argument("zero dimension");
+    }
     Ok(result)
 }
 fn rect(value: &json::Value) -> Result<Rect> {
     let a = arr(value)?;
-    if a.len() != 4 { return argument("expected [x,y,width,height]"); }
-    Rect::new(signed(&a[0])?, signed(&a[1])?, unsigned(&a[2])?, unsigned(&a[3])?)
-        .map_err(|e| Fault { code: e.code(), message: e.to_string() })
+    if a.len() != 4 {
+        return argument("expected [x,y,width,height]");
+    }
+    Rect::new(
+        signed(&a[0])?,
+        signed(&a[1])?,
+        unsigned(&a[2])?,
+        unsigned(&a[3])?,
+    )
+    .map_err(|e| Fault {
+        code: e.code(),
+        message: e.to_string(),
+    })
 }
 fn name(value: &str) -> Result<String> {
-    if value.is_empty() || value.len() > 64 ||
-        !value.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
+    if value.is_empty()
+        || value.len() > 64
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
     {
         return argument("names must contain 1..64 ASCII letters, digits, _ or -");
     }
@@ -85,20 +122,30 @@ fn name(value: &str) -> Result<String> {
 }
 fn color(value: &json::Value) -> Result<Pixel> {
     let text = string(value)?;
-    let Some(hex) = text.strip_prefix('#') else { return capability("palette references are not yet supported"); };
+    let Some(hex) = text.strip_prefix('#') else {
+        return capability("palette references are not yet supported");
+    };
     if !matches!(hex.len(), 6 | 8) || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
         return argument("color must be #RRGGBB or #RRGGBBAA");
     }
     let mut rgba = [0, 0, 0, 255];
     for (i, chunk) in hex.as_bytes().chunks(2).enumerate() {
-        let pair = std::str::from_utf8(chunk).map_err(|_| Fault { code: "E_ARGUMENT", message: "invalid hex color".into() })?;
-        rgba[i] = u8::from_str_radix(pair, 16).map_err(|_| Fault { code: "E_ARGUMENT", message: "invalid hex color".into() })?;
+        let pair = std::str::from_utf8(chunk).map_err(|_| Fault {
+            code: "E_ARGUMENT",
+            message: "invalid hex color".into(),
+        })?;
+        rgba[i] = u8::from_str_radix(pair, 16).map_err(|_| Fault {
+            code: "E_ARGUMENT",
+            message: "invalid hex color".into(),
+        })?;
     }
     Ok(rgba)
 }
 fn allowed(map: &Map, names: &[&str]) -> Result<()> {
     for key in map.keys() {
-        if !names.contains(&key.as_str()) { return capability(format!("unsupported field: {key}")); }
+        if !names.contains(&key.as_str()) {
+            return capability(format!("unsupported field: {key}"));
+        }
     }
     Ok(())
 }
@@ -110,17 +157,28 @@ fn boolean(map: &Map, key: &str, default: bool) -> Result<bool> {
     }
 }
 fn optional_point(map: &Map, key: &str, default: [i32; 2]) -> Result<[i32; 2]> {
-    map.get(key).map(point).transpose().map(|v| v.unwrap_or(default))
+    map.get(key)
+        .map(point)
+        .transpose()
+        .map(|v| v.unwrap_or(default))
 }
 fn parse_json(bytes: &[u8], work: &mut Work) -> Result<json::Value> {
-    json::parse(bytes, json::Limits::default(), work)
-        .map_err(|e| Fault { code: e.code(), message: e.to_string() })
+    json::parse(bytes, json::Limits::default(), work).map_err(|e| Fault {
+        code: e.code(),
+        message: e.to_string(),
+    })
 }
 fn raster<T>(result: std::result::Result<T, raipixel::Error>) -> Result<T> {
-    result.map_err(|e| Fault { code: e.code(), message: e.to_string() })
+    result.map_err(|e| Fault {
+        code: e.code(),
+        message: e.to_string(),
+    })
 }
 fn codec<T>(result: std::result::Result<T, png::Error>) -> Result<T> {
-    result.map_err(|e| Fault { code: e.code(), message: e.to_string() })
+    result.map_err(|e| Fault {
+        code: e.code(),
+        message: e.to_string(),
+    })
 }
 
 #[derive(Default)]
@@ -146,14 +204,21 @@ impl Document {
         }
     }
     fn image_mut(&mut self, target: &str) -> Result<&mut Image> {
-        if target != self.cel_name()? { return argument("unknown cel target"); }
-        self.image.as_mut().ok_or_else(|| Fault { code: "E_ARGUMENT", message: "cel does not exist".into() })
+        if target != self.cel_name()? {
+            return argument("unknown cel target");
+        }
+        self.image.as_mut().ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "cel does not exist".into(),
+        })
     }
     fn apply(&mut self, operation: &Map, base: &Path, work: &mut Work) -> Result<()> {
         match text(operation, "op")? {
             "asset.create" => {
                 allowed(operation, &["op", "name", "size", "pivot"])?;
-                if self.asset.is_some() { return capability("this first slice supports one asset"); }
+                if self.asset.is_some() {
+                    return capability("this first slice supports one asset");
+                }
                 let extent = size(field(operation, "size")?)?;
                 let pivot = optional_point(operation, "pivot", [0, 0])?;
                 self.asset = Some(name(text(operation, "name")?)?);
@@ -163,30 +228,54 @@ impl Document {
             }
             "layer.create" => {
                 allowed(operation, &["op", "asset", "name"])?;
-                if self.asset.as_deref() != Some(text(operation, "asset")?) { return argument("unknown asset"); }
-                if self.layer.is_some() { return capability("this first slice supports one layer"); }
+                if self.asset.as_deref() != Some(text(operation, "asset")?) {
+                    return argument("unknown asset");
+                }
+                if self.layer.is_some() {
+                    return capability("this first slice supports one layer");
+                }
                 self.layer = Some(name(text(operation, "name")?)?);
                 Ok(())
             }
             "frame.create" => {
                 allowed(operation, &["op", "asset", "name"])?;
-                if self.asset.as_deref() != Some(text(operation, "asset")?) { return argument("unknown asset"); }
-                if self.frame.is_some() { return capability("this first slice supports one frame"); }
+                if self.asset.as_deref() != Some(text(operation, "asset")?) {
+                    return argument("unknown asset");
+                }
+                if self.frame.is_some() {
+                    return capability("this first slice supports one frame");
+                }
                 self.frame = Some(name(text(operation, "name")?)?);
                 Ok(())
             }
             "cel.create" => {
                 allowed(operation, &["op", "target"])?;
-                if text(operation, "target")? != self.cel_name()? { return argument("unknown cel target"); }
-                if self.image.is_some() { return argument("cel already exists"); }
-                let extent = self.size.ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing canvas".into() })?;
-                self.image = Some(raster(Image::new(extent[0], extent[1], Limits::default(), work))?);
+                if text(operation, "target")? != self.cel_name()? {
+                    return argument("unknown cel target");
+                }
+                if self.image.is_some() {
+                    return argument("cel already exists");
+                }
+                let extent = self.size.ok_or_else(|| Fault {
+                    code: "E_ARGUMENT",
+                    message: "missing canvas".into(),
+                })?;
+                self.image = Some(raster(Image::new(
+                    extent[0],
+                    extent[1],
+                    Limits::default(),
+                    work,
+                ))?);
                 Ok(())
             }
             "png.import" => {
                 allowed(operation, &["op", "target", "file"])?;
-                if text(operation, "target")? != self.cel_name()? { return argument("unknown cel target"); }
-                if self.image.is_some() { return argument("cel exists; replacement is unsupported"); }
+                if text(operation, "target")? != self.cel_name()? {
+                    return argument("unknown cel target");
+                }
+                if self.image.is_some() {
+                    return argument("cel exists; replacement is unsupported");
+                }
                 let input = read_input(base, text(operation, "file")?, 128 * 1024 * 1024)?;
                 let decoded = codec(png::decode(&input, Limits::default(), work))?;
                 if Some(decoded.image.size()) != self.size {
@@ -196,57 +285,102 @@ impl Document {
                 Ok(())
             }
             "draw" => {
-                allowed(operation, &["op", "targets", "shape", "at", "points", "rect", "color", "clip"])?;
+                allowed(
+                    operation,
+                    &[
+                        "op", "targets", "shape", "at", "points", "rect", "color", "clip",
+                    ],
+                )?;
                 let target = single_target(operation)?;
                 let clip = boolean(operation, "clip", false)?;
                 let sample = color(field(operation, "color")?)?;
                 let image = self.image_mut(&target)?;
                 match text(operation, "shape")? {
                     "pixel" => {
-                        if operation.contains_key("points") || operation.contains_key("rect") { return argument("pixel uses at only"); }
+                        if operation.contains_key("points") || operation.contains_key("rect") {
+                            return argument("pixel uses at only");
+                        }
                         let pos = point(field(operation, "at")?)?;
-                        raster(image.fill(raster(Rect::new(pos[0], pos[1], 1, 1))?, sample, clip, work))?;
+                        raster(image.fill(
+                            raster(Rect::new(pos[0], pos[1], 1, 1))?,
+                            sample,
+                            clip,
+                            work,
+                        ))?;
                     }
                     "rect" => {
-                        if operation.contains_key("at") || operation.contains_key("points") { return argument("rect uses rect only"); }
+                        if operation.contains_key("at") || operation.contains_key("points") {
+                            return argument("rect uses rect only");
+                        }
                         raster(image.fill(rect(field(operation, "rect")?)?, sample, clip, work))?;
                     }
                     "line" => {
-                        if operation.contains_key("at") || operation.contains_key("rect") { return argument("line uses points only"); }
+                        if operation.contains_key("at") || operation.contains_key("rect") {
+                            return argument("line uses points only");
+                        }
                         let points = arr(field(operation, "points")?)?;
-                        if points.len() != 2 { return argument("line needs two points"); }
-                        raster(image.line(point(&points[0])?, point(&points[1])?, sample, clip, work))?;
+                        if points.len() != 2 {
+                            return argument("line needs two points");
+                        }
+                        raster(image.line(
+                            point(&points[0])?,
+                            point(&points[1])?,
+                            sample,
+                            clip,
+                            work,
+                        ))?;
                     }
                     other => return capability(format!("unsupported shape: {other}")),
                 }
                 Ok(())
             }
             "grid" => {
-                allowed(operation, &["op", "targets", "at", "rows", "symbols", "skip", "clip"])?;
+                allowed(
+                    operation,
+                    &["op", "targets", "at", "rows", "symbols", "skip", "clip"],
+                )?;
                 let target = single_target(operation)?;
                 let at = optional_point(operation, "at", [0, 0])?;
                 let clip = boolean(operation, "clip", false)?;
-                let rows = arr(field(operation, "rows")?)?.iter().map(string).collect::<Result<Vec<_>>>()?;
+                let rows = arr(field(operation, "rows")?)?
+                    .iter()
+                    .map(string)
+                    .collect::<Result<Vec<_>>>()?;
                 let mapping = obj(field(operation, "symbols")?)?;
                 let mut symbols = Vec::new();
                 for (key, val) in mapping {
-                    if key.len() != 1 || !key.is_ascii() { return argument("grid symbols must be one ASCII byte"); }
+                    if key.len() != 1 || !key.is_ascii() {
+                        return argument("grid symbols must be one ASCII byte");
+                    }
                     symbols.push((key.as_bytes()[0], Some(color(val)?)));
                 }
                 if let Some(v) = operation.get("skip") {
                     let skip = string(v)?;
-                    if skip.len() != 1 || !skip.is_ascii() { return argument("skip must be one ASCII byte"); }
+                    if skip.len() != 1 || !skip.is_ascii() {
+                        return argument("skip must be one ASCII byte");
+                    }
                     symbols.push((skip.as_bytes()[0], None));
                 }
-                raster(self.image_mut(&target)?.draw_grid(at, &rows, &symbols, clip, work))?;
+                raster(
+                    self.image_mut(&target)?
+                        .draw_grid(at, &rows, &symbols, clip, work),
+                )?;
                 Ok(())
             }
             "fill" => {
                 allowed(operation, &["op", "targets", "at", "color", "region"])?;
                 let target = single_target(operation)?;
                 let at = point(field(operation, "at")?)?;
-                let at = [u32::try_from(at[0]).map_err(|_| Fault { code: "E_BOUNDS", message: "negative fill x".into() })?,
-                          u32::try_from(at[1]).map_err(|_| Fault { code: "E_BOUNDS", message: "negative fill y".into() })?];
+                let at = [
+                    u32::try_from(at[0]).map_err(|_| Fault {
+                        code: "E_BOUNDS",
+                        message: "negative fill x".into(),
+                    })?,
+                    u32::try_from(at[1]).map_err(|_| Fault {
+                        code: "E_BOUNDS",
+                        message: "negative fill y".into(),
+                    })?,
+                ];
                 let region = operation.get("region").map(rect).transpose()?;
                 let pixel = color(field(operation, "color")?)?;
                 raster(self.image_mut(&target)?.flood_fill(at, pixel, region, work))?;
@@ -264,43 +398,81 @@ impl Document {
         // Names are validated restricted ASCII, so insertion into JSON is safe.
         Ok(format!(
             r#"{{"format":"raipixel-project","version":1,"semantics":"1.0","images":[{{"id":"i000000","file":"images/000000.png","size":[{w},{h}]}}],"palettes":[],"styles":[],"assets":[{{"name":"{asset}","size":[{w},{h}],"pivot":[{px},{py}],"palette":null,"style":null,"layers":[{{"name":"{layer}","visible":true,"opacity":255}}],"frames":[{{"name":"{frame}","duration_ms":100,"cels":[{{"layer":"{layer}","image":"i000000","offset":[0,0]}}],"anchors":{{}},"metadata":{{}}}}],"clips":[],"metadata":{{}}}}],"metadata":{{}}}}"#,
-            px = self.pivot[0], py = self.pivot[1]
+            px = self.pivot[0],
+            py = self.pivot[1]
         ) + "\n")
     }
 }
 fn single_target(operation: &Map) -> Result<String> {
     let targets = arr(field(operation, "targets")?)?;
-    if targets.len() != 1 { return capability("one target per edit is supported"); }
+    if targets.len() != 1 {
+        return capability("one target per edit is supported");
+    }
     Ok(string(&targets[0])?.to_owned())
 }
 fn read_input(base: &Path, file: &str, limit: u64) -> Result<Vec<u8>> {
     let path = Path::new(file);
-    if path.as_os_str().is_empty() || path.components().any(|c| !matches!(c, Component::Normal(_) | Component::CurDir)) {
+    if path.as_os_str().is_empty()
+        || path
+            .components()
+            .any(|c| !matches!(c, Component::Normal(_) | Component::CurDir))
+    {
         return argument("source file must be a relative path without parent traversal");
     }
-    let root = base.canonicalize().map_err(|e| Fault { code: "E_IO", message: e.to_string() })?;
-    let full = base.join(path).canonicalize().map_err(|e| Fault { code: "E_IO", message: e.to_string() })?;
-    if !full.starts_with(root) { return argument("source file escapes request directory"); }
-    let meta = fs::metadata(&full).map_err(|e| Fault { code: "E_IO", message: e.to_string() })?;
-    if !meta.is_file() || meta.len() > limit { return fail("E_LIMIT", "invalid or oversized input file"); }
-    let file = fs::File::open(&full).map_err(|e| Fault { code: "E_IO", message: e.to_string() })?;
+    let root = base.canonicalize().map_err(|e| Fault {
+        code: "E_IO",
+        message: e.to_string(),
+    })?;
+    let full = base.join(path).canonicalize().map_err(|e| Fault {
+        code: "E_IO",
+        message: e.to_string(),
+    })?;
+    if !full.starts_with(root) {
+        return argument("source file escapes request directory");
+    }
+    let meta = fs::metadata(&full).map_err(|e| Fault {
+        code: "E_IO",
+        message: e.to_string(),
+    })?;
+    if !meta.is_file() || meta.len() > limit {
+        return fail("E_LIMIT", "invalid or oversized input file");
+    }
+    let file = fs::File::open(&full).map_err(|e| Fault {
+        code: "E_IO",
+        message: e.to_string(),
+    })?;
     let mut bytes = Vec::new();
-    file.take(limit + 1).read_to_end(&mut bytes).map_err(|e| Fault { code: "E_IO", message: e.to_string() })?;
-    if bytes.len() as u64 > limit { return fail("E_LIMIT", "input grew beyond limit"); }
+    file.take(limit + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| Fault {
+            code: "E_IO",
+            message: e.to_string(),
+        })?;
+    if bytes.len() as u64 > limit {
+        return fail("E_LIMIT", "input grew beyond limit");
+    }
     Ok(bytes)
 }
 fn load_snapshot(dir: &Path, work: &mut Work) -> Result<Document> {
     let manifest = read_input(dir, "project.json", 8 * 1024 * 1024)?;
     let root = parse_json(&manifest, work)?;
     let object = obj(&root)?;
-    if text(object, "format")? != "raipixel-project" || unsigned(field(object, "version")?)? != 1 ||
-        text(object, "semantics")? != "1.0" { return capability("unsupported project snapshot version"); }
+    if text(object, "format")? != "raipixel-project"
+        || unsigned(field(object, "version")?)? != 1
+        || text(object, "semantics")? != "1.0"
+    {
+        return capability("unsupported project snapshot version");
+    }
     let assets = arr(field(object, "assets")?)?;
-    if assets.len() != 1 { return capability("only one asset snapshot is supported"); }
+    if assets.len() != 1 {
+        return capability("only one asset snapshot is supported");
+    }
     let a = obj(&assets[0])?;
     let layers = arr(field(a, "layers")?)?;
     let frames = arr(field(a, "frames")?)?;
-    if layers.len() != 1 || frames.len() != 1 { return capability("layered or animated snapshots are not supported yet"); }
+    if layers.len() != 1 || frames.len() != 1 {
+        return capability("layered or animated snapshots are not supported yet");
+    }
     let l = obj(&layers[0])?;
     let f = obj(&frames[0])?;
     let mut document = Document {
@@ -353,19 +525,36 @@ fn export_image(image: &Image, scale: u32, work: &mut Work) -> Result<Vec<u8>> {
     codec(png::encode_compressed(&scaled_image, &mut png_bytes, work))?;
     Ok(png_bytes)
 }
-fn build_outputs(document: &Document, job: &Map, work: &mut Work) -> Result<Vec<(String, Vec<u8>)>> {
+fn build_outputs(
+    document: &Document,
+    job: &Map,
+    work: &mut Work,
+) -> Result<Vec<(String, Vec<u8>)>> {
     let mut outputs = Vec::new();
     if let Some(exports) = job.get("exports") {
         for spec in arr(exports)? {
             let m = obj(spec)?;
             allowed(m, &["name", "kind", "targets", "scale"])?;
-            if text(m, "kind")? != "frame" { return capability("only frame export is supported"); }
+            if text(m, "kind")? != "frame" {
+                return capability("only frame export is supported");
+            }
             let n = name(text(m, "name")?)?;
-            if outputs.iter().any(|(other, _)| other == &n) { return argument("duplicate export name"); }
+            if outputs.iter().any(|(other, _)| other == &n) {
+                return argument("duplicate export name");
+            }
             let targets = arr(field(m, "targets")?)?;
-            if targets.len() != 1 || string(&targets[0])? != document.frame_name()? { return argument("unknown frame export target"); }
+            if targets.len() != 1 || string(&targets[0])? != document.frame_name()? {
+                return argument("unknown frame export target");
+            }
             let scale = m.get("scale").map(unsigned).transpose()?.unwrap_or(1);
-            let bytes = export_image(document.image.as_ref().ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing cel".into() })?, scale, work)?;
+            let bytes = export_image(
+                document.image.as_ref().ok_or_else(|| Fault {
+                    code: "E_ARGUMENT",
+                    message: "missing cel".into(),
+                })?,
+                scale,
+                work,
+            )?;
             outputs.push((n, bytes));
         }
     }
@@ -390,7 +579,9 @@ fn run_job(job_file: &Path, output_dir: &Path, project: Option<&Path>, dry_run: 
     if let Some(checks) = job.get("checks") {
         for check in arr(checks)? {
             if !matches!(string(check)?, "structure" | "bounds" | "dimensions") {
-                return capability("this Foundation slice only supports structure, dimensions and bounds checks");
+                return capability(
+                    "this Foundation slice only supports structure, dimensions and bounds checks",
+                );
             }
         }
     }
@@ -401,42 +592,93 @@ fn run_job(job_file: &Path, output_dir: &Path, project: Option<&Path>, dry_run: 
     if document.image.is_none() { return argument("missing editable cel"); }
     let manifest = document.manifest()?;
     let exports = build_outputs(&document, job, &mut work)?;
-    let snapshot = export_image(document.image.as_ref().ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing cel".into() })?, 1, &mut work)?;
+    let snapshot = export_image(
+        document.image.as_ref().ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "missing cel".into(),
+        })?,
+        1,
+        &mut work,
+    )?;
     if dry_run {
-        println!(r#"{{"schema":1,"ok":true,"action":"run","result":{{"dry_run":true,"exports":{},"snapshot_png_bytes":{}}}}}"#, exports.len(), snapshot.len());
+        println!(
+            r#"{{"schema":1,"ok":true,"action":"run","result":{{"dry_run":true,"exports":{},"snapshot_png_bytes":{}}}}}"#,
+            exports.len(),
+            snapshot.len()
+        );
         return Ok(());
     }
-    let parent = output_dir.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
-    let stem = output_dir.file_name().and_then(|s| s.to_str()).ok_or_else(|| Fault { code: "E_ARGUMENT", message: "invalid destination".into() })?;
+    let parent = output_dir
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let stem = output_dir
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "invalid destination".into(),
+        })?;
     let mut stage = None;
     for i in 0..16 {
         let candidate = parent.join(format!(".{stem}.raipixel-stage-{}-{i}", std::process::id()));
         match fs::create_dir(&candidate) {
-            Ok(()) => { stage = Some(candidate); break; }
+            Ok(()) => {
+                stage = Some(candidate);
+                break;
+            }
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => return io(e),
         }
     }
-    let stage = stage.ok_or_else(|| Fault { code: "E_IO", message: "unable to allocate staging directory".into() })?;
+    let stage = stage.ok_or_else(|| Fault {
+        code: "E_IO",
+        message: "unable to allocate staging directory".into(),
+    })?;
     let result = (|| {
-        fs::create_dir(stage.join("images")).map_err(|e| Fault { code: "E_IO", message: e.to_string() })?;
-        fs::write(stage.join("images/000000.png"), snapshot).map_err(|e| Fault { code: "E_IO", message: e.to_string() })?;
-        fs::write(stage.join("project.json"), manifest).map_err(|e| Fault { code: "E_IO", message: e.to_string() })?;
+        fs::create_dir(stage.join("images")).map_err(|e| Fault {
+            code: "E_IO",
+            message: e.to_string(),
+        })?;
+        fs::write(stage.join("images/000000.png"), snapshot).map_err(|e| Fault {
+            code: "E_IO",
+            message: e.to_string(),
+        })?;
+        fs::write(stage.join("project.json"), manifest).map_err(|e| Fault {
+            code: "E_IO",
+            message: e.to_string(),
+        })?;
         for (n, bytes) in &exports {
             let artifact = stage.join("artifacts").join(n);
-            fs::create_dir_all(&artifact).map_err(|e| Fault { code: "E_IO", message: e.to_string() })?;
-            fs::write(artifact.join("image.png"), bytes).map_err(|e| Fault { code: "E_IO", message: e.to_string() })?;
+            fs::create_dir_all(&artifact).map_err(|e| Fault {
+                code: "E_IO",
+                message: e.to_string(),
+            })?;
+            fs::write(artifact.join("image.png"), bytes).map_err(|e| Fault {
+                code: "E_IO",
+                message: e.to_string(),
+            })?;
         }
         // A separate same-parent staging directory keeps ordinary encode/IO
         // failures unpublished. Cross-process destination races are NOT yet
         // a certified no-clobber guarantee for std::fs::rename.
-        if output_dir.exists() { return argument("output directory already exists"); }
-        fs::rename(&stage, output_dir).map_err(|e| Fault { code: "E_IO", message: e.to_string() })?;
+        if output_dir.exists() {
+            return argument("output directory already exists");
+        }
+        fs::rename(&stage, output_dir).map_err(|e| Fault {
+            code: "E_IO",
+            message: e.to_string(),
+        })?;
         Ok(())
     })();
-    if result.is_err() { let _ = fs::remove_dir_all(&stage); }
+    if result.is_err() {
+        let _ = fs::remove_dir_all(&stage);
+    }
     result?;
-    println!(r#"{{"schema":1,"ok":true,"action":"run","result":{{"exports":{},"snapshot":true}}}}"#, exports.len());
+    println!(
+        r#"{{"schema":1,"ok":true,"action":"run","result":{{"exports":{},"snapshot":true}}}}"#,
+        exports.len()
+    );
     Ok(())
 }
 fn execute() -> Result<()> {
@@ -446,33 +688,62 @@ fn execute() -> Result<()> {
         return Ok(());
     }
     if args.len() == 1 && args[0] == "help" {
-        println!("raipixel run JOB.json --out DIRECTORY [--project SNAPSHOT] [--dry-run]\nraipixel version");
+        println!(
+            "raipixel run JOB.json --out DIRECTORY [--project SNAPSHOT] [--dry-run]\nraipixel version"
+        );
         return Ok(());
     }
-    if args.len() < 4 || args[0] != "run" { return capability("supported commands: help, version, run"); }
+    if args.len() < 4 || args[0] != "run" {
+        return capability("supported commands: help, version, run");
+    }
     let job = PathBuf::from(&args[1]);
     let mut output = None;
     let mut project = None;
     let mut dry_run = false;
     let mut i = 2;
     while i < args.len() {
-        if args[i] == "--dry-run" { dry_run = true; i += 1; continue; }
+        if args[i] == "--dry-run" {
+            dry_run = true;
+            i += 1;
+            continue;
+        }
         if args[i] == "--out" && i + 1 < args.len() {
-            if output.replace(PathBuf::from(&args[i + 1])).is_some() { return argument("duplicate --out"); }
-            i += 2; continue;
+            if output.replace(PathBuf::from(&args[i + 1])).is_some() {
+                return argument("duplicate --out");
+            }
+            i += 2;
+            continue;
         }
         if args[i] == "--project" && i + 1 < args.len() {
-            if project.replace(PathBuf::from(&args[i + 1])).is_some() { return argument("duplicate --project"); }
-            i += 2; continue;
+            if project.replace(PathBuf::from(&args[i + 1])).is_some() {
+                return argument("duplicate --project");
+            }
+            i += 2;
+            continue;
         }
         return argument("unknown or incomplete command-line argument");
     }
-    run_job(&job, output.as_deref().ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing --out".into() })?, project.as_deref(), dry_run)
+    run_job(
+        &job,
+        output.as_deref().ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "missing --out".into(),
+        })?,
+        project.as_deref(),
+        dry_run,
+    )
 }
 fn main() {
     if let Err(error) = execute() {
-        let safe = error.message.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " ");
-        eprintln!(r#"{{"schema":1,"ok":false,"error":{{"code":"{}","message":"{}"}}}}"#, error.code, safe);
+        let safe = error
+            .message
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('\n', " ");
+        eprintln!(
+            r#"{{"schema":1,"ok":false,"error":{{"code":"{}","message":"{}"}}}}"#,
+            error.code, safe
+        );
         std::process::exit(1);
     }
 }
