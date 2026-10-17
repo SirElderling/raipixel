@@ -48,7 +48,14 @@ fn ellipse_draw_corrects_an_existing_cel_and_reopens_without_changing_source() {
     .unwrap();
     let edit = run(
         &root,
-        &["run", "ellipse.json", "--project", "initial", "--out", "edited"]
+        &[
+            "run",
+            "ellipse.json",
+            "--project",
+            "initial",
+            "--out",
+            "edited",
+        ],
     );
     assert!(
         edit.status.success(),
@@ -81,7 +88,14 @@ fn ellipse_draw_corrects_an_existing_cel_and_reopens_without_changing_source() {
     .unwrap();
     let reopen = run(
         &root,
-        &["run", "reopen.json", "--project", "edited", "--out", "reopened"]
+        &[
+            "run",
+            "reopen.json",
+            "--project",
+            "edited",
+            "--out",
+            "reopened",
+        ],
     );
     assert!(
         reopen.status.success(),
@@ -103,7 +117,14 @@ fn ellipse_draw_corrects_an_existing_cel_and_reopens_without_changing_source() {
     .unwrap();
     let invalid = run(
         &root,
-        &["run", "invalid.json", "--project", "edited", "--out", "rejected"]
+        &[
+            "run",
+            "invalid.json",
+            "--project",
+            "edited",
+            "--out",
+            "rejected",
+        ],
     );
     assert!(!invalid.status.success());
     assert!(!root.join("rejected").exists());
