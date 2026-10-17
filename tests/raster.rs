@@ -550,3 +550,81 @@ fn line_preflight_bounds_and_work_are_transactional() {
         RED, true, &mut default_budget), Err(Error::Limit(Resource::Work)));
     assert_eq!(canvas.pixels(), &[CLEAR; 4]);
 }
+
+#[test]
+fn symbolic_grid_preserves_skips_and_transparent_rgb_exactly() {
+    let mut actual = image(4, 4);
+    let original = [81, 92, 103, 201];
+    actual.fill(rect(0, 0, 4, 4), original, false, &mut work()).unwrap();
+    let hidden = [18, 37, 56, 0];
+    let symbols = [
+        (b'a', Some(hidden)),
+        (b'.', None),
+        (b'b', Some(BLUE)),
+        (b' ', Some(CLEAR)),
+    ];
+    let mut budget = Work::new(6).unwrap();
+    assert_eq!(
+        actual.draw_grid([1, 1], &["a.b", " ba"], &symbols, false, &mut budget),
+        Ok(0)
+    );
+    assert_eq!(budget.remaining(), 0);
+    assert_eq!(actual.pixel(1, 1), Some(hidden));
+    assert_eq!(actual.pixel(2, 1), Some(original)); // Explicit skip.
+    assert_eq!(actual.pixel(3, 1), Some(BLUE));
+    assert_eq!(actual.pixel(1, 2), Some(CLEAR)); // Actual transparency.
+    assert_eq!(actual.pixel(2, 2), Some(BLUE));
+    assert_eq!(actual.pixel(3, 2), Some(hidden));
+    assert_eq!(actual.pixel(0, 0), Some(original));
+}
+
+#[test]
+fn symbolic_grid_rejects_invalid_inputs_before_spending_work_or_writing() {
+    let mut actual = image(4, 4);
+    let cases: [(&[&str], &[(u8, Option<[u8; 4]>)]; 6] = [
+        (&[], &[(b'a', Some(RED))]),
+        (&["aa", "a"], &[(b'a', Some(RED))]),
+        (&["a?"], &[(b'a', Some(RED))]),
+        (&["aa"], &[(b'a', Some(RED)), (b'a', Some(BLUE))]),
+        (&["é"], &[(b'a', Some(RED))]),
+        (&["aa"], &[(10, Some(RED))]),
+    ];
+    for (rows, symbols) in cases {
+        let mut budget = Work::new(100).unwrap();
+        assert!(actual.draw_grid([0, 0], rows, symbols, true, &mut budget).is_err());
+        assert_eq!(budget.remaining(), 100);
+        assert_eq!(actual.pixels(), &[CLEAR; 16]);
+    }
+    let symbols = [(b'a', Some(RED))];
+    let mut budget = Work::new(10).unwrap();
+    assert_eq!(
+        actual.draw_grid([3, 3], &["aa"], &symbols, false, &mut budget),
+        Err(Error::Bounds)
+    );
+    assert_eq!(budget.remaining(), 10);
+    assert_eq!(actual.pixels(), &[CLEAR; 16]);
+
+    let mut insufficient = Work::new(1).unwrap();
+    assert_eq!(
+        actual.draw_grid([0, 0], &["aa"], &symbols, true, &mut insufficient),
+        Err(Error::Limit(Resource::Work))
+    );
+    assert_eq!(insufficient.remaining(), 1);
+    assert_eq!(actual.pixels(), &[CLEAR; 16]);
+}
+
+#[test]
+fn symbolic_grid_clips_without_modifying_surrounding_samples() {
+    let mut actual = image(3, 2);
+    let symbols = [(b'x', Some([3, 6, 9, 0]))];
+    let mut budget = Work::new(6).unwrap();
+    assert_eq!(
+        actual.draw_grid([-1, 0], &["xxx", "xxx"], &symbols, true, &mut budget),
+        Ok(2)
+    );
+    assert_eq!(budget.remaining(), 0);
+    assert_eq!(actual.pixels(), &[
+        [3, 6, 9, 0], [3, 6, 9, 0], CLEAR,
+        [3, 6, 9, 0], [3, 6, 9, 0], CLEAR,
+    ]);
+}
