@@ -14,6 +14,7 @@ mod model;
 pub mod palette;
 pub mod png;
 mod raster;
+mod scale;
 pub mod render;
 
 pub use color_edit::PaletteMismatch;
