@@ -14,6 +14,10 @@ const HASH_SIZE: usize = 8192;
 pub(crate) struct Encoder {
     dictionary: Vec<u32>,
     history: Vec<u8>,
+    trial_joined: Vec<u8>,
+    trial_heads: Vec<u32>,
+    trial_links: Vec<u32>,
+    trial_tokens: Vec<u16>,
     output: Vec<u8>,
     bits: u64,
     count: u32,
@@ -135,9 +139,27 @@ impl Encoder {
             .map_err(|_| Error::Allocation)?;
         let mut history = Vec::new();
         history.try_reserve_exact(32_768).map_err(|_| Error::Allocation)?;
+        let joined_capacity = max_block.checked_add(32_768)
+            .ok_or(Error::Allocation)?;
+        let mut trial_joined = Vec::new();
+        trial_joined.try_reserve_exact(joined_capacity)
+            .map_err(|_| Error::Allocation)?;
+        let mut trial_heads = Vec::new();
+        trial_heads.try_reserve_exact(HASH_SIZE)
+            .map_err(|_| Error::Allocation)?;
+        let mut trial_links = Vec::new();
+        trial_links.try_reserve_exact(joined_capacity)
+            .map_err(|_| Error::Allocation)?;
+        let mut trial_tokens = Vec::new();
+        trial_tokens.try_reserve_exact(max_block)
+            .map_err(|_| Error::Allocation)?;
         Ok(Self {
             dictionary,
             history,
+            trial_joined,
+            trial_heads,
+            trial_links,
+            trial_tokens,
             output,
             bits: 0,
             count: 0,
@@ -546,17 +568,19 @@ impl Encoder {
     pub(crate) fn block_history(&mut self, data: &[u8], last: bool) -> Result<&[u8], Error> {
         const DEPTH: usize = 64;
         debug_assert!(data.len() <= BLOCK);
-        let mut joined = Vec::new();
-        joined.try_reserve_exact(self.history.len() + data.len())
-            .map_err(|_| Error::Allocation)?;
+        let mut joined = std::mem::take(&mut self.trial_joined);
+        joined.clear();
+        assert!(joined.capacity() >= self.history.len() + data.len());
         joined.extend_from_slice(&self.history);
         joined.extend_from_slice(data);
         let start = self.history.len();
-        let mut heads = Vec::new();
-        heads.try_reserve_exact(HASH_SIZE).map_err(|_| Error::Allocation)?;
+        let mut heads = std::mem::take(&mut self.trial_heads);
+        heads.clear();
+        assert!(heads.capacity() >= HASH_SIZE);
         heads.resize(HASH_SIZE, u32::MAX);
-        let mut links = Vec::new();
-        links.try_reserve_exact(joined.len()).map_err(|_| Error::Allocation)?;
+        let mut links = std::mem::take(&mut self.trial_links);
+        links.clear();
+        assert!(links.capacity() >= joined.len());
         links.resize(joined.len(), u32::MAX);
         for pos in 0..start {
             if pos + 3 > joined.len() { break; }
@@ -565,8 +589,9 @@ impl Encoder {
             heads[slot] = pos as u32;
         }
         let saved = (self.bits, self.count);
-        let mut tokens = Vec::<u16>::new();
-        tokens.try_reserve_exact(data.len()).map_err(|_| Error::Allocation)?;
+        let mut tokens = std::mem::take(&mut self.trial_tokens);
+        tokens.clear();
+        assert!(tokens.capacity() >= data.len());
         self.output.clear();
         let mut pos = start;
         while pos + 3 <= joined.len() {
@@ -673,6 +698,10 @@ impl Encoder {
         let keep = joined.len().min(32_768);
         self.history.clear();
         self.history.extend_from_slice(&joined[joined.len() - keep..]);
+        self.trial_joined = joined;
+        self.trial_heads = heads;
+        self.trial_links = links;
+        self.trial_tokens = tokens;
         Ok(&self.output)
     }
 }
