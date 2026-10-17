@@ -25,7 +25,10 @@ one cel**, with a matching canvas and stored cel size. It supports:
   `cel.create`, and `png.import` when the cel does not yet exist.
 - `draw` with `pixel`, filled `rect`, or canonical `line`; `grid` with
   literal hexadecimal colors, `@palette/entry` references and optional skip;
-  and exact-RGBA flood `fill`.
+  and exact-RGBA flood `fill`. `stamp` can copy or source-over an
+  explicitly selected region of the same cel, including overlapping regions
+  with pre-edit source snapshot semantics. Other-cel stamping follows the
+  multi-layer model and is not yet implemented.
 - `palette.set` with 1–256 ordered named RGB colors (up to 256 palettes),
   optional explicit replacement, and asset palette reference. `palette.map`
   performs simultaneous RGB/RGBA recoloring; `alpha` supports exact color
@@ -78,7 +81,7 @@ full Foundation publication guarantee is **not** accepted.
 ## Tests and missing scope
 
 `tests/foundation_cli.rs`, `tests/cli_color_edit.rs`, `tests/cli_palettes.rs`,
-`tests/cli_inspect.rs` and `tests/palette_checks.rs` exercise new artwork, palette references,
+`tests/cli_inspect.rs`, `tests/cli_stamp.rs` and `tests/palette_checks.rs` exercise new artwork, palette references,
 recoloring, alpha cleanup, read-only inspection, hidden transparent RGB,
 PNG import, independent decoded pixel expectations, snapshot reopen and
 correction without mutating its source, dry-run, unsupported snapshot content,
