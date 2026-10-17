@@ -122,11 +122,20 @@ fn run_case(width: u32, height: u32, colors: usize, varied: bool, reps: usize) {
     let mut production = source.try_copy(&mut Work::default()).unwrap();
     let units = input.len() as u64 * colors as u64;
     let mut budget = Work::new(units).unwrap();
-    production.quantize_nearest(&palette, None, &mut budget).unwrap();
+    production
+        .quantize_nearest(&palette, None, &mut budget)
+        .unwrap();
     assert_eq!(production.pixels(), expected);
     assert_eq!(budget.remaining(), 0);
 
-    let result = Image::from_pixels(width, height, &alternative, Limits::default(), &mut Work::default()).unwrap();
+    let result = Image::from_pixels(
+        width,
+        height,
+        &alternative,
+        Limits::default(),
+        &mut Work::default(),
+    )
+    .unwrap();
     let mut png_a = Vec::new();
     let mut png_b = Vec::new();
     png::encode_compressed(&production, &mut png_a, &mut Work::default()).unwrap();
@@ -137,11 +146,31 @@ fn run_case(width: u32, height: u32, colors: usize, varied: bool, reps: usize) {
     let mut b = Vec::new();
     for i in 0..7 {
         if i % 2 == 0 {
-            a.push(sample(|| { black_box(direct(black_box(&input), black_box(&palette))); }, reps));
-            b.push(sample(|| { black_box(cached(black_box(&input), black_box(&palette))); }, reps));
+            a.push(sample(
+                || {
+                    black_box(direct(black_box(&input), black_box(&palette)));
+                },
+                reps,
+            ));
+            b.push(sample(
+                || {
+                    black_box(cached(black_box(&input), black_box(&palette)));
+                },
+                reps,
+            ));
         } else {
-            b.push(sample(|| { black_box(cached(black_box(&input), black_box(&palette))); }, reps));
-            a.push(sample(|| { black_box(direct(black_box(&input), black_box(&palette))); }, reps));
+            b.push(sample(
+                || {
+                    black_box(cached(black_box(&input), black_box(&palette)));
+                },
+                reps,
+            ));
+            a.push(sample(
+                || {
+                    black_box(direct(black_box(&input), black_box(&palette)));
+                },
+                reps,
+            ));
         }
     }
     let (a, b) = (median(a), median(b));

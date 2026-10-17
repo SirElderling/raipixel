@@ -229,9 +229,11 @@ impl Image {
             None => [0, 0, self.width, self.height],
         };
         let total = u64::from(x1 - x0) * u64::from(y1 - y0);
-        work.charge(total.checked_mul(comparisons_per_pixel).ok_or(
-            Error::Limit(crate::Resource::Work),
-        )?)?;
+        work.charge(
+            total
+                .checked_mul(comparisons_per_pixel)
+                .ok_or(Error::Limit(crate::Resource::Work))?,
+        )?;
         let mut changed = 0u64;
         for y in y0..y1 {
             let start = self.index(x0, y);
