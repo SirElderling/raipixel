@@ -55,7 +55,7 @@ impl Image {
     /// any mutation, even when clipped. Only in-canvas positions are visited:
     /// extreme off-canvas endpoints never cause an unbounded traversal.
     /// Returns the number of discarded out-of-canvas line pixels.
-    pub fn draw_line(
+    pub fn line(
         &mut self,
         start: [i32; 2],
         end: [i32; 2],
