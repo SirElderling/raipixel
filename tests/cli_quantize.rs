@@ -50,7 +50,14 @@ fn agent_quantization_is_exact_and_saved_palette_remains_editable() {
     .unwrap();
     let changed = run(
         &root,
-        &["run", "quantize.json", "--project", "first", "--out", "second"],
+        &[
+            "run",
+            "quantize.json",
+            "--project",
+            "first",
+            "--out",
+            "second",
+        ],
     );
     assert!(
         changed.status.success(),
@@ -85,11 +92,18 @@ fn agent_quantization_is_exact_and_saved_palette_remains_editable() {
     assert_eq!(original.pixel(0, 0), Some([5, 0, 0, 255]));
     let baseline = fs::read(root.join("first/project.json")).unwrap();
     let current = fs::read(root.join("second/project.json")).unwrap();
-    assert_eq!(baseline, current, "quantization silently altered non-raster metadata");
+    assert_eq!(
+        baseline, current,
+        "quantization silently altered non-raster metadata"
+    );
 
-    fs::write(root.join("bad.json"), r#"{"interface":1,"semantics":"1.0","ops":[
+    fs::write(
+        root.join("bad.json"),
+        r#"{"interface":1,"semantics":"1.0","ops":[
        {"op":"palette.quantize","targets":["icon/paint/base"],
-        "palette":"ramp","dither":"bayer4"}]}"#).unwrap();
+        "palette":"ramp","dither":"bayer4"}]}"#,
+    )
+    .unwrap();
     let invalid = run(
         &root,
         &["run", "bad.json", "--project", "first", "--out", "rejected"],
