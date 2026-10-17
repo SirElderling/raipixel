@@ -16,8 +16,8 @@ fn fixture(width: u32, height: u32) -> Image {
         })
         .collect();
     Image::from_pixels(
-        output_width,
-        output_height,
+        width,
+        height,
         &samples,
         Limits::default(),
         &mut Work::default(),
@@ -56,8 +56,8 @@ fn copy_map(input: &Image, kind: Transform, work: &mut Work) -> Result<Image, Er
     // Internal image creation is part of measured CPU and allocations.
     // The equal external work charge represents the same output pixel visits.
     Image::from_pixels(
-        width,
-        height,
+        output_width,
+        output_height,
         &samples,
         Limits::default(),
         &mut Work::default(),
