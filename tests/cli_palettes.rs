@@ -92,8 +92,8 @@ fn named_palette_resolves_opaque_colors_and_survives_native_round_trip() {
     let snapshot_before = fs::read(scratch.file("original/project.json")).unwrap();
     let snapshot_text = String::from_utf8_lossy(&snapshot_before);
     assert!(snapshot_text.contains(r#""name":"metal""#));
-    assert!(snapshot_text.contains(r#""rgb":"#112233""#));
-    assert!(snapshot_text.contains(r#""rgb":"#445566""#));
+    assert!(snapshot_text.contains(r##""rgb":"#112233""##));
+    assert!(snapshot_text.contains(r##""rgb":"#445566""##));
 
     // Replacing a palette does not retroactively alter stored pixels.
     fs::write(
