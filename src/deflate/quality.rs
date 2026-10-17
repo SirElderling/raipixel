@@ -746,7 +746,9 @@ struct TrialNode { freq:u32, left:Option<usize>, right:Option<usize>, sym:Option
 
 // Scratch-only bounded-size Huffman trees. If an optimal tree exceeds DEFLATE
 // length caps, reject the candidate and use accepted fixed/stored output.
-fn trial_lengths(freq:&[u32],max_depth:u8)->Option<Vec<u8>> {
+// DEFLATE has at most 286 literal/length, 30 distance and 19 code-length
+// symbols. Fixed-size code-length storage avoids two allocations per block.
+fn trial_lengths(freq:&[u32],max_depth:u8)->Option<[u8;286]> {
     use std::cmp::Reverse;
     use std::collections::BinaryHeap;
     let mut nodes=Vec::<TrialNode>::new();
@@ -761,9 +763,7 @@ fn trial_lengths(freq:&[u32],max_depth:u8)->Option<Vec<u8>> {
         }
     }
     if queue.is_empty(){return None;}
-    let mut lengths=Vec::new();
-    lengths.try_reserve_exact(freq.len()).ok()?;
-    lengths.resize(freq.len(),0u8);
+    let mut lengths=[0u8;286];
     if queue.len()==1 {
         let Reverse((_,index))=queue.pop()?;
         lengths[nodes[index].sym?]=1;
@@ -792,16 +792,15 @@ fn trial_lengths(freq:&[u32],max_depth:u8)->Option<Vec<u8>> {
     }
     Some(lengths)
 }
-fn trial_codes(lengths:&[u8])->Option<Vec<(u16,u8)>> {
+// A canonical Huffman code table has the same 286-symbol upper bound.
+fn trial_codes(lengths:&[u8])->Option<[(u16,u8);286]> {
     let mut count=[0u16;16];
     for &length in lengths {
         if length!=0 {count[usize::from(length)]+=1;}
     }
     let mut next=[0u16;16];
     for n in 1..16{next[n]=(next[n-1]+count[n-1])<<1;}
-    let mut result=Vec::new();
-    result.try_reserve_exact(lengths.len()).ok()?;
-    result.resize(lengths.len(),(0u16,0u8));
+    let mut result=[(0u16,0u8);286];
     for (symbol,&length) in lengths.iter().enumerate(){
         if length!=0 {
             let code=next[usize::from(length)];
@@ -890,11 +889,11 @@ impl Encoder {
         let Some(dist_lens)=trial_lengths(&df,15) else{return false;};
         let ll_count=lens.iter().rposition(|&v|v!=0).unwrap_or(256).max(256)+1;
         let ds_count=dist_lens.iter().rposition(|&v|v!=0).unwrap_or(0)+1;
-        let mut together=Vec::new();
-        if together.try_reserve_exact(ll_count+ds_count).is_err() {return false;}
-        together.extend_from_slice(&lens[..ll_count]);
-        together.extend_from_slice(&dist_lens[..ds_count]);
-        let Some(runs)=trial_rle(&together) else{return false;};
+        // Maximum 286 literal/length + 30 distance code lengths.
+        let mut together=[0u8;316];
+        together[..ll_count].copy_from_slice(&lens[..ll_count]);
+        together[ll_count..ll_count+ds_count].copy_from_slice(&dist_lens[..ds_count]);
+        let Some(runs)=trial_rle(&together[..ll_count+ds_count]) else{return false;};
         let mut cf=[0u32;19];
         for &(sym,_,_) in &runs{cf[sym]+=1;}
         if cf.iter().filter(|&&v|v!=0).count()==1
