@@ -11,7 +11,9 @@ fn image(width: u32, height: u32) -> Image {
 // exact conic inequality prescribed in docs/design/05-functional-specification.md.
 fn oracle(rect: [i32; 4], x: i32, y: i32) -> bool {
     let [rx, ry, w, h] = rect;
-    if x < rx || y < ry || i64::from(x) >= i64::from(rx) + i64::from(w)
+    if x < rx
+        || y < ry
+        || i64::from(x) >= i64::from(rx) + i64::from(w)
         || i64::from(y) >= i64::from(ry) + i64::from(h)
     {
         return false;
@@ -42,12 +44,15 @@ fn ellipse_matches_independent_integer_oracle_for_small_shapes_and_outlines() {
                         let x = x as i32;
                         let y = y as i32;
                         let expected = oracle([2, 3, width as i32, height as i32], x, y)
-                            && (filled || ![
-                                oracle([2, 3, width as i32, height as i32], x - 1, y),
-                                oracle([2, 3, width as i32, height as i32], x + 1, y),
-                                oracle([2, 3, width as i32, height as i32], x, y - 1),
-                                oracle([2, 3, width as i32, height as i32], x, y + 1),
-                            ].into_iter().all(|inside| inside));
+                            && (filled
+                                || ![
+                                    oracle([2, 3, width as i32, height as i32], x - 1, y),
+                                    oracle([2, 3, width as i32, height as i32], x + 1, y),
+                                    oracle([2, 3, width as i32, height as i32], x, y - 1),
+                                    oracle([2, 3, width as i32, height as i32], x, y + 1),
+                                ]
+                                .into_iter()
+                                .all(|inside| inside));
                         assert_eq!(
                             canvas.pixel(x as u32, y as u32),
                             Some(if expected { HIDDEN } else { CLEAR }),
@@ -65,7 +70,10 @@ fn clipped_ellipse_preserves_unselected_samples_and_declared_work() {
     let mut canvas = image(5, 5);
     let rect = Rect::new(-2, -1, 6, 6).unwrap();
     let mut budget = Work::new(36).unwrap();
-    assert_eq!(canvas.ellipse(rect, HIDDEN, true, true, &mut budget), Ok(36 - 20));
+    assert_eq!(
+        canvas.ellipse(rect, HIDDEN, true, true, &mut budget),
+        Ok(36 - 20)
+    );
     assert_eq!(budget.remaining(), 0);
     for y in 0..5 {
         for x in 0..5 {
@@ -86,11 +94,23 @@ fn malformed_ellipse_and_work_failure_never_mutate_pixels() {
     let mut canvas = image(4, 4);
     let mut work = Work::new(4).unwrap();
     assert_eq!(
-        canvas.ellipse(Rect::new(-1, 0, 2, 2).unwrap(), HIDDEN, true, false, &mut work),
+        canvas.ellipse(
+            Rect::new(-1, 0, 2, 2).unwrap(),
+            HIDDEN,
+            true,
+            false,
+            &mut work
+        ),
         Err(Error::Bounds)
     );
     assert_eq!(
-        canvas.ellipse(Rect::new(0, 0, 4, 4).unwrap(), HIDDEN, true, true, &mut work),
+        canvas.ellipse(
+            Rect::new(0, 0, 4, 4).unwrap(),
+            HIDDEN,
+            true,
+            true,
+            &mut work
+        ),
         Err(Error::Limit(Resource::Work))
     );
     assert_eq!(work.remaining(), 4);
@@ -114,11 +134,17 @@ fn ellipse_center_and_perimeter_are_distinct_on_seven_square() {
     let mut filled = image(7, 7);
     let mut outline = image(7, 7);
     let rect = Rect::new(0, 0, 7, 7).unwrap();
-    filled.ellipse(rect, HIDDEN, true, false, &mut Work::default()).unwrap();
-    outline.ellipse(rect, HIDDEN, false, false, &mut Work::default()).unwrap();
+    filled
+        .ellipse(rect, HIDDEN, true, false, &mut Work::default())
+        .unwrap();
+    outline
+        .ellipse(rect, HIDDEN, false, false, &mut Work::default())
+        .unwrap();
     assert_eq!(filled.pixel(3, 3), Some(HIDDEN));
     assert_eq!(outline.pixel(3, 3), Some(CLEAR));
     assert_eq!(outline.pixel(3, 0), Some(HIDDEN));
-    assert!(outline.pixels().iter().filter(|x| **x == HIDDEN).count()
-        < filled.pixels().iter().filter(|x| **x == HIDDEN).count());
+    assert!(
+        outline.pixels().iter().filter(|x| **x == HIDDEN).count()
+            < filled.pixels().iter().filter(|x| **x == HIDDEN).count()
+    );
 }

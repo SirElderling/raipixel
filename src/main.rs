@@ -452,8 +452,7 @@ impl Document {
                 allowed(
                     operation,
                     &[
-                        "op", "targets", "shape", "at", "points", "rect", "color", "clip",
-                        "filled",
+                        "op", "targets", "shape", "at", "points", "rect", "color", "clip", "filled",
                     ],
                 )?;
                 let target = single_target(operation)?;

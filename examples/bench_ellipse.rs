@@ -19,8 +19,14 @@ fn fixture(width: u32, height: u32) -> Image {
             ]);
         }
     }
-    Image::from_pixels(width, height, &pixels, Limits::default(), &mut Work::default())
-        .unwrap()
+    Image::from_pixels(
+        width,
+        height,
+        &pixels,
+        Limits::default(),
+        &mut Work::default(),
+    )
+    .unwrap()
 }
 
 fn contains(x: i64, y: i64, geometry: [i64; 4]) -> bool {
@@ -60,13 +66,7 @@ fn span(y: i64, geometry: [i64; 4]) -> Option<(i64, i64)> {
     Some((left, rx + width - 1 - left))
 }
 
-fn row_spans(
-    canvas: &mut Image,
-    rect: [i32; 4],
-    color: Pixel,
-    filled: bool,
-    work: &mut Work,
-) {
+fn row_spans(canvas: &mut Image, rect: [i32; 4], color: Pixel, filled: bool, work: &mut Work) {
     let [rx, ry, w, h] = rect;
     let geometry = [i64::from(rx), i64::from(ry), i64::from(w), i64::from(h)];
     work.charge(w as u64 * h as u64).unwrap();
@@ -92,20 +92,23 @@ fn row_spans(
             }
             let start = current;
             current += 1;
-            while current < end && (filled
-                || current == lo
-                || current == hi
-                || prev.is_none_or(|(a, b)| current < a || current > b)
-                || next.is_none_or(|(a, b)| current < a || current > b))
+            while current < end
+                && (filled
+                    || current == lo
+                    || current == hi
+                    || prev.is_none_or(|(a, b)| current < a || current > b)
+                    || next.is_none_or(|(a, b)| current < a || current > b))
             {
                 current += 1;
             }
-            canvas.fill(
-                Rect::new(start as i32, y as i32, (current - start) as u32, 1).unwrap(),
-                color,
-                false,
-                &mut Work::default(),
-            ).unwrap();
+            canvas
+                .fill(
+                    Rect::new(start as i32, y as i32, (current - start) as u32, 1).unwrap(),
+                    color,
+                    false,
+                    &mut Work::default(),
+                )
+                .unwrap();
         }
     }
 }
@@ -151,7 +154,9 @@ fn run_case(width: u32, height: u32, filled: bool, iterations: usize) {
     for round in 0..7 {
         let mut method_a = || {
             let mut working = source.try_copy(&mut Work::default()).unwrap();
-            working.ellipse(shape, color, filled, false, &mut Work::default()).unwrap();
+            working
+                .ellipse(shape, color, filled, false, &mut Work::default())
+                .unwrap();
             black_box(working);
         };
         let mut method_b = || {
@@ -161,7 +166,9 @@ fn run_case(width: u32, height: u32, filled: bool, iterations: usize) {
         };
         let mut full_a = || {
             let mut working = source.try_copy(&mut Work::default()).unwrap();
-            working.ellipse(shape, color, filled, false, &mut Work::default()).unwrap();
+            working
+                .ellipse(shape, color, filled, false, &mut Work::default())
+                .unwrap();
             black_box(png_bytes(&working));
         };
         let mut full_b = || {
