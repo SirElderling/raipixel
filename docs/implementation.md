@@ -140,6 +140,17 @@ change production behavior.
 Toolchain installation uses the network; Cargo build/test commands run offline.
 The workflow runs on pull requests and pushes to main/feat branches.
 
+Exact visible-RGB palette extraction now uses the two-method decision rule:
+a bounded scratch sort for images smaller than 4096 pixels and a fixed-size
+counting table for larger images, with sorting on low-memory settings, overflow
+and hash-collision saturation. The alternative benchmark and accepted decision
+include Linux x86-64, macOS ARM64 and Windows MSVC timings plus exact output
+and work equivalence, adversarial collision and small-memory tests; see
+[measured decision](../benchmarks/palette-extraction-decision.md) and
+[two-method review gate](two-implementation-rule.md). The measured 1024²
+counting method is approximately 3.8–9.2× faster on the recorded corpus,
+without changing PNG encoding. Scratch estimates are not peak RSS.
+
 The optional, feature-gated indexed Balanced PNG encoder has been measured
 against the public `png 0.18.1` reference on Linux x86-64, macOS ARM64 and
 Windows MSVC. See the separate integrated native CI, including complete input

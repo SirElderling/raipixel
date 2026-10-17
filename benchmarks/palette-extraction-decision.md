@@ -1,7 +1,7 @@
 # Exact palette extraction A/B decision (17 October 2026)
 
-Status: **accept a bounded two-path implementation** for PR #2, subject to
-cross-platform post-change CI and regression tests. The old sorting path is
+Status: **accepted for PR #2** after cross-platform post-change CI and
+regression tests. The old sorting path is
 retained only where it is faster or avoids a larger temporary table, and as
 the exact-count fallback for overflow or adversarial collisions.
 
@@ -32,6 +32,23 @@ A second independent run adds 32×32 and 48×48 crossover workloads:
 Linux fluctuates considerably at small sizes; macOS/Windows favor the counter
 at 32×32, while all three favor it at 64×64. To avoid unnecessary scratch for
 small AI-authored sprites, use sorting under 4096 pixels.
+
+Crossover timing (microseconds, sort/count; separate follow-up run):
+
+| Size | Linux | macOS ARM64 | Windows |
+|---|---:|---:|---:|
+| 32×32, 4 colors | 11.97 / 21.51 | 6.30 / 4.02 | 10.06 / 5.01 |
+| 32×32, 16 colors | 15.36 / 21.68 | 8.21 / 4.10 | 12.38 / 5.16 |
+| 48×48, 16 colors | 31.65 / 24.28 | 16.73 / 6.85 | 24.58 / 7.53 |
+
+The mixed 32×32 results and fixed-table scratch justify the deliberately
+conservative >=4096-pixel dispatch. The selected implementation keeps the
+sorted fallback for hostile collisions, exact overflow counts and
+low-memory scenarios.
+
+**Verification:** [Rust 1.99.1 CI — all three targets passed](https://github.com/SirElderling/raipixel/actions/runs/39058362661);
+[final A/B comparison — all three targets passed](https://github.com/SirElderling/raipixel/actions/runs/39058358047).
+No output byte, PNG codec, external dependency, or unsafe-Rust changes.
 
 The sort allocates one RGB key per pixel (3 MiB at 1024²); the counter occupies
 49,152 bytes of fixed table scratch plus at most 256 counted-color outputs
