@@ -1,7 +1,7 @@
 //! AI-directed same-cel stamping: frozen source, copy semantics and rollback.
 use raipixel::{Limits, Work, png};
-use std::{fs, path::PathBuf, process::Command};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::{fs, path::PathBuf, process::Command};
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
@@ -9,10 +9,7 @@ struct Scratch(PathBuf);
 impl Scratch {
     fn new() -> Self {
         let id = NEXT.fetch_add(1, Ordering::Relaxed);
-        let root = std::env::temp_dir().join(format!(
-            "raipixel-stamp-{}-{id}",
-            std::process::id()
-        ));
+        let root = std::env::temp_dir().join(format!("raipixel-stamp-{}-{id}", std::process::id()));
         fs::create_dir(&root).unwrap();
         Self(root)
     }
@@ -68,14 +65,12 @@ fn overlapping_copy_stamps_from_frozen_original_and_keeps_hidden_rgb() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let expected = [
-        [1, 2, 3, 0],
-        [1, 2, 3, 0],
-        [4, 5, 6, 255],
-        [7, 8, 9, 128],
-    ];
+    let expected = [[1, 2, 3, 0], [1, 2, 3, 0], [4, 5, 6, 255], [7, 8, 9, 128]];
     assert_eq!(pixels(&root.path("result/images/000000.png")), expected);
-    assert_eq!(pixels(&root.path("result/artifacts/game/image.png")), expected);
+    assert_eq!(
+        pixels(&root.path("result/artifacts/game/image.png")),
+        expected
+    );
 }
 
 #[test]
@@ -104,7 +99,12 @@ fn source_over_uses_integer_alpha_rule_and_rejected_stamps_do_not_publish() {
     )
     .unwrap();
     let output = root.run(&[
-        "run", "edit.json", "--project", "source", "--out", "revised",
+        "run",
+        "edit.json",
+        "--project",
+        "source",
+        "--out",
+        "revised",
     ]);
     assert!(
         output.status.success(),
