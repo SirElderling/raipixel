@@ -6,6 +6,7 @@ mod checksum;
 mod color_edit;
 mod deflate;
 mod error;
+pub mod inspect;
 pub mod json;
 mod limits;
 mod model;
