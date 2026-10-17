@@ -232,8 +232,8 @@ fn unsupported_snapshot_content_is_rejected_instead_of_discarded() {
     fs::write(
         &manifest,
         content.replace(
-            r#""palettes":[]"#,
-            r#""palettes":[{"name":"keep","entries":[]}]"#,
+            r#""styles":[]"#,
+            r#""styles":[{"name":"keep","size":null,"palette":null,"alpha":"any","anchors":[],"nonempty":false}]"#,
         ),
     )
     .unwrap();
