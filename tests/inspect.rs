@@ -141,3 +141,23 @@ fn all_256_histogram_entries_are_supported() {
     assert_eq!(stats.histogram[0].rgba, [0, 0, 0, 0]);
     assert_eq!(stats.histogram[255].rgba, [255, 0, 0, 0]);
 }
+
+#[test]
+fn inspection_respects_aggregate_logical_scratch_limit_before_work() {
+    let limits = Limits::new(2, 4, 16).unwrap();
+    let image = Image::from_pixels(
+        2,
+        2,
+        &[[1, 2, 3, 0]; 4],
+        limits,
+        &mut Work::default(),
+    )
+    .unwrap();
+    let mut budget = Work::new(1_000).unwrap();
+    assert_eq!(
+        image.inspect(None, 16, false, &mut budget),
+        Err(Error::Limit(Resource::Bytes))
+    );
+    assert_eq!(budget.remaining(), 1_000);
+    assert_eq!(image.pixels(), &[[1, 2, 3, 0]; 4]);
+}

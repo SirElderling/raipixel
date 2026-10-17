@@ -73,7 +73,20 @@ impl Image {
         if include_pixels && count > 4096 {
             return Err(Error::Limit(Resource::Pixels));
         }
-        // Charge bounded sorting and copying before allocation or traversal.
+        // Reserve only the histogram slots this region can actually use.
+        // Check input plus logical temporary capacities before spending Work.
+        // This is a conservative budget check, not an allocator/RSS certificate.
+        let heap_slots = histogram_limit.min(count as usize);
+        let extra = count
+            .checked_mul(if include_pixels { 8 } else { 4 })
+            .and_then(|size| {
+                size.checked_add(
+                    (heap_slots as u64) * std::mem::size_of::<Worst>() as u64,
+                )
+            })
+            .and_then(|size| size.checked_add((self.pixels().len() as u64) * 4))
+            .ok_or(Error::Limit(Resource::Bytes))?;
+        self.limits.check_buffer(extra)?;
         work.charge(count.saturating_mul(32))?;
         let mut sorted = Vec::new();
         sorted
@@ -132,7 +145,7 @@ impl Image {
         };
         sorted.sort_unstable();
         let mut best = BinaryHeap::new();
-        best.try_reserve(histogram_limit)
+        best.try_reserve(heap_slots)
             .map_err(|_| Error::Allocation)?;
         let mut distinct = 0u64;
         let mut offset = 0;
