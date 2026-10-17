@@ -125,10 +125,7 @@ fn counted_overflow_reports_actual_distinct_count_and_preserves_bytes() {
             distinct: 1757
         })
     );
-    assert_eq!(
-        Work::default().remaining() - work.remaining(),
-        4096 * 32
-    );
+    assert_eq!(Work::default().remaining() - work.remaining(), 4096 * 32);
     assert_eq!(image, prior);
 }
 
@@ -138,16 +135,16 @@ fn constrained_bytes_use_compatible_sort_fallback_or_reject_before_work() {
     // 4 * 4096 live RGBA plus 3 * 4096 sortable bytes fit; the
     // fixed hash scratch does not. The prior implementation also succeeded.
     let limited = Limits::new(64, 4096, 30_000).unwrap();
-    let image =
-        Image::from_pixels(64, 64, &pixels, limited, &mut Work::default()).unwrap();
+    let image = Image::from_pixels(64, 64, &pixels, limited, &mut Work::default()).unwrap();
     assert_eq!(
-        image.extract_visible_palette(256, &mut Work::default())
-            .unwrap()[0].count,
+        image
+            .extract_visible_palette(256, &mut Work::default())
+            .unwrap()[0]
+            .count,
         4096
     );
     let tighter = Limits::new(64, 4096, 20_000).unwrap();
-    let image =
-        Image::from_pixels(64, 64, &pixels, tighter, &mut Work::default()).unwrap();
+    let image = Image::from_pixels(64, 64, &pixels, tighter, &mut Work::default()).unwrap();
     let mut work = Work::default();
     assert_eq!(
         image.extract_visible_palette(256, &mut work),
@@ -159,9 +156,7 @@ fn constrained_bytes_use_compatible_sort_fallback_or_reject_before_work() {
 #[test]
 fn adversarial_32_probe_collision_falls_back_without_losing_counts() {
     // For this exact hash, red is absent from the low 11-bit slot key.
-    let pixels: Vec<_> = (0..4096u32)
-        .map(|i| [(i % 128) as u8, 0, 0, 255])
-        .collect();
+    let pixels: Vec<_> = (0..4096u32).map(|i| [(i % 128) as u8, 0, 0, 255]).collect();
     let image = rgba(64, &pixels);
     let palette = image
         .extract_visible_palette(256, &mut Work::default())

@@ -38,10 +38,12 @@ impl Image {
         let sort_bytes = count.checked_mul(7).ok_or(Error::Limit(Resource::Bytes))?;
         let counter_bytes = count
             .checked_mul(4)
-            .and_then(|b| b.checked_add(
-                (COUNT_SLOTS * std::mem::size_of::<Option<PaletteColor>>()) as u64
-                    + (max_colors * std::mem::size_of::<PaletteColor>()) as u64
-            ))
+            .and_then(|b| {
+                b.checked_add(
+                    (COUNT_SLOTS * std::mem::size_of::<Option<PaletteColor>>()) as u64
+                        + (max_colors * std::mem::size_of::<PaletteColor>()) as u64,
+                )
+            })
             .ok_or(Error::Limit(Resource::Bytes))?;
         let use_counter = self.pixels().len() >= COUNT_MIN_PIXELS
             && self.limits.check_buffer(counter_bytes).is_ok();
@@ -97,7 +99,9 @@ impl Image {
             return Err(Error::PaletteEmpty);
         }
         let mut result = Vec::new();
-        result.try_reserve_exact(distinct).map_err(|_| Error::Allocation)?;
+        result
+            .try_reserve_exact(distinct)
+            .map_err(|_| Error::Allocation)?;
         result.extend(slots.into_iter().flatten());
         result.sort_unstable_by(|a, b| b.count.cmp(&a.count).then_with(|| a.rgb.cmp(&b.rgb)));
         Ok(Some(result))

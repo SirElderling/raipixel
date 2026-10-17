@@ -102,11 +102,17 @@ fn sorted(image: &Image, work: &mut Work) -> Result<Vec<PaletteColor>, Error> {
         }
         distinct += 1;
         if distinct <= 256 {
-            out.push(PaletteColor { rgb: sample, count: (index - from) as u64 });
+            out.push(PaletteColor {
+                rgb: sample,
+                count: (index - from) as u64,
+            });
         }
     }
     if distinct > 256 {
-        return Err(Error::PaletteTooMany { limit: 256, distinct });
+        return Err(Error::PaletteTooMany {
+            limit: 256,
+            distinct,
+        });
     }
     out.sort_unstable_by(|a, b| b.count.cmp(&a.count).then_with(|| a.rgb.cmp(&b.rgb)));
     Ok(out)
