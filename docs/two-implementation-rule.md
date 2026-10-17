@@ -62,10 +62,10 @@ and compares additional scratch, not process RSS. The hash variant remains
 experimental until measurements and full resource-limit semantics justify
 adoption. Run:
 
-\`\`\`sh
+```sh
 cargo run --release --locked --offline --example bench_palette_extract
-\`\`\`
+```
 
-Native Actions workflow: \`.github/workflows/palette-extract-compare.yml\`.
-The existing \`examples/bench_color_map.rs\` provides another precedent:
+Native Actions workflow: `.github/workflows/palette-extract-compare.yml`.
+The existing `examples/bench_color_map.rs` provides another precedent:
 a bounded hash lookup against sorted binary search on identical mappings.

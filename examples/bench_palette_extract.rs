@@ -63,7 +63,9 @@ fn counted(image: &Image, work: &mut Work) -> Result<Vec<PaletteColor>, Error> {
         return Err(Error::PaletteEmpty);
     }
     let mut result = Vec::new();
-    result.try_reserve_exact(distinct).map_err(|_| Error::Allocation)?;
+    result
+        .try_reserve_exact(distinct)
+        .map_err(|_| Error::Allocation)?;
     result.extend(slots.into_iter().flatten());
     result.sort_unstable_by(|a, b| b.count.cmp(&a.count).then_with(|| a.rgb.cmp(&b.rgb)));
     Ok(result)
@@ -105,13 +107,25 @@ fn run_case(name: &str, side: u32, colors: usize, iterations: usize) {
     let expected = image.extract_visible_palette(256, &mut a_work);
     let actual = counted(&image, &mut b_work);
     assert_eq!(expected, actual, "{name}: output mismatch");
-    assert_eq!(a_work.remaining(), b_work.remaining(), "{name}: work mismatch");
-    assert_eq!(FALLBACKS.load(Ordering::Relaxed), 0, "{name}: unexpected fallback");
+    assert_eq!(
+        a_work.remaining(),
+        b_work.remaining(),
+        "{name}: work mismatch"
+    );
+    assert_eq!(
+        FALLBACKS.load(Ordering::Relaxed),
+        0,
+        "{name}: unexpected fallback"
+    );
     let mut a_times = Vec::new();
     let mut b_times = Vec::new();
     for round in 0..7 {
         let mut a = || {
-            black_box(image.extract_visible_palette(256, &mut Work::default()).unwrap());
+            black_box(
+                image
+                    .extract_visible_palette(256, &mut Work::default())
+                    .unwrap(),
+            );
         };
         let mut b = || {
             black_box(counted(&image, &mut Work::default()).unwrap());

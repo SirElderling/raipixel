@@ -101,7 +101,10 @@ impl Work {
         self.remaining
     }
 
-    pub(crate) fn charge(&mut self, units: u64) -> Result<(), Error> {
+    /// Reserve explicit caller-owned work units for a custom operation.
+    /// A failed charge leaves the budget unchanged. Units never exceed the
+    /// maximum configured by `Work::new` or `Work::default`.
+    pub fn charge(&mut self, units: u64) -> Result<(), Error> {
         self.remaining = self
             .remaining
             .checked_sub(units)
