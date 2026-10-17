@@ -111,4 +111,27 @@ C13 candidate fingerprints from the CI JSON: greedy None `af9a2de76be2f6df2d705f
 2. Freeze the smallest sufficient set of strategies and test them on a broader corpus of deterministic, independently generated pixel-art patterns and unfavorable/high-entropy inputs. Record when automatic palette encoding is unsupported.
 3. Before production, establish a fallible reusable workspace, conservative bounded work charge per candidate, a documented quality-mode spend limit, and low-budget/alloc failure tests. Production fast and compact bytes must stay unchanged. Keep PR #2 open and unmerged.
 
+## Production gate: explicit scratch bounds and work accounting (C15 follow-up)
+
+The experimental candidates are **not** safe-to-promote product code despite passing roundtrips. Static inspection of the scratch code gives the following **major backing-buffer capacities**, for a full 65,535-byte DEFLATE block and 32 KiB history. These numbers describe intended maximum element counts, **not empirically measured heap peaks**, and exclude allocator overhead, short-lived Huffman tree/heap/RLE/code buffers, full-file selected output(s), and the input image.
+
+| Temporary buffer | Capacity (bytes) |
+|---|---:|
+| Packed raw block | 65,535 |
+| Previous-history + raw input joined | 98,303 |
+| Existing encoder dictionary (8,192 `u32`) | 32,768 |
+| Additional hash heads (8,192 `u32`) | 32,768 |
+| Per-position hash-chain links (98,303 `u32`) | 393,212 |
+| Fixed encoder output reservation (`BLOCK*9/8+16`) | 73,742 |
+| Packed literal/match tokens (up to 65,535 `u16`) | 131,070 |
+| Retained rolling history | 32,768 |
+| Two 4,096-byte indexed rows (8-bit, max width) | 8,192 |
+| **Known listed backing buffers only** | **868,358 B (~848 KiB)** |
+
+Those buffers and intermediate Huffman structures are currently created with `Vec::with_capacity`, `vec![]`, `.push` or `.extend` without a fully fallible reusable workspace. A production opt-in encoder must make all allocations explicit/fallible and limit individual allocations and aggregate peak including **one current output and one retained best output**; it must not keep all candidate PNGs in memory as the diagnostic test does. A heap-cap implementation should be verified on 32-bit/64-bit targets using `size_of`, `capacity()` and allocation-failure tests; the static estimate alone is **not a certified memory bound**.
+
+The existing indexed writer charges `raw_size*16 + ceil(raw_size/65535)*8256` work units per pass (plus pixel palette scan). It does **not** charge the new depth-64 chain traversals or lazy lookahead. At 4,096×4,096 with 8-bit indexed pixels: `raw_size=16,781,312 B`, `blocks=257`, existing charge **270,622,784 units for one pass**, **1,353,113,920 units for five** or **1,894,359,488 for seven**, exceeding default `MAX_WORK=1,000,000,000` even *before* the extra search work. For a four-bit 1,024×1,024 sheet: 525,312 raw bytes and **8,479,296 charged units per pass**, **42,396,480 for five**, again excluding the substantially heavier chain matching. Do **not** interpret equality of `Work::remaining()` in prior trials as adequate billing.
+
+**Minimum acceptable implementation policy:** a single reusable workspace per operation; explicit checked raw-size/heap/output-size arithmetic; preflight total output staging/algorithm budget before touching the caller's writer; charge the actual bounded match attempts/byte-comparisons (not a pretended unchanged baseline) or use a conservative explicit preflight search ceiling; store at most a best and a current PNG; stable minimum-size selection; low-budget and allocation-failure tests; no unsafe, assembly, FFI or production dependencies. On insufficient budget fail without writing bytes or skip optional candidates via a documented deterministic policy; never leave partially written output due to budget failure. Only a true output-I/O error may leave partial bytes under existing writer contracts. Keep the existing `encode`, `encode_compact`, and `encode_indexed` APIs/byte contracts untouched until a new explicit opt-in passes these gates.
+
 **Repetition guard:** Before coding, search this register and [the candidate notes](candidates/) for the same idea, compressor mode, corpus and search depth. Avoid duplicate runs on unchanged SHA/fixtures. If a trial is rejected, require a different causal condition (e.g. Sub *with dynamic Huffman* instead of Sub *with fixed Huffman*) and name that difference. Distinguish *queued*, *failed*, *rejected*, *promising*, *validated* and *promoted* statuses. Do not cherry-pick one file or one OS to make a generic claim.
