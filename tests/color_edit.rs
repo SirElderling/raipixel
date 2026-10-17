@@ -148,3 +148,56 @@ fn upper_mapping_bound_and_reverse_pair_order_are_deterministic() {
         Err(Error::PixelCount)
     );
 }
+
+#[test]
+fn hash_collision_budget_always_falls_back_to_exact_rgba_mapping() {
+    let mut samples = Vec::new();
+    // At least 18 keys in one open-addressing bucket force the bounded
+    // 16-probe fallback. A fully opaque white key also exercises the
+    // 32-bit sentinel edge case without relying on sentinel encoding.
+    for index in 0..1_000_000u32 {
+        let candidate = [
+            (index >> 16) as u8,
+            (index >> 8) as u8,
+            index as u8,
+            255,
+        ];
+        let bucket = (u32::from_be_bytes(candidate).wrapping_mul(0x9E37_79B1) as usize)
+            & 2047;
+        if bucket == 0 {
+            samples.push(candidate);
+            if samples.len() == 18 {
+                break;
+            }
+        }
+    }
+    assert_eq!(samples.len(), 18);
+    samples.push([255, 255, 255, 255]);
+    samples.push([1, 2, 3, 0]);
+    let mut pairs = Vec::new();
+    for (i, &sample) in samples[..19].iter().enumerate() {
+        pairs.push((sample, [i as u8, 77, 88, 0]));
+    }
+    let mut image = Image::from_pixels(
+        samples.len() as u32,
+        1,
+        &samples,
+        Limits::default(),
+        &mut Work::default(),
+    )
+    .unwrap();
+    let mut budget = Work::new(samples.len() as u64).unwrap();
+    assert_eq!(
+        image.map_colors(&pairs, false, None, &mut budget),
+        Ok(19)
+    );
+    assert_eq!(budget.remaining(), 0);
+    for (i, pixel) in image.pixels().iter().enumerate() {
+        let expected = if i < 19 {
+            [i as u8, 77, 88, 0]
+        } else {
+            [1, 2, 3, 0]
+        };
+        assert_eq!(*pixel, expected, "collision index {i}");
+    }
+}
