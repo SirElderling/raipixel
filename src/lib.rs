@@ -3,6 +3,7 @@
 //! The typed agent interface is not implemented yet.
 
 mod checksum;
+mod color_edit;
 mod deflate;
 mod error;
 pub mod json;
