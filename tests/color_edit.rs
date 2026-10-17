@@ -113,7 +113,10 @@ fn alpha_key_matches_requested_channels_and_preserves_rgb() {
 fn alpha_threshold_uses_strict_below_and_preserves_rgb() {
     let base = [[5, 6, 7, 0], [5, 6, 7, 127], [5, 6, 7, 128], [5, 6, 7, 255]];
     let mut image = image(&base);
-    assert_eq!(image.alpha_threshold(128, None, &mut Work::default()), Ok(2));
+    assert_eq!(
+        image.alpha_threshold(128, None, &mut Work::default()),
+        Ok(2)
+    );
     assert_eq!(
         image.pixels(),
         &[[5, 6, 7, 0], [5, 6, 7, 0], [5, 6, 7, 255], [5, 6, 7, 255]]
@@ -129,8 +132,14 @@ fn upper_mapping_bound_and_reverse_pair_order_are_deterministic() {
     let mut reversed = pairs.clone();
     reversed.reverse();
     let mut second = image.try_copy(&mut Work::default()).unwrap();
-    assert_eq!(image.map_colors(&pairs, true, None, &mut Work::default()), Ok(7));
-    assert_eq!(second.map_colors(&reversed, true, None, &mut Work::default()), Ok(7));
+    assert_eq!(
+        image.map_colors(&pairs, true, None, &mut Work::default()),
+        Ok(7)
+    );
+    assert_eq!(
+        second.map_colors(&reversed, true, None, &mut Work::default()),
+        Ok(7)
+    );
     assert_eq!(image, second);
     let mut excessive = pairs;
     excessive.push(([0, 0, 0, 0], [0, 0, 0, 0]));
