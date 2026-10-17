@@ -133,9 +133,11 @@ impl Encoder {
         output
             .try_reserve_exact(max_block * 9 / 8 + 16)
             .map_err(|_| Error::Allocation)?;
+        let mut history = Vec::new();
+        history.try_reserve_exact(32_768).map_err(|_| Error::Allocation)?;
         Ok(Self {
             dictionary,
-            history: Vec::new(),
+            history,
             output,
             bits: 0,
             count: 0,
@@ -541,15 +543,21 @@ mod tests {
 impl Encoder {
     // Scratch only: retain 32 KiB of uncompressed input history across
     // consecutive DEFLATE blocks; encode the current block only.
-    pub(crate) fn block_history(&mut self, data: &[u8], last: bool) -> &[u8] {
+    pub(crate) fn block_history(&mut self, data: &[u8], last: bool) -> Result<&[u8], Error> {
         const DEPTH: usize = 64;
         debug_assert!(data.len() <= BLOCK);
-        let mut joined = Vec::with_capacity(self.history.len() + data.len());
+        let mut joined = Vec::new();
+        joined.try_reserve_exact(self.history.len() + data.len())
+            .map_err(|_| Error::Allocation)?;
         joined.extend_from_slice(&self.history);
         joined.extend_from_slice(data);
         let start = self.history.len();
-        let mut heads = vec![u32::MAX; HASH_SIZE];
-        let mut links = vec![u32::MAX; joined.len()];
+        let mut heads = Vec::new();
+        heads.try_reserve_exact(HASH_SIZE).map_err(|_| Error::Allocation)?;
+        heads.resize(HASH_SIZE, u32::MAX);
+        let mut links = Vec::new();
+        links.try_reserve_exact(joined.len()).map_err(|_| Error::Allocation)?;
+        links.resize(joined.len(), u32::MAX);
         for pos in 0..start {
             if pos + 3 > joined.len() { break; }
             let (slot, _) = hash(&joined, pos);
@@ -558,6 +566,7 @@ impl Encoder {
         }
         let saved = (self.bits, self.count);
         let mut tokens = Vec::<u16>::new();
+        tokens.try_reserve_exact(data.len()).map_err(|_| Error::Allocation)?;
         self.output.clear();
         let mut pos = start;
         while pos + 3 <= joined.len() {
@@ -664,7 +673,7 @@ impl Encoder {
         let keep = joined.len().min(32_768);
         self.history.clear();
         self.history.extend_from_slice(&joined[joined.len() - keep..]);
-        &self.output
+        Ok(&self.output)
     }
 }
 
@@ -702,7 +711,9 @@ fn trial_lengths(freq:&[u32],max_depth:u8)->Option<Vec<u8>> {
     use std::cmp::Reverse;
     use std::collections::BinaryHeap;
     let mut nodes=Vec::<TrialNode>::new();
+    nodes.try_reserve_exact(freq.len().saturating_mul(2)).ok()?;
     let mut queue=BinaryHeap::<Reverse<(u32,usize)>>::new();
+    queue.try_reserve(freq.len()).ok()?;
     for (symbol,&weight) in freq.iter().enumerate(){
         if weight!=0{
             let index=nodes.len();
@@ -711,7 +722,9 @@ fn trial_lengths(freq:&[u32],max_depth:u8)->Option<Vec<u8>> {
         }
     }
     if queue.is_empty(){return None;}
-    let mut lengths=vec![0u8;freq.len()];
+    let mut lengths=Vec::new();
+    lengths.try_reserve_exact(freq.len()).ok()?;
+    lengths.resize(freq.len(),0u8);
     if queue.len()==1 {
         let Reverse((_,index))=queue.pop()?;
         lengths[nodes[index].sym?]=1;
@@ -726,7 +739,9 @@ fn trial_lengths(freq:&[u32],max_depth:u8)->Option<Vec<u8>> {
         queue.push(Reverse((weight,index)));
     }
     let Reverse((_,root))=queue.pop()?;
-    let mut stack=vec![(root,0u8)];
+    let mut stack=Vec::new();
+    stack.try_reserve_exact(nodes.len()).ok()?;
+    stack.push((root,0u8));
     while let Some((node,depth))=stack.pop(){
         if depth>max_depth{return None;}
         if let Some(symbol)=nodes[node].sym{
@@ -738,14 +753,16 @@ fn trial_lengths(freq:&[u32],max_depth:u8)->Option<Vec<u8>> {
     }
     Some(lengths)
 }
-fn trial_codes(lengths:&[u8])->Vec<(u16,u8)> {
+fn trial_codes(lengths:&[u8])->Option<Vec<(u16,u8)>> {
     let mut count=[0u16;16];
     for &length in lengths {
         if length!=0 {count[usize::from(length)]+=1;}
     }
     let mut next=[0u16;16];
     for n in 1..16{next[n]=(next[n-1]+count[n-1])<<1;}
-    let mut result=vec![(0u16,0u8);lengths.len()];
+    let mut result=Vec::new();
+    result.try_reserve_exact(lengths.len()).ok()?;
+    result.resize(lengths.len(),(0u16,0u8));
     for (symbol,&length) in lengths.iter().enumerate(){
         if length!=0 {
             let code=next[usize::from(length)];
@@ -753,10 +770,11 @@ fn trial_codes(lengths:&[u8])->Vec<(u16,u8)> {
             result[symbol]=(code.reverse_bits()>>(16-length),length);
         }
     }
-    result
+    Some(result)
 }
-fn trial_rle(lengths:&[u8])->Vec<(usize,u32,u32)> {
+fn trial_rle(lengths:&[u8])->Option<Vec<(usize,u32,u32)>> {
     let mut output=Vec::new();
+    output.try_reserve_exact(lengths.len()).ok()?;
     let mut i=0;
     while i<lengths.len(){
         let value=lengths[i];
@@ -787,7 +805,7 @@ fn trial_rle(lengths:&[u8])->Vec<(usize,u32,u32)> {
         }
         i=end;
     }
-    output
+    Some(output)
 }
 // Fixed-code bit cost: three-bit header, seven-bit end marker and tokens.
 fn trial_fixed_bits(tokens: &[u16]) -> u32 {
@@ -833,9 +851,11 @@ impl Encoder {
         let Some(dist_lens)=trial_lengths(&df,15) else{return false;};
         let ll_count=lens.iter().rposition(|&v|v!=0).unwrap_or(256).max(256)+1;
         let ds_count=dist_lens.iter().rposition(|&v|v!=0).unwrap_or(0)+1;
-        let mut together=lens[..ll_count].to_vec();
+        let mut together=Vec::new();
+        if together.try_reserve_exact(ll_count+ds_count).is_err() {return false;}
+        together.extend_from_slice(&lens[..ll_count]);
         together.extend_from_slice(&dist_lens[..ds_count]);
-        let runs=trial_rle(&together);
+        let Some(runs)=trial_rle(&together) else{return false;};
         let mut cf=[0u32;19];
         for &(sym,_,_) in &runs{cf[sym]+=1;}
         if cf.iter().filter(|&&v|v!=0).count()==1{
@@ -843,9 +863,9 @@ impl Encoder {
         }
         let Some(code_lens)=trial_lengths(&cf,7) else{return false;};
         let cl_count=ORDER.iter().rposition(|&s|code_lens[s]!=0).unwrap_or(3).max(3)+1;
-        let lc=trial_codes(&lens);
-        let dc=trial_codes(&dist_lens);
-        let cc=trial_codes(&code_lens);
+        let Some(lc)=trial_codes(&lens) else{return false;};
+        let Some(dc)=trial_codes(&dist_lens) else{return false;};
+        let Some(cc)=trial_codes(&code_lens) else{return false;};
         self.put(u32::from(last)|4,3); // BTYPE=10, dynamic.
         self.put((ll_count-257) as u32,5);
         self.put((ds_count-1) as u32,5);
