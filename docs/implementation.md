@@ -12,6 +12,10 @@ only the library functions listed below are available today. The API is unstable
 - Positive-size, contiguous row-major straight RGBA8 images. Transparent RGB is preserved.
 - Half-open rectangles, exact bounded Bresenham lines, lossless ASCII symbol grids, four-connected exact-RGBA flood fill, copy and source-over stamps, explicit clipping,
   and same-image stamps that read a pre-edit snapshot. Calls return discarded pixel counts.
+- Exact integer filled and four-neighbor-outline ellipses via bounded row-span
+  binary search. Hidden RGBA, malformed bounds, clipping and stable PNG reopen
+  are checked; two distinct algorithms and their native timings are recorded in
+  the [ellipse implementation decision](../benchmarks/ellipse-decision.md).
 - Integer alpha/opacity rounding as specified in the architecture.
 - Exact, simultaneous RGB/RGBA recolor using bounded fixed-size lookup, alpha
   key and threshold operations that preserve all underlying RGB samples.

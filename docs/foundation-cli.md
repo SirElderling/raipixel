@@ -24,7 +24,10 @@ one cel**, with a matching canvas and stored cel size. It supports:
 
 - `asset.create` (name, size, optional pivot), `layer.create`, `frame.create`,
   `cel.create`, and `png.import` when the cel does not yet exist.
-- `draw` with `pixel`, filled `rect`, or canonical `line`; `grid` with
+- `draw` with `pixel`, filled `rect`, canonical `line`, or center-sampled
+  `ellipse` (`filled=true` by default; `false` draws its four-neighbor outline).
+  The ellipse uses the integer specification, a bounded work preflight and a
+  measured row-span algorithm. `grid` supports
   literal hexadecimal colors, `@palette/entry` references and optional skip;
   and exact-RGBA flood `fill`. `stamp` can copy or source-over an
   explicitly selected region of the same cel, including overlapping regions
