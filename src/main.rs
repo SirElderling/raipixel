@@ -260,7 +260,7 @@ impl Document {
         let layer = self.layer.as_deref().ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing layer".into() })?;
         let frame = self.frame.as_deref().ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing frame".into() })?;
         let [w, h] = self.size.ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing size".into() })?;
-        if self.image.as_ref().is_none_or(|i| i.size() != [w, h]) { return argument("missing or mismatched editable cel"); }
+        if self.image.as_ref().is_some_and(|i| i.size() != [w, h]) { return argument("mismatched editable cel"); }
         // Names are validated restricted ASCII, so insertion into JSON is safe.
         Ok(format!(
             r#"{{"format":"raipixel-project","version":1,"semantics":"1.0","images":[{{"id":"i000000","file":"images/000000.png","size":[{w},{h}]}}],"palettes":[],"styles":[],"assets":[{{"name":"{asset}","size":[{w},{h}],"pivot":[{px},{py}],"palette":null,"style":null,"layers":[{{"name":"{layer}","visible":true,"opacity":255}}],"frames":[{{"name":"{frame}","duration_ms":100,"cels":[{{"layer":"{layer}","image":"i000000","offset":[0,0]}}],"anchors":{{}},"metadata":{{}}}}],"clips":[],"metadata":{{}}}}],"metadata":{{}}}}"#,
@@ -313,7 +313,7 @@ fn load_snapshot(dir: &Path, work: &mut Work) -> Result<Document> {
     };
     // Round-trip only snapshots whose complete semantic structure is supported.
     // This prevents accidentally erasing unknown palettes, metadata or clips.
-    let expected = document.manifest_without_image()?;
+    let expected = document.manifest()?;
     let baseline = parse_json(expected.as_bytes(), work)?;
     if baseline != root { return capability("snapshot contains unsupported or altered fields"); }
     let bytes = read_input(dir, "images/000000.png", 128 * 1024 * 1024)?;
@@ -321,19 +321,6 @@ fn load_snapshot(dir: &Path, work: &mut Work) -> Result<Document> {
     if Some(decoded.image.size()) != document.size { return argument("snapshot image dimensions disagree with manifest"); }
     document.image = Some(decoded.image);
     Ok(document)
-}
-impl Document {
-    fn manifest_without_image(&self) -> Result<String> {
-        // Compose the canonical manifest before the image has been decoded.
-        let extent = self.size.ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing size".into() })?;
-        let blank = Image::new(extent[0], extent[1], Limits::default(), &mut Work::default())
-            .map_err(|e| Fault { code: e.code(), message: e.to_string() })?;
-        let temporary = Document {
-            asset: self.asset.clone(), layer: self.layer.clone(), frame: self.frame.clone(),
-            size: self.size, pivot: self.pivot, image: Some(blank)
-        };
-        temporary.manifest()
-    }
 }
 fn export_image(image: &Image, scale: u32, work: &mut Work) -> Result<Vec<u8>> {
     if !(1..=16).contains(&scale) { return argument("scale must be 1..16"); }
@@ -403,6 +390,7 @@ fn run_job(job_file: &Path, output_dir: &Path, project: Option<&Path>, dry_run: 
     for op in arr(field(job, "ops")?)? {
         document.apply(obj(op)?, job_base, &mut work)?;
     }
+    if document.image.is_none() { return argument("missing editable cel"); }
     let manifest = document.manifest()?;
     let exports = build_outputs(&document, job, &mut work)?;
     let snapshot = export_image(document.image.as_ref().ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing cel".into() })?, 1, &mut work)?;
