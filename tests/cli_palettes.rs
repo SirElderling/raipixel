@@ -170,6 +170,7 @@ fn invalid_palette_commands_never_publish_and_preserve_source_snapshot() {
     let suffix = "]}";
     let failures = [
         r##"{"op":"palette.set","name":"p","entries":[{"name":"a","rgb":"#010203"},{"name":"a","rgb":"#040506"}]}"##,
+        r##"{"op":"palette.set","name":"p","entries":[{"name":"a","rgb":"#010203"},{"name":"b","rgb":"#010203"}]}"##,
         r##"{"op":"palette.set","name":"p","entries":[{"name":"a","rgb":"#010203FF"}]}"##,
         r##"{"op":"palette.set","name":"p","replace":true,"entries":[{"name":"a","rgb":"#010203"}]}"##,
         r##"{"op":"palette.set","name":"p","entries":[{"name":"a","rgb":"#010203"}]},{"op":"palette.set","name":"p","entries":[{"name":"b","rgb":"#040506"}]}"##,
