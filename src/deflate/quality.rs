@@ -583,10 +583,10 @@ impl Encoder {
         assert!(links.capacity() >= joined.len());
         links.resize(joined.len(), u32::MAX);
         work.charge(start as u64)?;
-        for pos in 0..start {
+        for (pos, link) in links.iter_mut().enumerate().take(start) {
             if pos + 3 > joined.len() { break; }
             let (slot, _) = hash(&joined, pos);
-            links[pos] = heads[slot];
+            *link = heads[slot];
             heads[slot] = pos as u32;
         }
         let saved = (self.bits, self.count);
@@ -632,7 +632,7 @@ impl Encoder {
                     best_pos = pos - 1;
                 }
             }
-            if best >= 3 && best < 258 && pos + 4 <= joined.len() {
+            if (3..258).contains(&best) && pos + 4 <= joined.len() {
                 work.charge(4)?;
                 let next = pos + 1;
                 let (next_slot, _) = hash(&joined, next);
@@ -897,9 +897,8 @@ impl Encoder {
         let Some(runs)=trial_rle(&together) else{return false;};
         let mut cf=[0u32;19];
         for &(sym,_,_) in &runs{cf[sym]+=1;}
-        if cf.iter().filter(|&&v|v!=0).count()==1{
-            if let Some(slot)=cf.iter().position(|&v|v==0){cf[slot]=1;}
-        }
+        if cf.iter().filter(|&&v|v!=0).count()==1
+            && let Some(slot)=cf.iter().position(|&v|v==0){cf[slot]=1;}
         let Some(code_lens)=trial_lengths(&cf,7) else{return false;};
         let cl_count=ORDER.iter().rposition(|&s|code_lens[s]!=0).unwrap_or(3).max(3)+1;
         let Some(lc)=trial_codes(&lens) else{return false;};
