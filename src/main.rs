@@ -1140,6 +1140,123 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
+/// Validate the supported single-cel snapshot without editing or publishing it.
+/// Every reported check has an explicit pass/fail result for AI callers.
+fn validate_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
+    use std::fmt::Write as _;
+
+    let mut work = Work::default();
+    let document = load_snapshot(project, &mut work)?;
+    let parsed = if let Some(path) = query_file {
+        let base = path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        let filename = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| Fault {
+                code: "E_ARGUMENT",
+                message: "invalid validation query filename".into(),
+            })?;
+        parse_json(&read_input(base, filename, 8 * 1024 * 1024)?, &mut work)?
+    } else {
+        json::Value::Object(Map::new())
+    };
+    let query = obj(&parsed)?;
+    allowed(query, &["asset", "checks"])?;
+    if let Some(selected) = query.get("asset")
+        && string(selected)? != document.asset.as_deref().unwrap_or("")
+    {
+        return fail("E_REFERENCE", "unknown validation asset");
+    }
+    let names = [
+        "structure", "dimensions", "palette", "alpha", "bounds", "metadata",
+    ];
+    let requested: Vec<&str> = match query.get("checks") {
+        Some(value) => arr(value)?.iter().map(string).collect::<Result<Vec<_>>>()?,
+        None => names.to_vec(),
+    };
+    if requested.is_empty() {
+        return argument("at least one validation check is required");
+    }
+    let mut seen = Vec::new();
+    for check in &requested {
+        if !names.contains(check) {
+            return capability(format!("unsupported validation check: {check}"));
+        }
+        if seen.contains(check) {
+            return argument("duplicate validation check");
+        }
+        seen.push(*check);
+    }
+    let [width, height] = document.size.ok_or_else(|| Fault {
+        code: "E_PROJECT",
+        message: "missing canvas".into(),
+    })?;
+    let image = document.image.as_ref().ok_or_else(|| Fault {
+        code: "E_PROJECT",
+        message: "missing cel".into(),
+    })?;
+    let mut palette_invalid = None;
+    if requested.contains(&"palette")
+        && let Some(palette_name) = document.palette_ref.as_ref()
+    {
+        let entries = document.palettes.get(palette_name).ok_or_else(|| Fault {
+            code: "E_REFERENCE",
+            message: "asset refers to unknown palette".into(),
+        })?;
+        let mut allowed_rgb: Vec<[u8; 3]> = entries.iter().map(|(_, rgb)| *rgb).collect();
+        allowed_rgb.sort_unstable();
+        allowed_rgb.dedup();
+        for (index, pixel) in image.pixels().iter().enumerate() {
+            if pixel[3] != 0 && allowed_rgb.binary_search(&[pixel[0], pixel[1], pixel[2]]).is_err() {
+                palette_invalid = Some([(index % width as usize) as u32, (index / width as usize) as u32]);
+                break;
+            }
+        }
+    }
+    let dimensions_valid = image.size() == [width, height];
+    let mut checks_json = String::from("[");
+    for (index, check) in requested.iter().enumerate() {
+        if index != 0 {
+            checks_json.push(',');
+        }
+        let passed = match *check {
+            "structure" | "alpha" | "metadata" => true,
+            "bounds" | "dimensions" => dimensions_valid,
+            "palette" => palette_invalid.is_none(),
+            _ => unreachable!(),
+        };
+        let _ = write!(checks_json, r#"{{"name":"{check}","passed":{passed}}}"#);
+    }
+    checks_json.push(']');
+    let failed = palette_invalid.is_some() || !dimensions_valid;
+    let mut diagnostics = String::from("[");
+    if let Some([x, y]) = palette_invalid {
+        let _ = write!(
+            diagnostics,
+            r#"{{"severity":"error","code":"E_STYLE","check":"palette","message":"Visible RGB not present in the assigned palette","at":[{x},{y}]}}"#
+        );
+    }
+    if !dimensions_valid {
+        if diagnostics.len() > 1 {
+            diagnostics.push(',');
+        }
+        diagnostics.push_str(r#"{"severity":"error","code":"E_BOUNDS","check":"dimensions","message":"Canvas and cel dimensions disagree"}"#);
+    }
+    diagnostics.push(']');
+    let error_count = usize::from(palette_invalid.is_some()) + usize::from(!dimensions_valid);
+    let ok = !failed;
+    println!(
+        r#"{{"schema":1,"ok":{ok},"action":"validate","result":{{"passed":{ok},"checks":{checks_json},"error_count":{error_count},"warning_count":0}},"diagnostics":{diagnostics}}}"#
+    );
+    if failed {
+        std::process::exit(3);
+    }
+    Ok(())
+}
+
 fn execute() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if args.len() == 1 && args[0] == "version" {
@@ -1148,7 +1265,7 @@ fn execute() -> Result<()> {
     }
     if args.len() == 1 && args[0] == "help" {
         println!(
-            "raipixel run JOB.json --out DIRECTORY [--project SNAPSHOT] [--dry-run]\nraipixel inspect SNAPSHOT [--query QUERY.json]\nraipixel version"
+            "raipixel run JOB.json --out DIRECTORY [--project SNAPSHOT] [--dry-run]\nraipixel inspect SNAPSHOT [--query QUERY.json]\nraipixel validate SNAPSHOT [--query QUERY.json]\nraipixel version"
         );
         return Ok(());
     }
@@ -1162,8 +1279,18 @@ fn execute() -> Result<()> {
         }
         return argument("inspect usage: inspect SNAPSHOT [--query QUERY.json]");
     }
+    if args.len() >= 2 && args[0] == "validate" {
+        let snapshot = PathBuf::from(&args[1]);
+        if args.len() == 2 {
+            return validate_snapshot(&snapshot, None);
+        }
+        if args.len() == 4 && args[2] == "--query" {
+            return validate_snapshot(&snapshot, Some(Path::new(&args[3])));
+        }
+        return argument("validate usage: validate SNAPSHOT [--query QUERY.json]");
+    }
     if args.len() < 4 || args[0] != "run" {
-        return capability("supported commands: help, version, run");
+        return capability("supported commands: help, version, run, inspect, validate");
     }
     let job = PathBuf::from(&args[1]);
     let mut output = None;
