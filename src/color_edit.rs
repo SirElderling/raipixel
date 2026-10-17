@@ -1,6 +1,21 @@
 //! Exact deterministic color edits with bounded, allocation-free lookups.
 use crate::{Error, Image, Pixel, Rect, Work};
 
+const HASH_SLOTS: usize = 2048;
+
+// Pack RGB into low bytes rather than [R,G,B,0], which hashes poorly;
+// fold all channels when performing exact RGBA matching.
+#[inline]
+fn hash_slot(pixel: Pixel, preserve_alpha: bool) -> usize {
+    let packed = if preserve_alpha {
+        u32::from_be_bytes([0, pixel[0], pixel[1], pixel[2]])
+    } else {
+        let rgba = u32::from_be_bytes(pixel);
+        rgba ^ (rgba >> 16)
+    };
+    (packed.wrapping_mul(0x9E37_79B1) as usize) & (HASH_SLOTS - 1)
+}
+
 /// Coordinate and exact RGB of the first out-of-palette visible pixel.
 pub type PaletteMismatch = ([u32; 2], [u8; 3]);
 
@@ -41,13 +56,11 @@ impl Image {
         // Bounded open addressing is measurably faster on the native sprite
         // corpus than repeated comparisons or binary search. Keep the sorted
         // table as a guaranteed worst-case fallback for adversarial collisions.
-        const SLOTS: usize = 2048;
         const PROBES: usize = 16;
-        let mut lookup = [None::<(Pixel, Pixel)>; SLOTS];
+        let mut lookup = [None::<(Pixel, Pixel)>; HASH_SLOTS];
         let mut fast_path = true;
         for &(from, to) in table.iter() {
-            let mut slot = (u32::from_be_bytes(from).wrapping_mul(0x9E37_79B1) as usize)
-                & (SLOTS - 1);
+            let mut slot = hash_slot(from, preserve_alpha);
             let mut inserted = false;
             for _ in 0..PROBES {
                 if lookup[slot].is_none() {
@@ -55,7 +68,7 @@ impl Image {
                     inserted = true;
                     break;
                 }
-                slot = (slot + 1) & (SLOTS - 1);
+                slot = (slot + 1) & (HASH_SLOTS - 1);
             }
             if !inserted {
                 fast_path = false;
@@ -69,8 +82,7 @@ impl Image {
                 key[3] = 0;
             }
             if fast_path {
-                let mut slot = (u32::from_be_bytes(key).wrapping_mul(0x9E37_79B1) as usize)
-                    & (SLOTS - 1);
+                let mut slot = hash_slot(key, preserve_alpha);
                 for _ in 0..PROBES {
                     match lookup[slot] {
                         Some((from, mut to)) if from == key => {
@@ -80,7 +92,7 @@ impl Image {
                             return to;
                         }
                         None => return sample,
-                        _ => slot = (slot + 1) & (SLOTS - 1),
+                        _ => slot = (slot + 1) & (HASH_SLOTS - 1),
                     }
                 }
             }
