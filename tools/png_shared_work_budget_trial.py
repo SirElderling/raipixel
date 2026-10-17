@@ -935,7 +935,9 @@ fn main()->Result<(),E>{
                 "test corpus too costly for default shared work maximum");
         let (six_staged,exact_remaining)=choose_shared(total_six_work)?;
         assert_eq!(exact_remaining,0,"exact six-mode budget not exhausted");
-        assert_eq!(six_staged,outputs[winner6],
+        let expected=outputs[..6].iter().min_by_key(|bytes|bytes.len())
+            .ok_or("empty quality candidate list")?;
+        assert_eq!(six_staged.as_slice(),expected.as_slice(),
                    "shared-budget PNG changed selected output");
         let mut caller_sentinel=vec![0x5D_u8];
         let too_small=choose_shared(total_six_work-1)
