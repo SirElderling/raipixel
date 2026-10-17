@@ -816,6 +816,40 @@ fn build_outputs(
     }
     Ok(outputs)
 }
+/// Validate only visible pixels against the asset palette. Hidden RGB is
+/// deliberately unconstrained, so transparent source fidelity is retained.
+fn enforce_visible_palette(document: &Document, work: &mut Work) -> Result<()> {
+    let Some(selected) = document.palette_ref.as_ref() else {
+        return Ok(());
+    };
+    let entries = document.palettes.get(selected).ok_or_else(|| Fault {
+        code: "E_REFERENCE",
+        message: "asset refers to a missing palette".into(),
+    })?;
+    let mut colors = Vec::new();
+    colors.try_reserve_exact(entries.len()).map_err(|_| Fault {
+        code: "E_ALLOC",
+        message: "palette validation allocation".into(),
+    })?;
+    colors.extend(entries.iter().map(|(_, rgb)| *rgb));
+    let image = document.image.as_ref().ok_or_else(|| Fault {
+        code: "E_ARGUMENT",
+        message: "missing editable cel".into(),
+    })?;
+    if let Some((at, rgb)) =
+        raster(image.first_visible_color_outside_palette(&colors, work))?
+    {
+        return fail(
+            "E_PROJECT",
+            format!(
+                "visible pixel at [{},{}] has RGB #{:02X}{:02X}{:02X} outside asset palette",
+                at[0], at[1], rgb[0], rgb[1], rgb[2]
+            ),
+        );
+    }
+    Ok(())
+}
+
 fn run_job(
     job_file: &Path,
     output_dir: &Path,
@@ -847,12 +881,17 @@ fn run_job(
     if unsigned(field(job, "interface")?)? != 1 || text(job, "semantics")? != "1.0" {
         return capability("unsupported job version");
     }
+    let mut require_palette = false;
     if let Some(checks) = job.get("checks") {
         for check in arr(checks)? {
-            if !matches!(string(check)?, "structure" | "bounds" | "dimensions") {
-                return capability(
-                    "this Foundation slice only supports structure, dimensions and bounds checks",
-                );
+            match string(check)? {
+                "structure" | "bounds" | "dimensions" | "alpha" => {}
+                "palette" => require_palette = true,
+                _ => {
+                    return capability(
+                        "this Foundation slice supports structure, dimensions, bounds, alpha and palette checks",
+                    );
+                }
             }
         }
     }
@@ -866,6 +905,9 @@ fn run_job(
     }
     if document.image.is_none() {
         return argument("missing editable cel");
+    }
+    if require_palette {
+        enforce_visible_palette(&document, &mut work)?;
     }
     let manifest = document.manifest()?;
     let exports = build_outputs(&document, job, &mut work)?;
