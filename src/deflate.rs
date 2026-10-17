@@ -4,6 +4,9 @@ use std::borrow::Cow;
 #[path = "deflate/encode.rs"]
 mod encode;
 pub(crate) use encode::{BLOCK, Encoder};
+#[cfg(feature = "experimental-quality")]
+#[path = "deflate/quality.rs"]
+pub(crate) mod quality;
 
 #[derive(Debug)]
 pub(crate) enum Error {
