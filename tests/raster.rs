@@ -492,7 +492,9 @@ fn flood_fill_is_four_connected_and_uses_exact_hidden_rgba() {
     let mut canvas = Image::from_pixels(
         3,
         3,
-        &[old, different, old, old, different, old, old, different, old],
+        &[
+            old, different, old, old, different, old, old, different, old,
+        ],
         Limits::default(),
         &mut work(),
     )
@@ -504,7 +506,9 @@ fn flood_fill_is_four_connected_and_uses_exact_hidden_rgba() {
     );
     assert_eq!(
         canvas.pixels(),
-        &[new_color, different, old, new_color, different, old, new_color, different, old]
+        &[
+            new_color, different, old, new_color, different, old, new_color, different, old
+        ]
     );
     assert_eq!(
         canvas.flood_fill([0, 0], new_color, None, &mut work()),
@@ -580,7 +584,9 @@ fn flood_fill_bounds_rejection_preserves_work_and_pixels() {
 fn symbolic_grid_preserves_skips_and_transparent_rgb_exactly() {
     let mut actual = image(4, 4);
     let original = [81, 92, 103, 201];
-    actual.fill(rect(0, 0, 4, 4), original, false, &mut work()).unwrap();
+    actual
+        .fill(rect(0, 0, 4, 4), original, false, &mut work())
+        .unwrap();
     let hidden = [18, 37, 56, 0];
     let symbols = [
         (b'a', Some(hidden)),
@@ -617,7 +623,11 @@ fn symbolic_grid_rejects_invalid_inputs_before_spending_work_or_writing() {
     ];
     for (rows, symbols) in cases {
         let mut budget = Work::new(100).unwrap();
-        assert!(actual.draw_grid([0, 0], rows, symbols, true, &mut budget).is_err());
+        assert!(
+            actual
+                .draw_grid([0, 0], rows, symbols, true, &mut budget)
+                .is_err()
+        );
         assert_eq!(budget.remaining(), 100);
         assert_eq!(actual.pixels(), &[CLEAR; 16]);
     }
@@ -649,8 +659,15 @@ fn symbolic_grid_clips_without_modifying_surrounding_samples() {
         Ok(2)
     );
     assert_eq!(budget.remaining(), 0);
-    assert_eq!(actual.pixels(), &[
-        [3, 6, 9, 0], [3, 6, 9, 0], CLEAR,
-        [3, 6, 9, 0], [3, 6, 9, 0], CLEAR,
-    ]);
+    assert_eq!(
+        actual.pixels(),
+        &[
+            [3, 6, 9, 0],
+            [3, 6, 9, 0],
+            CLEAR,
+            [3, 6, 9, 0],
+            [3, 6, 9, 0],
+            CLEAR,
+        ]
+    );
 }
