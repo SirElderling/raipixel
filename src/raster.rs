@@ -29,6 +29,67 @@ pub fn blend(src: Pixel, dst: Pixel, opacity: u8, mode: Blend) -> Pixel {
 }
 
 impl Image {
+
+    /// Draw a one-pixel-wide integer Bresenham line with inclusive endpoints.
+    ///
+    /// Endpoint order cannot affect coverage. Charge the full candidate count
+    /// before mutation, including off-canvas samples when clipping is enabled.
+    /// A failed bounds/work preflight leaves all pixels unchanged.
+    pub fn line(
+        &mut self,
+        from: [i32; 2],
+        to: [i32; 2],
+        color: Pixel,
+        clip: bool,
+        work: &mut Work,
+    ) -> Result<u64, Error> {
+        let (width, height) = (i64::from(self.width), i64::from(self.height));
+        if !clip
+            && [from, to].iter().any(|point| {
+                i64::from(point[0]) < 0
+                    || i64::from(point[1]) < 0
+                    || i64::from(point[0]) >= width
+                    || i64::from(point[1]) >= height
+            })
+        {
+            return Err(Error::Bounds);
+        }
+
+        let (first, last) = if from <= to { (from, to) } else { (to, from) };
+        let (mut x, mut y) = (i64::from(first[0]), i64::from(first[1]));
+        let (end_x, end_y) = (i64::from(last[0]), i64::from(last[1]));
+        let dx = (end_x - x).abs();
+        let dy = -(end_y - y).abs();
+        let count = dx.max(-dy) as u64 + 1;
+        work.charge(count)?;
+
+        let step_x = if x < end_x { 1 } else { -1 };
+        let step_y = if y < end_y { 1 } else { -1 };
+        let mut error = dx + dy;
+        let mut written = 0u64;
+        loop {
+            if (0..width).contains(&x) && (0..height).contains(&y) {
+                let index = self.index(x as u32, y as u32);
+                self.pixels_mut()[index] = color;
+                written += 1;
+            }
+            if x == end_x && y == end_y {
+                break;
+            }
+            // Signed i64 arithmetic covers even opposite i32 endpoints.
+            let twice = 2 * error;
+            if twice >= dy {
+                error += dy;
+                x += step_x;
+            }
+            if twice <= dx {
+                error += dx;
+                y += step_y;
+            }
+        }
+        Ok(count - written)
+    }
+
     /// Fill all four samples. Return the number of discarded pixels.
     /// Preflight failures never modify this image.
     pub fn fill(

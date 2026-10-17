@@ -488,3 +488,65 @@ fn unclipped_line_bounds_and_single_pixel_are_transactional() {
     assert_eq!(budget.remaining(), 0);
     assert_eq!(actual.pixel(2, 3), Some(hidden));
 }
+
+#[test]
+fn line_covers_all_octants_and_is_endpoint_order_invariant() {
+    let origin = [5, 5];
+    for end in [
+        [10, 7], [7, 10], [3, 10], [0, 7],
+        [0, 3], [3, 0], [7, 0], [10, 3],
+        [5, 5], [5, 10], [0, 5],
+    ] {
+        let mut forward = image(11, 11);
+        let mut reversed = image(11, 11);
+        let mut a = work();
+        let mut b = work();
+        assert_eq!(forward.line(origin, end, RED, false, &mut a), Ok(0));
+        assert_eq!(reversed.line(end, origin, RED, false, &mut b), Ok(0));
+        assert_eq!(forward, reversed, "octant endpoint {end:?}");
+        assert_eq!(a.remaining(), b.remaining());
+        let expected = (end[0] - origin[0]).abs().max((end[1] - origin[1]).abs()) as usize + 1;
+        assert_eq!(forward.pixels().iter().filter(|pixel| **pixel == RED).count(), expected);
+    }
+}
+
+#[test]
+fn line_exact_diagonal_and_transparent_rgb_copy() {
+    let mut canvas = image(4, 4);
+    let hidden = [17, 32, 91, 0];
+    canvas.line([0, 0], [3, 3], hidden, false, &mut work()).unwrap();
+    for y in 0..4 {
+        for x in 0..4 {
+            assert_eq!(canvas.pixel(x, y), Some(if x == y { hidden } else { CLEAR }));
+        }
+    }
+}
+
+#[test]
+fn line_clipping_reports_discarded_candidates_and_preserves_neighbors() {
+    let mut canvas = image(3, 3);
+    let mut budget = Work::new(5).unwrap();
+    assert_eq!(canvas.line([-2, 1], [2, 1], BLUE, true, &mut budget), Ok(2));
+    assert_eq!(budget.remaining(), 0);
+    for y in 0..3 {
+        for x in 0..3 {
+            assert_eq!(canvas.pixel(x, y), Some(if y == 1 { BLUE } else { CLEAR }));
+        }
+    }
+}
+
+#[test]
+fn line_preflight_bounds_and_work_are_transactional() {
+    let mut canvas = image(2, 2);
+    let mut budget = Work::new(1).unwrap();
+    assert_eq!(canvas.line([-1, 0], [1, 0], RED, false, &mut budget), Err(Error::Bounds));
+    assert_eq!(budget.remaining(), 1);
+    assert_eq!(canvas.line([0, 0], [1, 1], RED, false, &mut budget),
+        Err(Error::Limit(Resource::Work)));
+    assert_eq!(budget.remaining(), 1);
+    assert_eq!(canvas.pixels(), &[CLEAR; 4]);
+    let mut default_budget = work();
+    assert_eq!(canvas.line([i32::MIN, i32::MIN], [i32::MAX, i32::MAX],
+        RED, true, &mut default_budget), Err(Error::Limit(Resource::Work)));
+    assert_eq!(canvas.pixels(), &[CLEAR; 4]);
+}
