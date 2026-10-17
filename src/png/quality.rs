@@ -87,7 +87,7 @@ fn encode_mode(
     alpha
         .try_reserve_exact(colors.len())
         .map_err(|_| crate::Error::Allocation)?;
-    for color in &colors {
+    for color in colors {
         palette.extend_from_slice(&color[..3]);
         alpha.push(color[3]);
     }
