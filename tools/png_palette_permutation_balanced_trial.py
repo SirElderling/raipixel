@@ -277,7 +277,7 @@ def main():
         shutil.copyfile(ROOT / "benchmarks/png/reference.lock", folder / "Cargo.lock")
         (folder / "src/main.rs").write_text(DRIVER, encoding="utf-8")
         subprocess.run(
-            ["cargo", "build", "--release", "--offline", "--manifest-path",
+            ["cargo", "build", "--release", "--manifest-path",
              str(folder / "Cargo.toml")], check=True
         )
         exe = folder / "target/release" / (
