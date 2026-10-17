@@ -10,7 +10,7 @@ only the library functions listed below are available today. The API is unstable
 - One edition-2024 Cargo library, minimum Rust 1.99, with unsafe code forbidden.
 - No dependencies, dev-dependencies, build-dependencies, or build script.
 - Positive-size, contiguous row-major straight RGBA8 images. Transparent RGB is preserved.
-- Half-open filled rectangles, copy and source-over stamps, explicit clipping,
+- Half-open rectangles, exact bounded Bresenham lines, four-connected exact-RGBA flood fill, copy and source-over stamps, explicit clipping,
   and same-image stamps that read a pre-edit snapshot. Calls return discarded pixel counts.
 - Integer alpha/opacity rounding as specified in the architecture.
 - Typed errors with interface-compatible category codes; no structured CLI errors yet.

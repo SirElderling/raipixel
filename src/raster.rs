@@ -55,7 +55,7 @@ impl Image {
     /// any mutation, even when clipped. Only in-canvas positions are visited:
     /// extreme off-canvas endpoints never cause an unbounded traversal.
     /// Returns the number of discarded out-of-canvas line pixels.
-    pub fn line(
+    pub fn draw_line(
         &mut self,
         start: [i32; 2],
         end: [i32; 2],
@@ -128,64 +128,76 @@ impl Image {
         Ok(declared - written)
     }
 
-    /// Draw a compact ASCII color grid, preserving exact hidden RGB samples.
+
+    /// Replace the exact four-connected component containing `at`.
     ///
-    /// Each row has the same nonzero byte width. Symbols are printable ASCII;
-    /// `None` is an explicit skip, unlike the transparent RGBA pixel [0; 4].
-    /// Validation, bounds and the full declared work charge precede all writes.
-    /// No temporary pixel grid or heap allocation is required.
-    pub fn draw_grid(
+    /// The component is discovered against the original four RGBA samples,
+    /// including hidden RGB. No pixel changes until discovery, allocation,
+    /// and charged work succeed. A region restricts the search to that
+    /// in-bounds rectangle; there is no implicit clipping or diagonal reach.
+    ///
+    /// Returns the number of replaced pixels. Scratch uses at most one
+    /// visited byte per canvas pixel and one u32 per candidate region pixel,
+    /// with a conservative aggregate memory preflight.
+    pub fn flood_fill(
         &mut self,
-        at: [i32; 2],
-        rows: &[&str],
-        symbols: &[(u8, Option<Pixel>)],
-        clip: bool,
+        at: [u32; 2],
+        color: Pixel,
+        region: Option<Rect>,
         work: &mut Work,
     ) -> Result<u64, Error> {
-        let width = u32::try_from(rows.first().ok_or(Error::Rectangle)?.len())
-            .map_err(|_| Error::Rectangle)?;
-        let height = u32::try_from(rows.len()).map_err(|_| Error::Rectangle)?;
-        let rect = Rect::new(at[0], at[1], width, height)?;
-        if symbols.len() > 95 {
-            return Err(Error::PixelCount);
+        let [left, top, right, bottom] = match region {
+            Some(rect) => self.coverage(rect, false)?,
+            None => [0, 0, self.width, self.height],
+        };
+        if at[0] < left || at[0] >= right || at[1] < top || at[1] >= bottom {
+            return Err(Error::Bounds);
         }
-        let mut lookup = [None; 95];
-        for &(symbol, color) in symbols {
-            if !(b' '..=b'~').contains(&symbol) {
-                return Err(Error::PixelCount);
-            }
-            let slot = &mut lookup[usize::from(symbol - b' ')];
-            if slot.is_some() {
-                return Err(Error::PixelCount);
-            }
-            *slot = Some(color);
+        let start = self.index(at[0], at[1]);
+        let original = self.pixels()[start];
+        if original == color {
+            return Ok(0);
         }
-        for row in rows {
-            if row.len() != width as usize {
-                return Err(Error::PixelCount);
-            }
-            for &symbol in row.as_bytes() {
-                if !(b' '..=b'~').contains(&symbol)
-                    || lookup[usize::from(symbol - b' ')].is_none()
-                {
-                    return Err(Error::PixelCount);
+        let count = self.pixels().len();
+        let candidates = u64::from(right - left) * u64::from(bottom - top);
+        let planned = (count as u64) * 5 + candidates * 4;
+        self.limits.check_buffer(planned)?;
+
+        // Stage the discovered connected component before modifying pixels.
+        // u32 indices are sufficient under the 16,777,216-pixel image ceiling.
+        let mut visited = reserve::<u8>(count)?;
+        visited.resize(count, 0);
+        let mut queue = reserve::<u32>(candidates as usize)?;
+        queue.push(start as u32);
+        visited[start] = 1;
+        let stride = self.width as usize;
+        let mut cursor = 0;
+        while cursor < queue.len() {
+            // One visit and at most four neighbor comparisons per pixel.
+            // A work failure can consume earlier visits, but never changes
+            // destination pixels.
+            work.charge(5)?;
+            let index = queue[cursor] as usize;
+            let x = (index % stride) as u32;
+            let y = (index / stride) as u32;
+            let neighbors = [
+                (x > left).then_some(index.wrapping_sub(1)),
+                (x + 1 < right).then_some(index + 1),
+                (y > top).then_some(index.wrapping_sub(stride)),
+                (y + 1 < bottom).then_some(index + stride),
+            ];
+            for next in neighbors.into_iter().flatten() {
+                if visited[next] == 0 && self.pixels()[next] == original {
+                    visited[next] = 1;
+                    queue.push(next as u32);
                 }
             }
+            cursor += 1;
         }
-        let coverage = self.coverage(rect, clip)?;
-        work.charge(rect.area())?;
-        let [x0, y0, x1, y1] = coverage;
-        for y in y0..y1 {
-            let row = rows[(i64::from(y) - i64::from(at[1])) as usize].as_bytes();
-            for x in x0..x1 {
-                let column = (i64::from(x) - i64::from(at[0])) as usize;
-                if let Some(color) = lookup[usize::from(row[column] - b' ')].unwrap() {
-                    let index = self.index(x, y);
-                    self.pixels_mut()[index] = color;
-                }
-            }
+        for index in queue.iter().copied() {
+            self.pixels_mut()[index as usize] = color;
         }
-        Ok(discarded(rect, coverage))
+        Ok(queue.len() as u64)
     }
 
     /// Stamp an in-bounds source region at an explicit destination position.

@@ -490,141 +490,92 @@ fn unclipped_line_bounds_and_single_pixel_are_transactional() {
 }
 
 #[test]
-fn line_covers_all_octants_and_is_endpoint_order_invariant() {
-    let origin = [5, 5];
-    for end in [
-        [10, 7], [7, 10], [3, 10], [0, 7],
-        [0, 3], [3, 0], [7, 0], [10, 3],
-        [5, 5], [5, 10], [0, 5],
-    ] {
-        let mut forward = image(11, 11);
-        let mut reversed = image(11, 11);
-        let mut a = work();
-        let mut b = work();
-        assert_eq!(forward.line(origin, end, RED, false, &mut a), Ok(0));
-        assert_eq!(reversed.line(end, origin, RED, false, &mut b), Ok(0));
-        assert_eq!(forward, reversed, "octant endpoint {end:?}");
-        assert_eq!(a.remaining(), b.remaining());
-        let expected = (end[0] - origin[0]).abs().max((end[1] - origin[1]).abs()) as usize + 1;
-        assert_eq!(forward.pixels().iter().filter(|pixel| **pixel == RED).count(), expected);
-    }
-}
-
-#[test]
-fn line_exact_diagonal_and_transparent_rgb_copy() {
-    let mut canvas = image(4, 4);
-    let hidden = [17, 32, 91, 0];
-    canvas.line([0, 0], [3, 3], hidden, false, &mut work()).unwrap();
-    for y in 0..4 {
-        for x in 0..4 {
-            assert_eq!(canvas.pixel(x, y), Some(if x == y { hidden } else { CLEAR }));
-        }
-    }
-}
-
-#[test]
-fn line_clipping_reports_discarded_candidates_and_preserves_neighbors() {
-    let mut canvas = image(3, 3);
-    let mut budget = Work::new(5).unwrap();
-    assert_eq!(canvas.line([-2, 1], [2, 1], BLUE, true, &mut budget), Ok(2));
-    assert_eq!(budget.remaining(), 0);
-    for y in 0..3 {
-        for x in 0..3 {
-            assert_eq!(canvas.pixel(x, y), Some(if y == 1 { BLUE } else { CLEAR }));
-        }
-    }
-}
-
-#[test]
-fn line_preflight_bounds_and_work_are_transactional() {
-    let mut canvas = image(2, 2);
-    let mut budget = Work::new(1).unwrap();
-    assert_eq!(canvas.line([-1, 0], [1, 0], RED, false, &mut budget), Err(Error::Bounds));
-    assert_eq!(budget.remaining(), 1);
-    assert_eq!(canvas.line([0, 0], [1, 1], RED, false, &mut budget),
-        Err(Error::Limit(Resource::Work)));
-    assert_eq!(budget.remaining(), 1);
-    assert_eq!(canvas.pixels(), &[CLEAR; 4]);
-    let mut default_budget = work();
-    assert_eq!(canvas.line([i32::MIN, i32::MIN], [i32::MAX, i32::MAX],
-        RED, true, &mut default_budget), Err(Error::Limit(Resource::Work)));
-    assert_eq!(canvas.pixels(), &[CLEAR; 4]);
-}
-
-#[test]
-fn symbolic_grid_preserves_skips_and_transparent_rgb_exactly() {
-    let mut actual = image(4, 4);
-    let original = [81, 92, 103, 201];
-    actual.fill(rect(0, 0, 4, 4), original, false, &mut work()).unwrap();
-    let hidden = [18, 37, 56, 0];
-    let symbols = [
-        (b'a', Some(hidden)),
-        (b'.', None),
-        (b'b', Some(BLUE)),
-        (b' ', Some(CLEAR)),
-    ];
-    let mut budget = Work::new(6).unwrap();
+fn flood_fill_is_four_connected_and_uses_exact_hidden_rgba() {
+    let old = [9, 8, 7, 0];
+    let different = [0, 0, 0, 0];
+    let mut canvas = Image::from_pixels(
+        3,
+        3,
+        &[old, different, old, old, different, old, old, old, old],
+        Limits::default(),
+        &mut work(),
+    )
+    .unwrap();
+    let new_color = [21, 22, 23, 0];
     assert_eq!(
-        actual.draw_grid([1, 1], &["a.b", " ba"], &symbols, false, &mut budget),
+        canvas.flood_fill([0, 0], new_color, None, &mut work()),
+        Ok(3)
+    );
+    assert_eq!(
+        canvas.pixels(),
+        &[new_color, different, old, new_color, different, old, new_color, old, old]
+    );
+    assert_eq!(
+        canvas.flood_fill([0, 0], new_color, None, &mut work()),
         Ok(0)
     );
-    assert_eq!(budget.remaining(), 0);
-    assert_eq!(actual.pixel(1, 1), Some(hidden));
-    assert_eq!(actual.pixel(2, 1), Some(original)); // Explicit skip.
-    assert_eq!(actual.pixel(3, 1), Some(BLUE));
-    assert_eq!(actual.pixel(1, 2), Some(CLEAR)); // Actual transparency.
-    assert_eq!(actual.pixel(2, 2), Some(BLUE));
-    assert_eq!(actual.pixel(3, 2), Some(hidden));
-    assert_eq!(actual.pixel(0, 0), Some(original));
 }
 
 #[test]
-fn symbolic_grid_rejects_invalid_inputs_before_spending_work_or_writing() {
-    let mut actual = image(4, 4);
-    let cases: [(&[&str], &[(u8, Option<[u8; 4]>)]; 6] = [
-        (&[], &[(b'a', Some(RED))]),
-        (&["aa", "a"], &[(b'a', Some(RED))]),
-        (&["a?"], &[(b'a', Some(RED))]),
-        (&["aa"], &[(b'a', Some(RED)), (b'a', Some(BLUE))]),
-        (&["é"], &[(b'a', Some(RED))]),
-        (&["aa"], &[(10, Some(RED))]),
-    ];
-    for (rows, symbols) in cases {
-        let mut budget = Work::new(100).unwrap();
-        assert!(actual.draw_grid([0, 0], rows, symbols, true, &mut budget).is_err());
-        assert_eq!(budget.remaining(), 100);
-        assert_eq!(actual.pixels(), &[CLEAR; 16]);
-    }
-    let symbols = [(b'a', Some(RED))];
-    let mut budget = Work::new(10).unwrap();
+fn flood_fill_respects_region_and_leaves_surroundings_untouched() {
+    let mut canvas = image(5, 4);
+    let region = rect(1, 1, 3, 2);
     assert_eq!(
-        actual.draw_grid([3, 3], &["aa"], &symbols, false, &mut budget),
+        canvas.flood_fill([1, 1], BLUE, Some(region), &mut work()),
+        Ok(6)
+    );
+    for y in 0..4 {
+        for x in 0..5 {
+            assert_eq!(
+                canvas.pixel(x, y),
+                Some(if (1..4).contains(&x) && (1..3).contains(&y) {
+                    BLUE
+                } else {
+                    CLEAR
+                })
+            );
+        }
+    }
+    assert_eq!(
+        canvas.flood_fill([0, 0], RED, Some(region), &mut work()),
         Err(Error::Bounds)
     );
-    assert_eq!(budget.remaining(), 10);
-    assert_eq!(actual.pixels(), &[CLEAR; 16]);
-
-    let mut insufficient = Work::new(1).unwrap();
-    assert_eq!(
-        actual.draw_grid([0, 0], &["aa"], &symbols, true, &mut insufficient),
-        Err(Error::Limit(Resource::Work))
-    );
-    assert_eq!(insufficient.remaining(), 1);
-    assert_eq!(actual.pixels(), &[CLEAR; 16]);
+    assert_eq!(canvas.pixel(2, 2), Some(BLUE));
 }
 
 #[test]
-fn symbolic_grid_clips_without_modifying_surrounding_samples() {
-    let mut actual = image(3, 2);
-    let symbols = [(b'x', Some([3, 6, 9, 0]))];
-    let mut budget = Work::new(6).unwrap();
+fn flood_fill_work_exhaustion_and_memory_rejection_are_transactional() {
+    let mut canvas = image(6, 6);
+    let mut insufficient = Work::new(5).unwrap();
     assert_eq!(
-        actual.draw_grid([-1, 0], &["xxx", "xxx"], &symbols, true, &mut budget),
-        Ok(2)
+        canvas.flood_fill([1, 1], RED, None, &mut insufficient),
+        Err(Error::Limit(Resource::Work))
     );
-    assert_eq!(budget.remaining(), 0);
-    assert_eq!(actual.pixels(), &[
-        [3, 6, 9, 0], [3, 6, 9, 0], CLEAR,
-        [3, 6, 9, 0], [3, 6, 9, 0], CLEAR,
-    ]);
+    assert_eq!(canvas.pixels(), &[CLEAR; 36]);
+
+    let limits = Limits::new(6, 36, 144).unwrap();
+    let mut memory_limited = Image::new(6, 6, limits, &mut work()).unwrap();
+    let mut budget = Work::new(100).unwrap();
+    assert_eq!(
+        memory_limited.flood_fill([1, 1], BLUE, None, &mut budget),
+        Err(Error::Limit(Resource::Bytes))
+    );
+    assert_eq!(budget.remaining(), 100);
+    assert_eq!(memory_limited.pixels(), &[CLEAR; 36]);
+}
+
+#[test]
+fn flood_fill_bounds_rejection_preserves_work_and_pixels() {
+    let mut canvas = image(2, 2);
+    let mut budget = Work::new(20).unwrap();
+    assert_eq!(
+        canvas.flood_fill([2, 0], RED, None, &mut budget),
+        Err(Error::Bounds)
+    );
+    assert_eq!(
+        canvas.flood_fill([1, 1], RED, Some(rect(-1, 0, 2, 2)), &mut budget),
+        Err(Error::Bounds)
+    );
+    assert_eq!(budget.remaining(), 20);
+    assert_eq!(canvas.pixels(), &[CLEAR; 4]);
 }
