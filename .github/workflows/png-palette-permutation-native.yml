@@ -1,0 +1,50 @@
+name: PNG palette permutation scratch trial
+
+on:
+  push:
+    branches: [feat/raster-foundation]
+    paths:
+      - 'tools/png_palette_permutation_balanced_trial.py'
+      - '.github/workflows/png-palette-permutation-native.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: png-palette-permutation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: Palette permutation / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Linux
+            runner: ubuntu-24.04
+          - os: Windows
+            runner: windows-2022
+          - os: macOS ARM64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.99.1
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Export deterministic PNG test images
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: cargo run --release --locked --offline --example png_bench -- --export png-stage-inputs
+      - name: Restore independent original sheet
+        run: python -c "import json;from pathlib import Path;p=Path('png-original-inputs');p.mkdir(exist_ok=True);[(p / (c['name'] + '.png')).write_bytes(bytes.fromhex(c['png_hex'])) for c in json.loads(Path('benchmarks/png/original-inputs.json').read_text())['cases']]"
+      - name: Generate independent three-color cross-block fixture
+        run: python -c "from pathlib import Path;from tools.png_balanced_integrated_reference import cross_block_fixture;p=Path('png-original-inputs');cross_block_fixture(p)"
+      - name: Compare every palette order with all balanced modes and independently decode
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_palette_permutation_balanced_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/indexed-case-3-1024x300.png
