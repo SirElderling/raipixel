@@ -144,12 +144,7 @@ fn balanced_png_preserves_c24_independent_art_champions() {
         )
         .unwrap();
         let mut encoded = Vec::new();
-        assert!(png::encode_indexed_balanced(
-            &image,
-            &mut encoded,
-            &mut Work::default()
-        )
-        .unwrap());
+        assert!(png::encode_indexed_balanced(&image, &mut encoded, &mut Work::default()).unwrap());
         assert_eq!(encoded.len(), expected, "C24 known size winner regressed");
         assert_eq!(
             png::decode(&encoded, Limits::default(), &mut Work::default())
