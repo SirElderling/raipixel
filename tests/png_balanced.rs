@@ -105,3 +105,58 @@ fn balanced_unsupported_palette_and_caller_io_failure() {
     assert_eq!(err.code(), "E_IO");
     assert_eq!(reject.calls, 1);
 }
+
+#[test]
+fn balanced_png_preserves_c24_independent_art_champions() {
+    // Exact RGBA of the C16/C24 independent seeded art fixtures. Their
+    // diagonal and banded indexes do not depend on the fixture PRNG.
+    for (width, height, seed, diagonal, expected) in [
+        (257usize, 129usize, 4u8, true, 517usize),
+        (512, 128, 5u8, false, 445),
+    ] {
+        let palette: Vec<[u8; 4]> = (0..16u8)
+            .map(|i| {
+                [
+                    i,
+                    i.wrapping_mul(37).wrapping_add(seed.wrapping_mul(3)),
+                    i.wrapping_mul(83).wrapping_add(seed.wrapping_mul(7)),
+                    [0, 64, 128, 255][usize::from(i.wrapping_add(seed) % 4)],
+                ]
+            })
+            .collect();
+        let mut pixels = Vec::with_capacity(width * height);
+        for y in 0..height {
+            for x in 0..width {
+                let index = if diagonal {
+                    ((x + y) / 7) % 16
+                } else {
+                    ((y / 4) + (x / 73)) % 16
+                };
+                pixels.push(palette[index]);
+            }
+        }
+        let image = Image::from_pixels(
+            width as u32,
+            height as u32,
+            &pixels,
+            Limits::default(),
+            &mut Work::default(),
+        )
+        .unwrap();
+        let mut encoded = Vec::new();
+        assert!(png::encode_indexed_balanced(
+            &image,
+            &mut encoded,
+            &mut Work::default()
+        )
+        .unwrap());
+        assert_eq!(encoded.len(), expected, "C24 known size winner regressed");
+        assert_eq!(
+            png::decode(&encoded, Limits::default(), &mut Work::default())
+                .unwrap()
+                .image,
+            image,
+            "lossless alpha-zero RGBA changed"
+        );
+    }
+}
