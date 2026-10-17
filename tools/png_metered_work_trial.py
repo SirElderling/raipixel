@@ -643,24 +643,25 @@ def make_metered(encoder,png):
                 // Updating hashes for interior match bytes also consumes work.
                 work.charge((best - 1) as u64)?;
                 pos += 1;""")
-    encoder=one(encoder,
-        """            if best >= 3 && best < 258 && pos + 4 <= joined.len() {
-                let next = pos + 1;""",
-        """            if best >= 3 && best < 258 && pos + 4 <= joined.len() {
-                work.charge(4)?;
-                let next = pos + 1;""")
-    encoder=one(encoder,
-        """                    if joined[candidate..candidate+3] == joined[next..next+3] {""",
-        """                    work.charge(4)?;
-                    if joined[candidate..candidate+3] == joined[next..next+3] {""")
-    encoder=one(encoder,
-        """                            &joined[next+3..next+max_next],
-                        );
-                        next_best = next_best.max(length);""",
-        """                            &joined[next+3..next+max_next],
-                        );
-                        work.charge((length + 16) as u64)?;
-                        next_best = next_best.max(length);""")
+    if "if best >= 3 && best < 258 && pos + 4 <= joined.len()" in encoder:
+        encoder=one(encoder,
+            """            if best >= 3 && best < 258 && pos + 4 <= joined.len() {
+                    let next = pos + 1;""",
+            """            if best >= 3 && best < 258 && pos + 4 <= joined.len() {
+                    work.charge(4)?;
+                    let next = pos + 1;""")
+        encoder=one(encoder,
+            """                    if joined[candidate..candidate+3] == joined[next..next+3] {""",
+            """                    work.charge(4)?;
+                        if joined[candidate..candidate+3] == joined[next..next+3] {""")
+        encoder=one(encoder,
+            """                            &joined[next+3..next+max_next],
+                            );
+                            next_best = next_best.max(length);""",
+            """                            &joined[next+3..next+max_next],
+                            );
+                            work.charge((length + 16) as u64)?;
+                            next_best = next_best.max(length);""")
     png=one(png,
         "encoder.block_history(&raw, offset + len == raw_size)?",
         "encoder.block_history(&raw, offset + len == raw_size, work)?")
