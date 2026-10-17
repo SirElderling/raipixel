@@ -641,11 +641,16 @@ impl Document {
                     code: "E_REFERENCE",
                     message: "unknown quantization palette".into(),
                 })?;
-                let colors: Vec<[u8; 3]> = entries.iter().map(|(_, rgb)| *rgb).collect();
+                // Named palettes are bounded to 256 entries; avoid a heap
+                // allocation for each AI quantization command.
+                let mut colors = [[0u8; 3]; 256];
+                for (slot, (_, rgb)) in colors.iter_mut().zip(entries) {
+                    *slot = *rgb;
+                }
                 let region = operation.get("region").map(rect).transpose()?;
                 raster(
                     self.image_mut(&target)?
-                        .quantize_nearest(&colors, region, work),
+                        .quantize_nearest(&colors[..entries.len()], region, work),
                 )?;
                 Ok(())
             }
