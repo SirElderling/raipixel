@@ -118,9 +118,15 @@ jobs:
         run: python tools/png_fallible_buffers_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
 
       - name: Reuse preallocated scratch encoder workspaces and verify byte-identical PNGs
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_workspace_reuse_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Transactional staged PNG export with resource and writer-failure injection
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_atomic_staging_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
 
       - name: Test frequency-ordered exact RGBA palettes against existing indexed writer
         if: github.event_name == 'workflow_dispatch'
