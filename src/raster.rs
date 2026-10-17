@@ -189,6 +189,66 @@ impl Image {
         Ok(declared - written)
     }
 
+    /// Draw a compact ASCII color grid, preserving exact hidden RGB samples.
+    ///
+    /// Each row has the same nonzero byte width. Symbols are printable ASCII;
+    /// `None` is an explicit skip, unlike the transparent RGBA pixel [0; 4].
+    /// Validation, bounds and the full declared work charge precede all writes.
+    /// No temporary pixel grid or heap allocation is required.
+    pub fn draw_grid(
+        &mut self,
+        at: [i32; 2],
+        rows: &[&str],
+        symbols: &[(u8, Option<Pixel>)],
+        clip: bool,
+        work: &mut Work,
+    ) -> Result<u64, Error> {
+        let width = u32::try_from(rows.first().ok_or(Error::Rectangle)?.len())
+            .map_err(|_| Error::Rectangle)?;
+        let height = u32::try_from(rows.len()).map_err(|_| Error::Rectangle)?;
+        let rect = Rect::new(at[0], at[1], width, height)?;
+        if symbols.len() > 95 {
+            return Err(Error::PixelCount);
+        }
+        let mut lookup = [None; 95];
+        for &(symbol, color) in symbols {
+            if !(b' '..=b'~').contains(&symbol) {
+                return Err(Error::PixelCount);
+            }
+            let slot = &mut lookup[usize::from(symbol - b' ')];
+            if slot.is_some() {
+                return Err(Error::PixelCount);
+            }
+            *slot = Some(color);
+        }
+        for row in rows {
+            if row.len() != width as usize {
+                return Err(Error::PixelCount);
+            }
+            for &symbol in row.as_bytes() {
+                if !(b' '..=b'~').contains(&symbol)
+                    || lookup[usize::from(symbol - b' ')].is_none()
+                {
+                    return Err(Error::PixelCount);
+                }
+            }
+        }
+        let coverage = self.coverage(rect, clip)?;
+        work.charge(rect.area())?;
+        let [x0, y0, x1, y1] = coverage;
+        for y in y0..y1 {
+            let row = rows[(i64::from(y) - i64::from(at[1])) as usize].as_bytes();
+            for x in x0..x1 {
+                let column = (i64::from(x) - i64::from(at[0])) as usize;
+                if let Some(color) = lookup[usize::from(row[column] - b' ')].unwrap() {
+                    let index = self.index(x, y);
+                    self.pixels_mut()[index] = color;
+                }
+            }
+        }
+        Ok(discarded(rect, coverage))
+    }
+
     /// Stamp an in-bounds source region at an explicit destination position.
     /// Clipping affects only destination coverage, never source validity.
     #[allow(clippy::too_many_arguments)]
