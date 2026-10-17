@@ -488,3 +488,81 @@ fn indexed_writer_refuses_nonrepresentable_colors_without_writing() {
     );
     assert!(output.is_empty());
 }
+
+#[test]
+fn staged_indexed_preserves_legacy_bytes_and_exact_transparent_rgba() {
+    let samples: Vec<_> = (0..(257 * 19))
+        .map(|i| {
+            let v = (i % 13) as u8;
+            [v, v.wrapping_mul(23), v.wrapping_mul(71), if v % 2 == 0 { 0 } else { 255 }]
+        })
+        .collect();
+    let image = Image::from_pixels(
+        257, 19, &samples, Limits::default(), &mut Work::default()
+    ).unwrap();
+    let mut original = Vec::new();
+    let mut staged = Vec::new();
+    assert!(png::encode_indexed(&image, &mut original, &mut Work::default()).unwrap());
+    assert!(png::encode_indexed_staged(&image, &mut staged, &mut Work::default()).unwrap());
+    assert_eq!(staged, original, "transactional wrapper changed encoder bytes");
+    let decoded = png::decode(&staged, Limits::default(), &mut Work::default()).unwrap();
+    assert_eq!(decoded.image, image, "hidden RGB under alpha zero was altered");
+    let mut again = Vec::new();
+    assert!(png::encode_indexed_staged(&image, &mut again, &mut Work::default()).unwrap());
+    assert_eq!(again, staged, "staged output must be deterministic");
+}
+
+#[test]
+fn staged_indexed_failure_does_not_touch_caller() {
+    let samples: Vec<_> = (0..(64 * 64))
+        .map(|i| [((i % 7) * 13) as u8, 18, 239, 0])
+        .collect();
+    let image = Image::from_pixels(
+        64, 64, &samples, Limits::default(), &mut Work::default()
+    ).unwrap();
+    let mut sink = vec![0x5d];
+    let error = png::encode_indexed_staged(&image, &mut sink, &mut Work::new(0).unwrap())
+        .unwrap_err();
+    assert_eq!(error.code(), "E_LIMIT");
+    assert_eq!(sink, [0x5d], "work-limit error published partial bytes");
+
+    let many_colors: Vec<_> = (0..257u16)
+        .map(|value| [value as u8, (value >> 8) as u8, 17, 0])
+        .collect();
+    let unsupported = Image::from_pixels(
+        257, 1, &many_colors, Limits::default(), &mut Work::default()
+    ).unwrap();
+    assert!(!png::encode_indexed_staged(
+        &unsupported, &mut sink, &mut Work::default()
+    ).unwrap());
+    assert_eq!(sink, [0x5d], "unsupported palette published output");
+
+    struct Reject {
+        calls: usize,
+    }
+    impl std::io::Write for Reject {
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            self.calls += 1;
+            Err(std::io::Error::other("intentional caller write failure"))
+        }
+        fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+    }
+    let mut reject = Reject { calls: 0 };
+    let error = png::encode_indexed_staged(
+        &image, &mut reject, &mut Work::default()
+    ).unwrap_err();
+    assert_eq!(error.code(), "E_IO");
+    assert_eq!(reject.calls, 1, "output should be attempted only at final commit");
+}
+
+#[test]
+fn staged_indexed_respects_image_memory_limit_before_writing() {
+    let limits = Limits::new(8, 64, 256).unwrap();
+    let image = Image::new(4, 4, limits, &mut Work::default()).unwrap();
+    let mut sink = vec![0xa5];
+    let error = png::encode_indexed_staged(
+        &image, &mut sink, &mut Work::default()
+    ).unwrap_err();
+    assert_eq!(error.code(), "E_LIMIT");
+    assert_eq!(sink, [0xa5]);
+}
