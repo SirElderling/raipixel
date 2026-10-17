@@ -1,6 +1,6 @@
 //! Minimal executable Foundation vertical slice: one editable cel and frame.
 //! Deliberately rejects unsupported v1 structures instead of dropping state.
-use raipixel::{Image, Limits, Pixel, Rect, Work, json, png};
+use raipixel::{Blend, Image, Limits, Pixel, Rect, Work, json, png};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
@@ -509,6 +509,37 @@ impl Document {
                 let region = operation.get("region").map(rect).transpose()?;
                 let pixel = self.resolve_color(field(operation, "color")?)?;
                 raster(self.image_mut(&target)?.flood_fill(at, pixel, region, work))?;
+                Ok(())
+            }
+            "stamp" => {
+                allowed(
+                    operation,
+                    &["op", "targets", "source", "at", "rect", "mode", "clip"],
+                )?;
+                let target = single_target(operation)?;
+                if text(operation, "source")? != target {
+                    return capability("the current single-cel slice stamps from its own cel only");
+                }
+                let at = optional_point(operation, "at", [0, 0])?;
+                let clip = boolean(operation, "clip", false)?;
+                let mode = match operation.get("mode") {
+                    None => Blend::Over,
+                    Some(value) => match string(value)? {
+                        "over" => Blend::Over,
+                        "copy" => Blend::Copy,
+                        _ => return argument("stamp mode must be copy or over"),
+                    },
+                };
+                let source = if let Some(value) = operation.get("rect") {
+                    rect(value)?
+                } else {
+                    let [width, height] = self.image_mut(&target)?.size();
+                    raster(Rect::new(0, 0, width, height))?
+                };
+                raster(
+                    self.image_mut(&target)?
+                        .stamp_within(source, at, mode, 255, clip, work),
+                )?;
                 Ok(())
             }
             "palette.map" => {
