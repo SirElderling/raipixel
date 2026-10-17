@@ -415,7 +415,9 @@ fn bounded_line_matches_independent_canonical_bresenham_in_all_octants() {
                     let mut actual = image(7, 7);
                     let mut budget = Work::new(reference.len() as u64).unwrap();
                     assert_eq!(
-                        actual.draw_line(start, end, color, true, &mut budget).unwrap(),
+                        actual
+                            .draw_line(start, end, color, true, &mut budget)
+                            .unwrap(),
                         reference.len() as u64 - kept,
                         "{start:?} to {end:?}"
                     );
@@ -423,7 +425,9 @@ fn bounded_line_matches_independent_canonical_bresenham_in_all_octants() {
                     assert_eq!(actual.pixels(), expected, "{start:?} to {end:?}");
 
                     let mut reversed = image(7, 7);
-                    reversed.draw_line(end, start, color, true, &mut work()).unwrap();
+                    reversed
+                        .draw_line(end, start, color, true, &mut work())
+                        .unwrap();
                     assert_eq!(reversed, actual, "endpoint order changed pixels");
                 }
             }
@@ -462,17 +466,25 @@ fn unclipped_line_bounds_and_single_pixel_are_transactional() {
     let mut actual = image(4, 4);
     let mut budget = Work::new(2).unwrap();
     assert_eq!(
-        actual.draw_line([-1, 0], [2, 0], RED, false, &mut budget).unwrap_err(),
+        actual
+            .draw_line([-1, 0], [2, 0], RED, false, &mut budget)
+            .unwrap_err(),
         Error::Bounds
     );
     assert_eq!(budget.remaining(), 2);
     assert_eq!(actual.pixels(), &[CLEAR; 16]);
 
     let hidden = [43, 27, 99, 0];
-    assert_eq!(actual.draw_line([2, 3], [2, 3], hidden, false, &mut budget), Ok(0));
+    assert_eq!(
+        actual.draw_line([2, 3], [2, 3], hidden, false, &mut budget),
+        Ok(0)
+    );
     assert_eq!(budget.remaining(), 1);
     assert_eq!(actual.pixel(2, 3), Some(hidden));
-    assert_eq!(actual.draw_line([-1, -1], [-1, -1], RED, true, &mut budget), Ok(1));
+    assert_eq!(
+        actual.draw_line([-1, -1], [-1, -1], RED, true, &mut budget),
+        Ok(1)
+    );
     assert_eq!(budget.remaining(), 0);
     assert_eq!(actual.pixel(2, 3), Some(hidden));
 }
