@@ -13,6 +13,10 @@ only the library functions listed below are available today. The API is unstable
 - Half-open rectangles, exact bounded Bresenham lines, lossless ASCII symbol grids, four-connected exact-RGBA flood fill, copy and source-over stamps, explicit clipping,
   and same-image stamps that read a pre-edit snapshot. Calls return discarded pixel counts.
 - Integer alpha/opacity rounding as specified in the architecture.
+- Exact, simultaneous RGB/RGBA recolor using bounded fixed-size lookup, alpha
+  key and threshold operations that preserve all underlying RGB samples.
+- Exact bounded RGBA histogram, alpha statistics, visibility bounding box and
+  optional region pixel inspection (raw region <=4096 pixels).
 - Typed errors with interface-compatible category codes; no structured CLI errors yet.
 - Per-image dimension/pixel/byte ceilings, fallible pixel-buffer reservations,
   and a cumulative caller-owned pixel-work budget.
@@ -50,19 +54,26 @@ failure after a successful charge may consume work.
 
 These are local raster safeguards. JSON and PNG have their own charged work
 and local allocation checks. The library performs no file or process I/O.
-A separate minimal CLI now supports one asset, one layer, one frame and one
-editable cel: create or import a static PNG, draw pixels/lines/rectangles or
-symbolic grids, flood-fill, export PNG, save a single-cel JSON/PNG snapshot
-and reopen it for further edits. Unsupported v1 operations and snapshot fields
-are rejected rather than discarded. A read-only single-frame compositor for
-multiple supplied layers is available as a library function, but the CLI
-cannot yet manage layered projects.
+A separate minimal CLI currently supports one asset, one layer, one frame and
+one editable cel: create or import static PNG, draw pixels/lines/rectangles and
+symbol grids, flood-fill, exact recolor, alpha cleanup, and static PNG export.
+Ordered named RGB palettes persist in JSON/PNG snapshots, resolve
+`@palette/entry` in drawing commands, and may be replaced without silently
+recoloring existing pixels. Reopen, edit, inspect and export are supported.
+Read-only inspection accepts bounded targeted pixel queries, deterministic
+histograms and project structure summaries. Unsupported fields and snapshot
+semantics are rejected instead of discarded. A read-only single-frame
+compositor for multiple supplied layers exists in the library, but the
+CLI cannot yet manage layered projects or animations.
 
 CLI output is staged in a sibling directory and renamed on success, and dry-run
 creates no output. This is not a certified cross-process no-clobber protocol,
-and the CLI still lacks the complete typed diagnostics, exit-code categories,
-inspection/validation commands and full S1 project model. Aggregate live
-project memory and process-wide RSS remain unverified.
+and the CLI still lacks complete typed diagnostics, documented exit-code
+categories, a standalone validation command and the full S1 project model.
+Aggregate live project memory and process-wide RSS remain unverified.
+Color-mapping kernel variants are compared in a native benchmark-only
+workflow; timing results must be recorded before changing the production
+algorithm. No performance superiority is assumed from algorithm selection.
 
 ## Develop
 
@@ -137,9 +148,9 @@ peak-RSS ceiling. Do not promote that opt-in to a default or claim universal
 compression parity from the current finite fixture set.
 
 Next, extend the now-working single-cel command workflow to an independently
-reopenable multi-layer model with complete typed field validation, read-only
-inspection and deterministic project publication. Use the existing frame
-renderer for flattening. Add resource accounting and path/no-clobber tests
+reopenable multi-layer model with complete typed field validation and a
+standalone validation command. Use the existing frame renderer for flattening.
+Harden deterministic publication, accounting and path/no-clobber tests
 before claiming the whole S1 Foundation milestone. Avoid further codec
 micro-optimizations until this complete workflow is available.
 No extra backend abstraction or package split is needed for those additions.
