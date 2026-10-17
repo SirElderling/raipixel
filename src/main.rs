@@ -954,6 +954,126 @@ fn run_job(
     );
     Ok(())
 }
+/// Read-only single-frame query. The image-statistics implementation is shared
+/// with callers of the library, so CLI and programmatic results use the same
+/// pixel traversal and deterministic histogram ordering.
+fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
+    use std::fmt::Write as _;
+
+    let mut work = Work::default();
+    let document = load_snapshot(project, &mut work)?;
+    let parsed = if let Some(path) = query_file {
+        let base = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+        let filename = path.file_name().and_then(|s| s.to_str()).ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "invalid query filename".into(),
+        })?;
+        let bytes = read_input(base, filename, 8 * 1024 * 1024)?;
+        parse_json(&bytes, &mut work)?
+    } else {
+        json::Value::Object(Map::new())
+    };
+    let query = obj(&parsed)?;
+    allowed(query, &["target", "region", "pixels", "symbols", "histogram_limit"])?;
+    if boolean(query, "symbols", false)? {
+        return capability("symbol-grid inspection is not supported in this slice");
+    }
+    let target = query.get("target").map(string).transpose()?;
+    if target.is_none() {
+        if query.contains_key("region") || query.contains_key("pixels")
+            || query.contains_key("histogram_limit")
+        {
+            return argument("inspection region and pixel options require a target");
+        }
+        let [w, h] = document.size.ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "missing canvas".into(),
+        })?;
+        let asset = document.asset.as_deref().ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "missing asset".into(),
+        })?;
+        let layer = document.layer.as_deref().ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "missing layer".into(),
+        })?;
+        let frame = document.frame.as_deref().ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "missing frame".into(),
+        })?;
+        let mut palettes = String::new();
+        for (index, name) in document.palettes.keys().enumerate() {
+            if index != 0 {
+                palettes.push(',');
+            }
+            let _ = write!(palettes, r#""{name}""#);
+        }
+        println!(
+            r#"{{"schema":1,"ok":true,"action":"inspect","result":{{"assets":["{asset}"],"layers":["{layer}"],"frames":["{frame}"],"palettes":[{palettes}],"size":[{w},{h}],"pivot":[{},{}]}}}}"#,
+            document.pivot[0],
+            document.pivot[1]
+        );
+        return Ok(());
+    }
+
+    let target = target.unwrap();
+    if target != document.cel_name()? && target != document.frame_name()? {
+        return fail("E_REFERENCE", "unknown cel or frame inspection target");
+    }
+    let region = query.get("region").map(rect).transpose()?;
+    let raw = boolean(query, "pixels", false)?;
+    let histogram_limit = query
+        .get("histogram_limit")
+        .map(unsigned)
+        .transpose()?
+        .unwrap_or(16) as usize;
+    let image = document.image.as_ref().ok_or_else(|| Fault {
+        code: "E_ARGUMENT",
+        message: "missing cel".into(),
+    })?;
+    let stats = raster(image.inspect(region, histogram_limit, raw, &mut work))?;
+
+    let mut histogram = String::new();
+    for (index, entry) in stats.histogram.iter().enumerate() {
+        if index != 0 {
+            histogram.push(',');
+        }
+        let [r, g, b, a] = entry.rgba;
+        let _ = write!(
+            histogram,
+            r#"{{"rgba":[{r},{g},{b},{a}],"count":{}}}"#,
+            entry.count
+        );
+    }
+    let bbox = match stats.visible_bbox {
+        Some([x, y, w, h]) => format!("[{x},{y},{w},{h}]"),
+        None => String::from("null"),
+    };
+    let [x, y, w, h] = stats.region;
+    let [image_width, image_height] = stats.size;
+    let mut pixels = String::new();
+    if let Some(raw_pixels) = stats.pixels.as_ref() {
+        pixels.push_str(r#","pixels":["#);
+        for (index, &[r, g, b, a]) in raw_pixels.iter().enumerate() {
+            if index != 0 {
+                pixels.push(',');
+            }
+            let _ = write!(pixels, "[{r},{g},{b},{a}]");
+        }
+        pixels.push(']');
+    }
+    println!(
+        r#"{{"schema":1,"ok":true,"action":"inspect","result":{{"target":"{target}","size":[{image_width},{image_height}],"region":[{x},{y},{w},{h}],"pixel_count":{},"zero_alpha":{},"partial_alpha":{},"opaque_alpha":{},"visible_bbox":{bbox},"unique_colors":{},"histogram_truncated":{},"histogram":[{histogram}]{pixels}}}}}"#,
+        stats.pixel_count,
+        stats.zero_alpha,
+        stats.partial_alpha,
+        stats.opaque_alpha,
+        stats.unique_colors,
+        stats.histogram_truncated
+    );
+    Ok(())
+}
+
 fn execute() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if args.len() == 1 && args[0] == "version" {
@@ -962,9 +1082,19 @@ fn execute() -> Result<()> {
     }
     if args.len() == 1 && args[0] == "help" {
         println!(
-            "raipixel run JOB.json --out DIRECTORY [--project SNAPSHOT] [--dry-run]\nraipixel version"
+            "raipixel run JOB.json --out DIRECTORY [--project SNAPSHOT] [--dry-run]\nraipixel inspect SNAPSHOT [--query QUERY.json]\nraipixel version"
         );
         return Ok(());
+    }
+    if args.len() >= 2 && args[0] == "inspect" {
+        let snapshot = PathBuf::from(&args[1]);
+        if args.len() == 2 {
+            return inspect_snapshot(&snapshot, None);
+        }
+        if args.len() == 4 && args[2] == "--query" {
+            return inspect_snapshot(&snapshot, Some(Path::new(&args[3])));
+        }
+        return argument("inspect usage: inspect SNAPSHOT [--query QUERY.json]");
     }
     if args.len() < 4 || args[0] != "run" {
         return capability("supported commands: help, version, run");
