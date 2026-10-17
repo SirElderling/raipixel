@@ -1,0 +1,36 @@
+name: Foundation CLI focused validation
+
+on:
+  push:
+    branches: ['feat/**']
+    paths:
+      - 'src/main.rs'
+      - 'tests/foundation_cli.rs'
+      - '.github/workflows/foundation-cli-focused.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pinned compiler
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+      - name: Format files in scratch checkout
+        run: cargo +1.99.1 fmt --all
+      - name: Capture formatted CLI and tests
+        run: |
+          echo 'BEGIN_FORMATTED_MAIN'
+          cat src/main.rs
+          echo 'END_FORMATTED_MAIN'
+          echo 'BEGIN_FORMATTED_TEST'
+          cat tests/foundation_cli.rs
+          echo 'END_FORMATTED_TEST'
+      - name: Compile and run executable Foundation tests
+        run: cargo +1.99.1 test --locked --offline --test foundation_cli -- --nocapture
+      - name: Verify source and integration tests with Clippy
+        run: cargo +1.99.1 clippy --locked --offline --all-targets -- -D warnings
