@@ -379,7 +379,11 @@ fn build_outputs(document: &Document, job: &Map, work: &mut Work) -> Result<Vec<
 fn run_job(job_file: &Path, output_dir: &Path, project: Option<&Path>, dry_run: bool) -> Result<()> {
     if output_dir.exists() { return argument("output directory already exists"); }
     let mut work = Work::default();
-    let bytes = read_input(job_file.parent().unwrap_or(Path::new(".")),
+    let job_base = job_file
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let bytes = read_input(job_base,
         job_file.file_name().and_then(|s| s.to_str()).ok_or_else(|| Fault { code: "E_ARGUMENT", message: "invalid job filename".into() })?,
         8 * 1024 * 1024)?;
     let input = parse_json(&bytes, &mut work)?;
@@ -397,7 +401,7 @@ fn run_job(job_file: &Path, output_dir: &Path, project: Option<&Path>, dry_run: 
     }
     let mut document = if let Some(path) = project { load_snapshot(path, &mut work)? } else { Document::default() };
     for op in arr(field(job, "ops")?)? {
-        document.apply(obj(op)?, job_file.parent().unwrap_or(Path::new(".")), &mut work)?;
+        document.apply(obj(op)?, job_base, &mut work)?;
     }
     let manifest = document.manifest()?;
     let exports = build_outputs(&document, job, &mut work)?;
