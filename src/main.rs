@@ -647,10 +647,11 @@ impl Document {
                 for (slot, (_, rgb)) in colors.iter_mut().zip(entries) {
                     *slot = *rgb;
                 }
+                let color_count = entries.len();
                 let region = operation.get("region").map(rect).transpose()?;
                 raster(
                     self.image_mut(&target)?
-                        .quantize_nearest(&colors[..entries.len()], region, work),
+                        .quantize_nearest(&colors[..color_count], region, work),
                 )?;
                 Ok(())
             }
