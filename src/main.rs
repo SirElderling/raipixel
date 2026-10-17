@@ -429,7 +429,15 @@ impl Document {
             "alpha" => {
                 allowed(
                     operation,
-                    &["op", "targets", "kind", "color", "match", "threshold", "region"],
+                    &[
+                        "op",
+                        "targets",
+                        "kind",
+                        "color",
+                        "match",
+                        "threshold",
+                        "region",
+                    ],
                 )?;
                 let target = single_target(operation)?;
                 let region = operation.get("region").map(rect).transpose()?;

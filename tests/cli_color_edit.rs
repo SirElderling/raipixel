@@ -49,8 +49,12 @@ fn mapped_colors_and_alpha_edits_survive_png_snapshot_round_trip() {
     assert_eq!(
         image.pixels(),
         &[
-            [4, 5, 6, 0], [7, 8, 9, 0], [0, 0, 0, 0],
-            [7, 8, 9, 0], [7, 8, 9, 255], [4, 5, 6, 0]
+            [4, 5, 6, 0],
+            [7, 8, 9, 0],
+            [0, 0, 0, 0],
+            [7, 8, 9, 0],
+            [7, 8, 9, 255],
+            [4, 5, 6, 0]
         ]
     );
 
@@ -59,7 +63,7 @@ fn mapped_colors_and_alpha_edits_survive_png_snapshot_round_trip() {
     fs::write(root.join("reopen.json"), reopen).unwrap();
     let result = run(
         &root,
-        &["run", "reopen.json", "--project", "one", "--out", "two"]
+        &["run", "reopen.json", "--project", "one", "--out", "two"],
     );
     assert!(
         result.status.success(),
@@ -75,7 +79,14 @@ fn mapped_colors_and_alpha_edits_survive_png_snapshot_round_trip() {
     fs::write(root.join("duplicate.json"), bad).unwrap();
     let result = run(
         &root,
-        &["run", "duplicate.json", "--project", "one", "--out", "rejected"]
+        &[
+            "run",
+            "duplicate.json",
+            "--project",
+            "one",
+            "--out",
+            "rejected",
+        ],
     );
     assert!(!result.status.success());
     assert!(!root.join("rejected").exists());
