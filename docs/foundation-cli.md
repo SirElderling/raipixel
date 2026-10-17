@@ -51,8 +51,12 @@ one cel**, with a matching canvas and stored cel size. It supports:
   row movement path; Over and partial-opacity Copy preserve their original
   immutable source snapshots. [Measured native A/B](../benchmarks/stamp-copy-decision.md).
 - `transform` supports whole-cel `flip-x`, `flip-y` and `rotate-180` as
-  deterministic in-place permutations; other kinds (including quarter-turn
-  and crop) remain unsupported. [Native two-implementation measurements](../benchmarks/transform-decision.md)
+  deterministic in-place permutations, and `rotate-90` / `rotate-270` with
+  a single destination allocation. The CLI currently accepts quarter-turns
+  only for square cels; rectangular quarter-turns are available through the
+  native image API but need independently sized cels in the project schema.
+  Crop remains unsupported. [Earlier transform measurements](../benchmarks/transform-decision.md)
+  and [native quarter-turn A/B results](../benchmarks/quarter-turn-decision.md)
   favor the allocation-free path, with exact hidden-RGB and rollback tests.
 - Single-target `frame` exports with nearest-neighbor scale 1–16.
   Scaled previews now allocate one RGBA output buffer rather than a second

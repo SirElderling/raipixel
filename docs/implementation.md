@@ -21,8 +21,10 @@ only the library functions listed below are available today. The API is unstable
   This is an isolated Core capability, not a declaration that S1 is complete.
 - Full-opacity overlapping same-cel Copy optimized with safe row-wise memmove;
   immutable-source results, work and PNG bytes verified across three native targets.
-- Exact allocation-free whole-cel flips and 180-degree rotation with charged
-  work, sample-preserving invariants and end-to-end PNG reopen tests.
+- Exact allocation-free whole-cel flips and 180-degree rotation; clockwise and
+  counterclockwise quarter-turns use one bounded destination RGBA allocation.
+  Pixel-preserving invariants, work accounting and end-to-end PNG reopen tests
+  cover these operations. [Native A/B rotation decision](../benchmarks/quarter-turn-decision.md).
 - Deterministic integer nearest-neighbor scaling with one output allocation,
   bounded dimensions/work and hidden-RGB exactness.
 - Exact bounded RGBA histogram, alpha statistics, visibility bounding box and
