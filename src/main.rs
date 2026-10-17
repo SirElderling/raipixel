@@ -649,10 +649,11 @@ impl Document {
                 }
                 let color_count = entries.len();
                 let region = operation.get("region").map(rect).transpose()?;
-                raster(
-                    self.image_mut(&target)?
-                        .quantize_nearest(&colors[..color_count], region, work),
-                )?;
+                raster(self.image_mut(&target)?.quantize_nearest(
+                    &colors[..color_count],
+                    region,
+                    work,
+                ))?;
                 Ok(())
             }
             "alpha" => {
