@@ -1,0 +1,48 @@
+name: PNG balanced opt-in native
+
+on:
+  push:
+    branches: [main, 'feat/**']
+    paths:
+      - 'src/**'
+      - 'tests/png_balanced.rs'
+      - 'tests/png.rs'
+      - 'Cargo.toml'
+      - '.github/workflows/png-balanced-native.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/png_balanced.rs'
+      - 'tests/png.rs'
+      - 'Cargo.toml'
+      - '.github/workflows/png-balanced-native.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Balanced PNG / ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Linux
+            runner: ubuntu-24.04
+          - os: Windows
+            runner: windows-2022
+          - os: macOS ARM64
+            runner: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+      - name: Compile and test experimental quality module
+        run: cargo +1.99.1 test --locked --offline --features experimental-quality --test png_balanced -- --nocapture
+      - name: Test accepted production writer unchanged
+        run: cargo +1.99.1 test --locked --offline --test png
+      - name: Compile integrated feature with all tests
+        run: cargo +1.99.1 test --locked --offline --features experimental-quality
