@@ -89,17 +89,15 @@ fn scalar_scan(canvas: &mut Image, rect: [i32; 4], color: Pixel, filled: bool, w
             if selected && run_start.is_none() {
                 run_start = Some(x);
             }
-            if !selected {
-                if let Some(start) = run_start.take() {
-                    canvas
-                        .fill(
-                            Rect::new(start as i32, y as i32, (x - start) as u32, 1).unwrap(),
-                            color,
-                            false,
-                            &mut Work::default(),
-                        )
-                        .unwrap();
-                }
+            if !selected && let Some(start) = run_start.take() {
+                canvas
+                    .fill(
+                        Rect::new(start as i32, y as i32, (x - start) as u32, 1).unwrap(),
+                        color,
+                        false,
+                        &mut Work::default(),
+                    )
+                    .unwrap();
             }
         }
     }
