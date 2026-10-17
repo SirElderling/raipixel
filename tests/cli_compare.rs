@@ -14,10 +14,8 @@ struct Scratch(PathBuf);
 impl Scratch {
     fn new() -> Self {
         let id = NEXT.fetch_add(1, Ordering::Relaxed);
-        let root = std::env::temp_dir().join(format!(
-            "raipixel-compare-{}-{id}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("raipixel-compare-{}-{id}", std::process::id()));
         fs::create_dir(&root).unwrap();
         Self(root)
     }
@@ -47,7 +45,11 @@ impl Scratch {
         )
         .unwrap();
         let result = self.run(&["run", "first.json", "--out", "first"]);
-        assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
         fs::write(
             self.path("edit.json"),
             r##"{"interface":1,"semantics":"1.0","ops":[
@@ -58,10 +60,12 @@ impl Scratch {
              ]}"##,
         )
         .unwrap();
-        let result = self.run(&[
-            "run", "edit.json", "--project", "first", "--out", "second",
-        ]);
-        assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+        let result = self.run(&["run", "edit.json", "--project", "first", "--out", "second"]);
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
     }
 }
 impl Drop for Scratch {
@@ -97,7 +101,11 @@ fn against_reports_exact_changed_rgba_and_preserves_both_snapshots() {
     )
     .unwrap();
     let output = root.run(&["inspect", "second", "--query", "compare.json"]);
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let parsed = compare_output(&output.stdout);
     let result = obj(obj(&parsed).get("result").unwrap());
     let diff = obj(result.get("against").unwrap());
@@ -109,7 +117,10 @@ fn against_reports_exact_changed_rgba_and_preserves_both_snapshots() {
         _ => panic!("expected changed rectangle"),
     };
     assert_eq!(bbox, [0, 0, 3, 2]);
-    assert_eq!(diff.get("unrelated_state_equal"), Some(&json::Value::Bool(true)));
+    assert_eq!(
+        diff.get("unrelated_state_equal"),
+        Some(&json::Value::Bool(true))
+    );
 
     fs::write(
         root.path("region.json"),
@@ -118,14 +129,29 @@ fn against_reports_exact_changed_rgba_and_preserves_both_snapshots() {
     )
     .unwrap();
     let partial = root.run(&["inspect", "second", "--query", "region.json"]);
-    assert!(partial.status.success(), "{}", String::from_utf8_lossy(&partial.stderr));
+    assert!(
+        partial.status.success(),
+        "{}",
+        String::from_utf8_lossy(&partial.stderr)
+    );
     let parsed = compare_output(&partial.stdout);
-    let partial_diff = obj(obj(obj(&parsed).get("result").unwrap()).get("against").unwrap());
+    let partial_diff = obj(obj(obj(&parsed).get("result").unwrap())
+        .get("against")
+        .unwrap());
     assert_eq!(number(partial_diff.get("changed_samples").unwrap()), 2);
-    assert_eq!(number(partial_diff.get("changed_visible_colors").unwrap()), 0);
+    assert_eq!(
+        number(partial_diff.get("changed_visible_colors").unwrap()),
+        0
+    );
     assert_eq!(number(partial_diff.get("changed_alpha").unwrap()), 1);
-    assert_eq!(fs::read(root.path("first/images/000000.png")).unwrap(), first_png);
-    assert_eq!(fs::read(root.path("second/images/000000.png")).unwrap(), second_png);
+    assert_eq!(
+        fs::read(root.path("first/images/000000.png")).unwrap(),
+        first_png
+    );
+    assert_eq!(
+        fs::read(root.path("second/images/000000.png")).unwrap(),
+        second_png
+    );
 }
 
 #[test]
@@ -141,7 +167,10 @@ fn against_rejects_traversal_mismatched_target_and_missing_owner() {
     ] {
         fs::write(root.path("invalid.json"), request).unwrap();
         let output = root.run(&["inspect", "second", "--query", "invalid.json"]);
-        assert!(!output.status.success(), "invalid query accepted: {request}");
+        assert!(
+            !output.status.success(),
+            "invalid query accepted: {request}"
+        );
         assert!(output.stdout.is_empty());
     }
 }

@@ -1262,7 +1262,6 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
         symbols.push_str("]}");
     }
 
-
     // Comparisons are read-only and preserve all exact RGBA samples, including
     // RGB under zero alpha. The other project is confined to the query folder.
     let mut against = String::new();
@@ -1324,9 +1323,7 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
         let _ = write!(
             against,
             r#","against":{{"target":"{other_target}","changed_samples":{},"changed_visible_colors":{},"changed_alpha":{},"changed_bbox":{change_bbox},"unrelated_state_equal":{same_state}}}"#,
-            diff.changed_samples,
-            diff.changed_visible_colors,
-            diff.changed_alpha
+            diff.changed_samples, diff.changed_visible_colors, diff.changed_alpha
         );
     }
 
