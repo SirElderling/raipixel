@@ -81,19 +81,29 @@ fn validation_query_rejects_unsupported_and_duplicate_checks() {
         std::thread::current().id()
     ));
     fs::create_dir(&root).unwrap();
+    fs::write(
+        root.join("initial.json"),
+        r#"{"interface":1,"semantics":"1.0","ops":[
+           {"op":"asset.create","name":"x","size":[1,1]},
+           {"op":"layer.create","asset":"x","name":"l"},
+           {"op":"frame.create","asset":"x","name":"f"},
+           {"op":"cel.create","target":"x/l/f"}
+        ]}"#,
+    )
+    .unwrap();
+    assert!(invoke(&root, &["run", "initial.json", "--out", "snapshot"]).status.success());
     for (index, query) in [
         r#"{"checks":["made_up"]}"#,
         r#"{"checks":["structure","structure"]}"#,
         r#"{"checks":[]}"#,
     ].iter().enumerate() {
         fs::write(root.join(format!("{index}.json")), query).unwrap();
-        // The snapshot does not exist, so the request itself cannot validate it;
-        // the behavior is covered separately by a materialized snapshot above.
         let output = invoke(
             &root,
-            &["validate", "missing", "--query", &format!("{index}.json")]
+            &["validate", "snapshot", "--query", &format!("{index}.json")],
         );
         assert!(!output.status.success());
+        assert!(output.stdout.is_empty(), "invalid request emitted a success report");
     }
     fs::remove_dir_all(root).unwrap();
 }
