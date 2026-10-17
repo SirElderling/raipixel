@@ -328,6 +328,46 @@ impl Document {
                 self.palettes.insert(palette, entries);
                 Ok(())
             }
+            "palette.extract" => {
+                allowed(operation, &["op", "source", "name", "max_colors"])?;
+                let source = text(operation, "source")?;
+                if source != self.cel_name()? {
+                    return fail("E_REFERENCE", "unknown palette extraction source");
+                }
+                let palette = name(text(operation, "name")?)?;
+                if self.palettes.contains_key(&palette) {
+                    return fail("E_EXISTS", "palette already exists");
+                }
+                if self.palettes.len() >= 256 {
+                    return fail("E_LIMIT", "too many named palettes");
+                }
+                let max_colors = operation
+                    .get("max_colors")
+                    .map(unsigned)
+                    .transpose()?
+                    .unwrap_or(256);
+                if !(1..=256).contains(&max_colors) {
+                    return argument("max_colors must be 1..256");
+                }
+                let image = self.image.as_ref().ok_or_else(|| Fault {
+                    code: "E_REFERENCE",
+                    message: "cel does not exist".into(),
+                })?;
+                let extracted = raster(image.extract_visible_palette(
+                    max_colors as usize,
+                    work,
+                ))?;
+                let mut entries = PaletteEntries::new();
+                entries.try_reserve_exact(extracted.len()).map_err(|_| Fault {
+                    code: "E_ALLOC",
+                    message: "extracted palette allocation".into(),
+                })?;
+                for (index, color) in extracted.into_iter().enumerate() {
+                    entries.push((format!("c{index:03}"), color.rgb));
+                }
+                self.palettes.insert(palette, entries);
+                Ok(())
+            }
             "asset.create" => {
                 allowed(operation, &["op", "name", "size", "pivot", "palette"])?;
                 if self.asset.is_some() {
