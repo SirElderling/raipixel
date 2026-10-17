@@ -59,7 +59,7 @@ fn symbolic_colors_survive_snapshot_reopen_and_palette_replace_does_not_recolor(
     let change = r##"{"interface":1,"semantics":"1.0","ops":[
       {"op":"palette.set","name":"metal","replace":true,"entries":[
         {"name":"dark","rgb":"#090807"},{"name":"light","rgb":"#AABBCC"}]}
-    ],"exports":[{"name":"unchanged","kind":"frame","targets":["weapon/base"]}]}"##;
+    ]}"##;
     fs::write(dir.join("change.json"), change).unwrap();
     let output = run(
         &dir,
@@ -77,8 +77,11 @@ fn symbolic_colors_survive_snapshot_reopen_and_palette_replace_does_not_recolor(
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_eq!(rgba(&dir, "second/artifacts/unchanged/image.png"), expected);
+    // Palette replacement only changes future references; stored samples are exact.
+    assert_eq!(rgba(&dir, "second/images/000000.png"), expected);
     let draw = r##"{"interface":1,"semantics":"1.0","ops":[
+      {"op":"draw","targets":["weapon/blade/base"],"shape":"pixel",
+       "at":[0,0],"color":"@metal/dark"},
       {"op":"draw","targets":["weapon/blade/base"],"shape":"pixel",
        "at":[0,1],"color":"@metal/dark"}
     ],"exports":[{"name":"modified","kind":"frame","targets":["weapon/base"]}]}"##;
@@ -93,6 +96,7 @@ fn symbolic_colors_survive_snapshot_reopen_and_palette_replace_does_not_recolor(
         String::from_utf8_lossy(&output.stderr)
     );
     let mut updated = expected;
+    updated[0] = [9, 8, 7, 255];
     updated[2] = [9, 8, 7, 255];
     assert_eq!(rgba(&dir, "third/artifacts/modified/image.png"), updated);
 
