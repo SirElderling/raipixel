@@ -162,8 +162,8 @@ fn hash_collision_budget_always_falls_back_to_exact_rgba_mapping() {
             index as u8,
             255,
         ];
-        let bucket = (u32::from_be_bytes(candidate).wrapping_mul(0x9E37_79B1) as usize)
-            & 2047;
+        let packed = u32::from_be_bytes(candidate);
+        let bucket = ((packed ^ (packed >> 16)).wrapping_mul(0x9E37_79B1) as usize) & 2047;
         if bucket == 0 {
             samples.push(candidate);
             if samples.len() == 18 {
