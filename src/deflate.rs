@@ -5,6 +5,8 @@ use std::borrow::Cow;
 mod encode;
 pub(crate) use encode::{BLOCK, Encoder};
 #[cfg(feature = "experimental-quality")]
+#[rustfmt::skip]
+#[allow(dead_code)]
 #[path = "deflate/quality.rs"]
 pub(crate) mod quality;
 
