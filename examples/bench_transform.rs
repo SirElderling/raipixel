@@ -16,8 +16,8 @@ fn fixture(width: u32, height: u32) -> Image {
         })
         .collect();
     Image::from_pixels(
-        width,
-        height,
+        output_width,
+        output_height,
         &samples,
         Limits::default(),
         &mut Work::default(),
@@ -30,17 +30,25 @@ fn fixture(width: u32, height: u32) -> Image {
 fn copy_map(input: &Image, kind: Transform, work: &mut Work) -> Result<Image, Error> {
     let [width, height] = input.size();
     let count = width as usize * height as usize;
+    let (output_width, output_height) =
+        if matches!(kind, Transform::Rotate90 | Transform::Rotate270) {
+            (height, width)
+        } else {
+            (width, height)
+        };
     work.charge(count as u64)?;
     let mut samples = Vec::new();
     samples
         .try_reserve_exact(count)
         .map_err(|_| Error::Allocation)?;
-    for y in 0..height {
-        for x in 0..width {
+    for y in 0..output_height {
+        for x in 0..output_width {
             let (sx, sy) = match kind {
                 Transform::FlipX => (width - 1 - x, y),
                 Transform::FlipY => (x, height - 1 - y),
                 Transform::Rotate180 => (width - 1 - x, height - 1 - y),
+                Transform::Rotate90 => (y, height - 1 - x),
+                Transform::Rotate270 => (width - 1 - y, x),
             };
             samples.push(input.pixel(sx, sy).unwrap());
         }
