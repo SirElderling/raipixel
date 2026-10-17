@@ -1,7 +1,7 @@
 //! Exact visible-palette constraints; hidden RGB is never silently rewritten.
 use raipixel::{Error, Image, Limits, Resource, Work};
-use std::{fs, process::Command};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::{fs, process::Command};
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
@@ -10,29 +10,19 @@ fn visible_palette_membership_is_bounded_exact_and_alpha_aware() {
     let image = Image::from_pixels(
         3,
         1,
-        &[
-            [99, 88, 77, 0],
-            [1, 2, 3, 1],
-            [4, 5, 6, 255],
-        ],
+        &[[99, 88, 77, 0], [1, 2, 3, 1], [4, 5, 6, 255]],
         Limits::default(),
         &mut Work::default(),
     )
     .unwrap();
     let mut work = Work::new(3).unwrap();
     assert_eq!(
-        image.first_visible_color_outside_palette(
-            &[[4, 5, 6], [1, 2, 3]],
-            &mut work
-        ),
+        image.first_visible_color_outside_palette(&[[4, 5, 6], [1, 2, 3]], &mut work),
         Ok(None)
     );
     assert_eq!(work.remaining(), 0);
     assert_eq!(
-        image.first_visible_color_outside_palette(
-            &[[1, 2, 3]],
-            &mut Work::default()
-        ),
+        image.first_visible_color_outside_palette(&[[1, 2, 3]], &mut Work::default()),
         Ok(Some(([2, 0], [4, 5, 6])))
     );
 
@@ -95,7 +85,12 @@ fn palette_check_accepts_hidden_rgb_but_rejects_visible_mismatch_before_publish(
     )
     .unwrap();
     let rejected = run(&[
-        "run", "change.json", "--project", "good", "--out", "rejected",
+        "run",
+        "change.json",
+        "--project",
+        "good",
+        "--out",
+        "rejected",
     ]);
     assert!(!rejected.status.success());
     assert!(String::from_utf8_lossy(&rejected.stderr).contains("E_PROJECT"));

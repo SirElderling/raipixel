@@ -29,9 +29,17 @@ fn validate_reports_palette_violations_without_changing_existing_files() {
     ]}"##;
     fs::write(root.join("initial.json"), job).unwrap();
     let made = invoke(&root, &["run", "initial.json", "--out", "first"]);
-    assert!(made.status.success(), "{}", String::from_utf8_lossy(&made.stderr));
+    assert!(
+        made.status.success(),
+        "{}",
+        String::from_utf8_lossy(&made.stderr)
+    );
     let first = invoke(&root, &["validate", "first"]);
-    assert!(first.status.success(), "{}", String::from_utf8_lossy(&first.stderr));
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
     let report = String::from_utf8_lossy(&first.stdout);
     assert!(report.contains(r#""passed":true"#));
     assert!(report.contains(r#""name":"palette","passed":true"#));
@@ -45,19 +53,31 @@ fn validate_reports_palette_violations_without_changing_existing_files() {
     .unwrap();
     let edit = invoke(
         &root,
-        &["run", "edit.json", "--project", "first", "--out", "changed"]
+        &["run", "edit.json", "--project", "first", "--out", "changed"],
     );
-    assert!(edit.status.success(), "{}", String::from_utf8_lossy(&edit.stderr));
+    assert!(
+        edit.status.success(),
+        "{}",
+        String::from_utf8_lossy(&edit.stderr)
+    );
     let before = fs::read(root.join("changed/images/000000.png")).unwrap();
     let check = invoke(&root, &["validate", "changed"]);
-    assert_eq!(check.status.code(), Some(3), "{}", String::from_utf8_lossy(&check.stderr));
+    assert_eq!(
+        check.status.code(),
+        Some(3),
+        "{}",
+        String::from_utf8_lossy(&check.stderr)
+    );
     assert!(check.stderr.is_empty());
     let report = String::from_utf8_lossy(&check.stdout);
     assert!(report.contains(r#""ok":false"#));
     assert!(report.contains(r#""code":"E_STYLE""#));
     assert!(report.contains(r#""at":[1,0]"#));
     assert!(report.contains(r#""error_count":1"#));
-    assert_eq!(fs::read(root.join("changed/images/000000.png")).unwrap(), before);
+    assert_eq!(
+        fs::read(root.join("changed/images/000000.png")).unwrap(),
+        before
+    );
 
     fs::write(
         root.join("export.json"),
@@ -67,11 +87,21 @@ fn validate_reports_palette_violations_without_changing_existing_files() {
     .unwrap();
     let forbidden = invoke(
         &root,
-        &["run", "export.json", "--project", "changed", "--out", "forbidden"],
+        &[
+            "run",
+            "export.json",
+            "--project",
+            "changed",
+            "--out",
+            "forbidden",
+        ],
     );
     assert!(!forbidden.status.success());
     assert!(!root.join("forbidden").exists());
-    assert_eq!(fs::read(root.join("changed/images/000000.png")).unwrap(), before);
+    assert_eq!(
+        fs::read(root.join("changed/images/000000.png")).unwrap(),
+        before
+    );
 
     fs::write(
         root.join("query.json"),
@@ -79,7 +109,11 @@ fn validate_reports_palette_violations_without_changing_existing_files() {
     )
     .unwrap();
     let check = invoke(&root, &["validate", "changed", "--query", "query.json"]);
-    assert!(check.status.success(), "{}", String::from_utf8_lossy(&check.stderr));
+    assert!(
+        check.status.success(),
+        "{}",
+        String::from_utf8_lossy(&check.stderr)
+    );
     let report = String::from_utf8_lossy(&check.stdout);
     assert!(report.contains(r#""error_count":0"#));
     assert!(!report.contains(r#""name":"palette""#));
@@ -105,19 +139,29 @@ fn validation_query_rejects_unsupported_and_duplicate_checks() {
         ]}"#,
     )
     .unwrap();
-    assert!(invoke(&root, &["run", "initial.json", "--out", "snapshot"]).status.success());
+    assert!(
+        invoke(&root, &["run", "initial.json", "--out", "snapshot"])
+            .status
+            .success()
+    );
     for (index, query) in [
         r#"{"checks":["made_up"]}"#,
         r#"{"checks":["structure","structure"]}"#,
         r#"{"checks":[]}"#,
-    ].iter().enumerate() {
+    ]
+    .iter()
+    .enumerate()
+    {
         fs::write(root.join(format!("{index}.json")), query).unwrap();
         let output = invoke(
             &root,
             &["validate", "snapshot", "--query", &format!("{index}.json")],
         );
         assert!(!output.status.success());
-        assert!(output.stdout.is_empty(), "invalid request emitted a success report");
+        assert!(
+            output.stdout.is_empty(),
+            "invalid request emitted a success report"
+        );
     }
     fs::remove_dir_all(root).unwrap();
 }

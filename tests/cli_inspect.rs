@@ -1,7 +1,7 @@
 //! Read-only AI inspection workflows against persisted exact-RGBA snapshots.
 use raipixel::{Work, json};
-use std::{collections::BTreeMap, fs, path::PathBuf, process::Command};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::{collections::BTreeMap, fs, path::PathBuf, process::Command};
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
@@ -9,10 +9,8 @@ struct Scratch(PathBuf);
 impl Scratch {
     fn new() -> Self {
         let i = NEXT.fetch_add(1, Ordering::Relaxed);
-        let root = std::env::temp_dir().join(format!(
-            "raipixel-inspect-{}-{i}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("raipixel-inspect-{}-{i}", std::process::id()));
         fs::create_dir(&root).unwrap();
         Self(root)
     }
@@ -91,7 +89,9 @@ fn inspect_project_and_canvas_region_report_exact_pixels_and_histogram() {
     let result = object(object(&value).get("result").unwrap());
     assert_eq!(
         result.get("assets"),
-        Some(&json::Value::Array(vec![json::Value::String("test".into())]))
+        Some(&json::Value::Array(vec![json::Value::String(
+            "test".into()
+        )]))
     );
     assert_eq!(
         result.get("palettes"),
@@ -117,7 +117,10 @@ fn inspect_project_and_canvas_region_report_exact_pixels_and_histogram() {
     assert_eq!(number(stats.get("partial_alpha").unwrap()), 1);
     assert_eq!(number(stats.get("opaque_alpha").unwrap()), 2);
     assert_eq!(number(stats.get("unique_colors").unwrap()), 4);
-    assert_eq!(stats.get("histogram_truncated"), Some(&json::Value::Bool(true)));
+    assert_eq!(
+        stats.get("histogram_truncated"),
+        Some(&json::Value::Bool(true))
+    );
     let entries = array(stats.get("histogram").unwrap());
     assert_eq!(entries.len(), 2);
     assert_eq!(number(object(&entries[0]).get("count").unwrap()), 2);
@@ -132,8 +135,14 @@ fn inspect_project_and_canvas_region_report_exact_pixels_and_histogram() {
         array(&pixels[3]).iter().map(number).collect::<Vec<_>>(),
         [4, 5, 6, 128]
     );
-    assert_eq!(fs::read(root.file("project/project.json")).unwrap(), manifest);
-    assert_eq!(fs::read(root.file("project/images/000000.png")).unwrap(), png);
+    assert_eq!(
+        fs::read(root.file("project/project.json")).unwrap(),
+        manifest
+    );
+    assert_eq!(
+        fs::read(root.file("project/images/000000.png")).unwrap(),
+        png
+    );
 }
 
 #[test]
@@ -175,13 +184,19 @@ fn symbols_encode_rgba_sorted_legend_and_escape_quoted_characters() {
     );
     let value = parsed(&result.stdout);
     let stats = object(object(&value).get("result").unwrap());
-    assert!(!stats.contains_key("pixels"), "raw pixels were not requested");
+    assert!(
+        !stats.contains_key("pixels"),
+        "raw pixels were not requested"
+    );
     let symbols = object(stats.get("symbols").unwrap());
     let rows = array(symbols.get("rows").unwrap());
-    assert_eq!(rows, [
-        json::Value::String("#$!".into()),
-        json::Value::String("\"#$".into())
-    ]);
+    assert_eq!(
+        rows,
+        [
+            json::Value::String("#$!".into()),
+            json::Value::String("\"#$".into())
+        ]
+    );
     let legend = array(symbols.get("legend").unwrap());
     assert_eq!(legend.len(), 4);
     assert_eq!(
@@ -207,14 +222,8 @@ fn symbols_reject_more_than_94_exact_samples_without_emitting_output() {
 
     let root = Scratch::new();
     let colors: Vec<_> = (0..95u8).map(|v| [v, 0, 0, 255]).collect();
-    let image = Image::from_pixels(
-        95,
-        1,
-        &colors,
-        Limits::default(),
-        &mut Work::default(),
-    )
-    .unwrap();
+    let image =
+        Image::from_pixels(95, 1, &colors, Limits::default(), &mut Work::default()).unwrap();
     let mut bytes = Vec::new();
     png::encode(&image, &mut bytes, &mut Work::default()).unwrap();
     fs::write(root.file("input.png"), bytes).unwrap();

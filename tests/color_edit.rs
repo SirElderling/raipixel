@@ -156,12 +156,7 @@ fn hash_collision_budget_always_falls_back_to_exact_rgba_mapping() {
     // 16-probe fallback. A fully opaque white key also exercises the
     // 32-bit sentinel edge case without relying on sentinel encoding.
     for index in 0..1_000_000u32 {
-        let candidate = [
-            (index >> 16) as u8,
-            (index >> 8) as u8,
-            index as u8,
-            255,
-        ];
+        let candidate = [(index >> 16) as u8, (index >> 8) as u8, index as u8, 255];
         let packed = u32::from_be_bytes(candidate);
         let bucket = ((packed ^ (packed >> 16)).wrapping_mul(0x9E37_79B1) as usize) & 2047;
         if bucket == 0 {
@@ -187,10 +182,7 @@ fn hash_collision_budget_always_falls_back_to_exact_rgba_mapping() {
     )
     .unwrap();
     let mut budget = Work::new(samples.len() as u64).unwrap();
-    assert_eq!(
-        image.map_colors(&pairs, false, None, &mut budget),
-        Ok(19)
-    );
+    assert_eq!(image.map_colors(&pairs, false, None, &mut budget), Ok(19));
     assert_eq!(budget.remaining(), 0);
     for (i, pixel) in image.pixels().iter().enumerate() {
         let expected = if i < 19 {

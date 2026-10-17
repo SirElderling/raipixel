@@ -141,7 +141,6 @@ impl Image {
         })
     }
 
-
     /// Find the first visible RGB sample that is not in the supplied palette.
     ///
     /// Fully transparent pixels retain their hidden RGB and do not violate a

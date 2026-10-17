@@ -837,10 +837,7 @@ fn visible_palette_violation(
         code: "E_ARGUMENT",
         message: "missing editable cel".into(),
     })?;
-    raster(image.first_visible_color_outside_palette(
-        &colors[..entries.len()],
-        work,
-    ))
+    raster(image.first_visible_color_outside_palette(&colors[..entries.len()], work))
 }
 
 /// Export and explicitly requested palette checks must not publish invalid
@@ -917,9 +914,9 @@ fn run_job(
     // Snapshot-only jobs may keep deliberately incomplete artwork with
     // checks=["structure"]. A game PNG export must never silently violate
     // the asset's declared visible-color palette.
-    let exporting = job.get("exports").is_some_and(|value| {
-        matches!(value, json::Value::Array(exports) if !exports.is_empty())
-    });
+    let exporting = job
+        .get("exports")
+        .is_some_and(|value| matches!(value, json::Value::Array(exports) if !exports.is_empty()));
     if require_palette || exporting {
         enforce_visible_palette(&document, &mut work)?;
     }
@@ -1047,7 +1044,8 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
     let want_symbols = boolean(query, "symbols", false)?;
     let target = query.get("target").map(string).transpose()?;
     if target.is_none() {
-        if want_symbols || query.contains_key("region")
+        if want_symbols
+            || query.contains_key("region")
             || query.contains_key("pixels")
             || query.contains_key("histogram_limit")
         {
@@ -1137,10 +1135,12 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
             message: "symbol query missing bounded pixels".into(),
         })?;
         let mut colors = Vec::new();
-        colors.try_reserve_exact(raw_pixels.len()).map_err(|_| Fault {
-            code: "E_ALLOC",
-            message: "symbol palette allocation".into(),
-        })?;
+        colors
+            .try_reserve_exact(raw_pixels.len())
+            .map_err(|_| Fault {
+                code: "E_ALLOC",
+                message: "symbol palette allocation".into(),
+            })?;
         colors.extend_from_slice(raw_pixels);
         colors.sort_unstable();
         colors.dedup();
@@ -1227,7 +1227,12 @@ fn validate_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
         return fail("E_REFERENCE", "unknown validation asset");
     }
     let names = [
-        "structure", "dimensions", "palette", "alpha", "bounds", "metadata",
+        "structure",
+        "dimensions",
+        "palette",
+        "alpha",
+        "bounds",
+        "metadata",
     ];
     let requested: Vec<&str> = match query.get("checks") {
         Some(value) => arr(value)?.iter().map(string).collect::<Result<Vec<_>>>()?,

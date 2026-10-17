@@ -87,9 +87,15 @@ fn hash(original: &[Pixel], pairs: &[(Pixel, Pixel)]) -> Vec<Pixel> {
 
 fn execute(method: usize, original: &[Pixel], width: usize, pairs: &[(Pixel, Pixel)]) {
     match method {
-        0 => { black_box(linear(original, pairs)); }
-        1 => { black_box(binary(original, width, pairs)); }
-        _ => { black_box(hash(original, pairs)); }
+        0 => {
+            black_box(linear(original, pairs));
+        }
+        1 => {
+            black_box(binary(original, width, pairs));
+        }
+        _ => {
+            black_box(hash(original, pairs));
+        }
     }
 }
 
@@ -102,7 +108,11 @@ fn bench_case(width: usize, height: usize, colors: usize) {
     let original = sample(width, height, colors);
     let pairs = mappings(colors);
     let reference = linear(&original, &pairs);
-    assert_eq!(binary(&original, width, &pairs).pixels(), reference.as_slice(), "binary mismatch");
+    assert_eq!(
+        binary(&original, width, &pairs).pixels(),
+        reference.as_slice(),
+        "binary mismatch"
+    );
     assert_eq!(hash(&original, &pairs), reference, "hash mismatch");
     let names = ["linear", "native_map_colors", "fixed_hash"];
     let mut batches: [Vec<f64>; 3] = std::array::from_fn(|_| Vec::new());
@@ -127,9 +137,8 @@ fn bench_case(width: usize, height: usize, colors: usize) {
             for _ in 0..repetitions[method] {
                 execute(method, &original, width, &pairs);
             }
-            batches[method].push(
-                start.elapsed().as_secs_f64() * 1_000_000.0 / repetitions[method] as f64,
-            );
+            batches[method]
+                .push(start.elapsed().as_secs_f64() * 1_000_000.0 / repetitions[method] as f64);
         }
     }
     for method in 0..3 {
@@ -147,12 +156,7 @@ fn bench_case(width: usize, height: usize, colors: usize) {
 
 fn main() {
     println!("raipixel exact-RGB color-map strategies, release-mode paired machine test");
-    for (width, height, colors) in [
-        (64, 64, 8),
-        (512, 512, 8),
-        (512, 512, 64),
-        (256, 256, 256),
-    ] {
+    for (width, height, colors) in [(64, 64, 8), (512, 512, 8), (512, 512, 64), (256, 256, 256)] {
         bench_case(width, height, colors);
     }
 }
