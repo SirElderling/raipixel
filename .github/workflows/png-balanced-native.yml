@@ -42,6 +42,8 @@ jobs:
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
       - name: Compile and test experimental quality module
         run: cargo +1.99.1 test --locked --offline --features experimental-quality --test png_balanced -- --nocapture
+      - name: Clippy including feature-gated encoder and internal fault-injection tests
+        run: cargo +1.99.1 clippy --locked --offline --all-targets --features experimental-quality -- -D warnings
       - name: Test accepted production writer unchanged
         run: cargo +1.99.1 test --locked --offline --test png
       - name: Compile integrated feature with all tests
