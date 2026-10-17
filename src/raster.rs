@@ -128,7 +128,6 @@ impl Image {
         Ok(declared - written)
     }
 
-
     /// Replace the exact four-connected component containing `at`.
     ///
     /// The component is discovered against the original four RGBA samples,
@@ -237,8 +236,7 @@ impl Image {
                 return Err(Error::PixelCount);
             }
             for &symbol in row.as_bytes() {
-                if !(b' '..=b'~').contains(&symbol)
-                    || lookup[usize::from(symbol - b' ')].is_none()
+                if !(b' '..=b'~').contains(&symbol) || lookup[usize::from(symbol - b' ')].is_none()
                 {
                     return Err(Error::PixelCount);
                 }
