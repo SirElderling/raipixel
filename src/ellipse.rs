@@ -58,7 +58,11 @@ impl Image {
         let bounds = rect.bounds();
         let width = i128::from(bounds[2] - bounds[0]);
         let height = i128::from(bounds[3] - bounds[1]);
-        let squared = [width * width, height * height, width * width * height * height];
+        let squared = [
+            width * width,
+            height * height,
+            width * width * height * height,
+        ];
         for y in top..bottom {
             let py = i64::from(y);
             let Some((first, last)) = row_span(py, bounds, squared) else {
