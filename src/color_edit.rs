@@ -126,6 +126,39 @@ impl Image {
         })
     }
 
+
+    /// Find the first visible RGB sample that is not in the supplied palette.
+    ///
+    /// Fully transparent pixels retain their hidden RGB and do not violate a
+    /// visible-palette restriction. One read per pixel is charged before the
+    /// scan; lookup uses a fixed 256-entry stack table and binary search.
+    pub fn first_visible_color_outside_palette(
+        &self,
+        allowed_rgb: &[[u8; 3]],
+        work: &mut Work,
+    ) -> Result<Option<([u32; 2], [u8; 3])>, Error> {
+        if allowed_rgb.is_empty() || allowed_rgb.len() > 256 {
+            return Err(Error::PixelCount);
+        }
+        let mut table = [[0u8; 3]; 256];
+        table[..allowed_rgb.len()].copy_from_slice(allowed_rgb);
+        let table = &mut table[..allowed_rgb.len()];
+        table.sort_unstable();
+        work.charge(self.pixels().len() as u64)?;
+        for (index, pixel) in self.pixels().iter().enumerate() {
+            if pixel[3] == 0 {
+                continue;
+            }
+            let rgb = [pixel[0], pixel[1], pixel[2]];
+            if table.binary_search(&rgb).is_err() {
+                let x = (index % self.width as usize) as u32;
+                let y = (index / self.width as usize) as u32;
+                return Ok(Some(([x, y], rgb)));
+            }
+        }
+        Ok(None)
+    }
+
     fn edit_region(
         &mut self,
         region: Option<Rect>,
