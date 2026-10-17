@@ -3,7 +3,7 @@ use raipixel::{Work, json};
 use std::{
     collections::BTreeMap,
     fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::Command,
     sync::atomic::{AtomicU64, Ordering},
 };
@@ -104,20 +104,11 @@ fn against_reports_exact_changed_rgba_and_preserves_both_snapshots() {
     assert_eq!(number(diff.get("changed_samples").unwrap()), 4);
     assert_eq!(number(diff.get("changed_visible_colors").unwrap()), 2);
     assert_eq!(number(diff.get("changed_alpha").unwrap()), 2);
-    assert_eq!(
-        diff.get("changed_bbox"),
-        Some(&json::Value::Array(
-            [0u64, 0, 3, 2].iter()
-                .map(|n| {
-                    let text = format!("{n}");
-                    match json::parse(text.as_bytes(), json::Limits::default(), &mut Work::default()).unwrap() {
-                        v @ json::Value::Number(_) => v,
-                        _ => unreachable!(),
-                    }
-                })
-                .collect()
-        ))
-    );
+    let bbox = match diff.get("changed_bbox").unwrap() {
+        json::Value::Array(values) => values.iter().map(number).collect::<Vec<_>>(),
+        _ => panic!("expected changed rectangle"),
+    };
+    assert_eq!(bbox, [0, 0, 3, 2]);
     assert_eq!(diff.get("unrelated_state_equal"), Some(&json::Value::Bool(true)));
 
     fs::write(
