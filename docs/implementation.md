@@ -15,6 +15,8 @@ only the library functions listed below are available today. The API is unstable
 - Integer alpha/opacity rounding as specified in the architecture.
 - Exact, simultaneous RGB/RGBA recolor using bounded fixed-size lookup, alpha
   key and threshold operations that preserve all underlying RGB samples.
+- Exact allocation-free whole-cel flips and 180-degree rotation with charged
+  work, sample-preserving invariants and end-to-end PNG reopen tests.
 - Deterministic integer nearest-neighbor scaling with one output allocation,
   bounded dimensions/work and hidden-RGB exactness.
 - Exact bounded RGBA histogram, alpha statistics, visibility bounding box and

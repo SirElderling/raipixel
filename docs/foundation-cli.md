@@ -39,6 +39,10 @@ one cel**, with a matching canvas and stored cel size. It supports:
   frequency and RGB ascending on ties. Hidden RGB remains unchanged and is
   ignored for extraction. Empty or over-limit palettes fail explicitly;
   extraction never quantizes or truncates colors.
+- `transform` supports whole-cel `flip-x`, `flip-y` and `rotate-180` as
+  deterministic in-place permutations; other kinds (including quarter-turn
+  and crop) remain unsupported. [Native two-implementation measurements](../benchmarks/transform-decision.md)
+  favor the allocation-free path, with exact hidden-RGB and rollback tests.
 - Single-target `frame` exports with nearest-neighbor scale 1–16.
   Scaled previews now allocate one RGBA output buffer rather than a second
   full-size temporary copy. Exact pixels, work and PNG bytes were compared
