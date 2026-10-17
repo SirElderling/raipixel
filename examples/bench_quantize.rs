@@ -173,11 +173,44 @@ fn run_case(width: u32, height: u32, colors: usize, varied: bool, reps: usize) {
             ));
         }
     }
+    // Secondary measurement includes building a public image and encoding PNG,
+    // so the decision is not based solely on a hot inner loop.
+    let mut full_a = Vec::new();
+    let mut full_b = Vec::new();
+    for round in 0..7 {
+        let mut completed = |cache: bool| {
+            let pixels = if cache {
+                cached(&input, &palette)
+            } else {
+                direct(&input, &palette)
+            };
+            let image = Image::from_pixels(
+                width,
+                height,
+                &pixels,
+                Limits::default(),
+                &mut Work::default(),
+            )
+            .unwrap();
+            let mut bytes = Vec::new();
+            png::encode_compressed(&image, &mut bytes, &mut Work::default()).unwrap();
+            black_box(bytes);
+        };
+        if round % 2 == 0 {
+            full_a.push(sample(|| completed(false), 1));
+            full_b.push(sample(|| completed(true), 1));
+        } else {
+            full_b.push(sample(|| completed(true), 1));
+            full_a.push(sample(|| completed(false), 1));
+        }
+    }
     let (a, b) = (median(a), median(b));
+    let (fa, fb) = (median(full_a), median(full_b));
     println!(
-        "width={width} height={height} palette={colors} data={} direct_ns={a} cached_ns={b} cached/direct={:.3} png_bytes={} identical_rgba=true identical_png=true equal_work=true scratch_direct_bytes=0 scratch_cached_max_bytes={} memory=logical_not_rss",
+        "width={width} height={height} palette={colors} data={} direct_ns={a} cached_ns={b} cached/direct={:.3} full_direct_ns={fa} full_cached_ns={fb} full_cached/direct={:.3} png_bytes={} identical_rgba=true identical_png=true equal_work=true scratch_direct_bytes=0 scratch_cached_max_bytes={} memory=logical_not_rss",
         if varied { "varied" } else { "repeated" },
         b as f64 / a as f64,
+        fb as f64 / fa as f64,
         png_a.len(),
         std::mem::size_of::<[Option<([u8; 3], u8)>; CACHE_SLOTS]>()
     );
