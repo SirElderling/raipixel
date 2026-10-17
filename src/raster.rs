@@ -48,6 +48,83 @@ impl Image {
         Ok(rect.area() - u64::from(x1 - x0) * u64::from(y1 - y0))
     }
 
+    /// Draw the exact canonical integer Bresenham line, including both endpoints.
+    ///
+    /// Coordinates are ordered lexicographically so reversing the endpoints
+    /// cannot change tie-breaking. Work charges the entire declared line before
+    /// any mutation, even when clipped. Only in-canvas positions are visited:
+    /// extreme off-canvas endpoints never cause an unbounded traversal.
+    /// Returns the number of discarded out-of-canvas line pixels.
+    pub fn draw_line(
+        &mut self,
+        start: [i32; 2],
+        end: [i32; 2],
+        color: Pixel,
+        clip: bool,
+        work: &mut Work,
+    ) -> Result<u64, Error> {
+        let (mut a, mut b) = (start, end);
+        if a > b {
+            std::mem::swap(&mut a, &mut b);
+        }
+        let (x0, y0) = (i64::from(a[0]), i64::from(a[1]));
+        let (x1, y1) = (i64::from(b[0]), i64::from(b[1]));
+        let (width, height) = (i64::from(self.width), i64::from(self.height));
+        let inside = |x: i64, y: i64| x >= 0 && x < width && y >= 0 && y < height;
+        if !clip && (!inside(x0, y0) || !inside(x1, y1)) {
+            return Err(Error::Bounds);
+        }
+        let dx = x1 - x0;
+        let dy = (y1 - y0).abs();
+        let declared = dx.max(dy) as u64 + 1;
+        work.charge(declared)?;
+        if dx == 0 && dy == 0 {
+            if inside(x0, y0) {
+                let index = self.index(x0 as u32, y0 as u32);
+                self.pixels_mut()[index] = color;
+                return Ok(0);
+            }
+            return Ok(1);
+        }
+
+        let mut written = 0u64;
+        if dx >= dy {
+            // Closed-form Bresenham minor coordinate with half-up ties.
+            // u128 avoids overflow for the complete i32 endpoint domain.
+            for x in 0..self.width {
+                let x = i64::from(x);
+                if x < x0 || x > x1 {
+                    continue;
+                }
+                let rise = ((x - x0) as u128 * dy as u128 + (dx / 2) as u128)
+                    / dx as u128;
+                let y = y0 + if y1 >= y0 { rise as i64 } else { -(rise as i64) };
+                if inside(x, y) {
+                    let index = self.index(x as u32, y as u32);
+                    self.pixels_mut()[index] = color;
+                    written += 1;
+                }
+            }
+        } else {
+            for y in 0..self.height {
+                let y = i64::from(y);
+                let step = if y1 >= y0 { y - y0 } else { y0 - y };
+                if step < 0 || step > dy {
+                    continue;
+                }
+                let rise = (step as u128 * dx as u128 + (dy / 2) as u128)
+                    / dy as u128;
+                let x = x0 + rise as i64;
+                if inside(x, y) {
+                    let index = self.index(x as u32, y as u32);
+                    self.pixels_mut()[index] = color;
+                    written += 1;
+                }
+            }
+        }
+        Ok(declared - written)
+    }
+
     /// Stamp an in-bounds source region at an explicit destination position.
     /// Clipping affects only destination coverage, never source validity.
     #[allow(clippy::too_many_arguments)]
