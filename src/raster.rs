@@ -96,9 +96,13 @@ impl Image {
                 if x < x0 || x > x1 {
                     continue;
                 }
-                let rise = ((x - x0) as u128 * dy as u128 + (dx / 2) as u128)
-                    / dx as u128;
-                let y = y0 + if y1 >= y0 { rise as i64 } else { -(rise as i64) };
+                let rise = ((x - x0) as u128 * dy as u128 + (dx / 2) as u128) / dx as u128;
+                let y = y0
+                    + if y1 >= y0 {
+                        rise as i64
+                    } else {
+                        -(rise as i64)
+                    };
                 if inside(x, y) {
                     let index = self.index(x as u32, y as u32);
                     self.pixels_mut()[index] = color;
@@ -112,8 +116,7 @@ impl Image {
                 if step < 0 || step > dy {
                     continue;
                 }
-                let rise = (step as u128 * dx as u128 + (dy / 2) as u128)
-                    / dy as u128;
+                let rise = (step as u128 * dx as u128 + (dy / 2) as u128) / dy as u128;
                 let x = x0 + rise as i64;
                 if inside(x, y) {
                     let index = self.index(x as u32, y as u32);
