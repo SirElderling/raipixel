@@ -984,12 +984,10 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
         query,
         &["target", "region", "pixels", "symbols", "histogram_limit"],
     )?;
-    if boolean(query, "symbols", false)? {
-        return capability("symbol-grid inspection is not supported in this slice");
-    }
+    let want_symbols = boolean(query, "symbols", false)?;
     let target = query.get("target").map(string).transpose()?;
     if target.is_none() {
-        if query.contains_key("region")
+        if want_symbols || query.contains_key("region")
             || query.contains_key("pixels")
             || query.contains_key("histogram_limit")
         {
@@ -1040,7 +1038,7 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
         code: "E_ARGUMENT",
         message: "missing cel".into(),
     })?;
-    let stats = raster(image.inspect(region, histogram_limit, raw, &mut work))?;
+    let stats = raster(image.inspect(region, histogram_limit, raw || want_symbols, &mut work))?;
 
     let mut histogram = String::new();
     for (index, entry) in stats.histogram.iter().enumerate() {
@@ -1061,7 +1059,7 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
     let [x, y, w, h] = stats.region;
     let [image_width, image_height] = stats.size;
     let mut pixels = String::new();
-    if let Some(raw_pixels) = stats.pixels.as_ref() {
+    if raw && let Some(raw_pixels) = stats.pixels.as_ref() {
         pixels.push_str(r#","pixels":["#);
         for (index, &[r, g, b, a]) in raw_pixels.iter().enumerate() {
             if index != 0 {
@@ -1071,8 +1069,68 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
         }
         pixels.push(']');
     }
+
+    let mut symbols = String::new();
+    if want_symbols {
+        let raw_pixels = stats.pixels.as_ref().ok_or_else(|| Fault {
+            code: "E_INTERNAL",
+            message: "symbol query missing bounded pixels".into(),
+        })?;
+        work.charge((raw_pixels.len() as u64).saturating_mul(8))
+            .map_err(|e| Fault {
+                code: e.code(),
+                message: e.to_string(),
+            })?;
+        let mut colors = Vec::new();
+        colors.try_reserve_exact(raw_pixels.len()).map_err(|_| Fault {
+            code: "E_ALLOC",
+            message: "symbol palette allocation".into(),
+        })?;
+        colors.extend_from_slice(raw_pixels);
+        colors.sort_unstable();
+        colors.dedup();
+        if colors.len() > 94 {
+            return fail("E_LIMIT", "symbol query exceeds 94 distinct RGBA colors");
+        }
+        symbols.push_str(r#","symbols":{"rows":["#);
+        for (row, pixels) in raw_pixels.chunks(w as usize).enumerate() {
+            if row != 0 {
+                symbols.push(',');
+            }
+            symbols.push('"');
+            for pixel in pixels {
+                let index = colors.binary_search(pixel).map_err(|_| Fault {
+                    code: "E_INTERNAL",
+                    message: "missing symbol color".into(),
+                })?;
+                match (33 + index as u8) as char {
+                    '"' => symbols.push_str("\\\""),
+                    '\\' => symbols.push_str("\\\\"),
+                    symbol => symbols.push(symbol),
+                }
+            }
+            symbols.push('"');
+        }
+        symbols.push_str(r#"],"legend":["#);
+        for (index, &[r, g, b, a]) in colors.iter().enumerate() {
+            if index != 0 {
+                symbols.push(',');
+            }
+            let symbol = match (33 + index as u8) as char {
+                '"' => String::from("\\\""),
+                '\\' => String::from("\\\\"),
+                symbol => symbol.to_string(),
+            };
+            let _ = write!(
+                symbols,
+                r#"{{"symbol":"{symbol}","rgba":[{r},{g},{b},{a}]}}"#
+            );
+        }
+        symbols.push_str("]}");
+    }
+
     println!(
-        r#"{{"schema":1,"ok":true,"action":"inspect","result":{{"target":"{target}","size":[{image_width},{image_height}],"region":[{x},{y},{w},{h}],"pixel_count":{},"zero_alpha":{},"partial_alpha":{},"opaque_alpha":{},"visible_bbox":{bbox},"unique_colors":{},"histogram_truncated":{},"histogram":[{histogram}]{pixels}}}}}"#,
+        r#"{{"schema":1,"ok":true,"action":"inspect","result":{{"target":"{target}","size":[{image_width},{image_height}],"region":[{x},{y},{w},{h}],"pixel_count":{},"zero_alpha":{},"partial_alpha":{},"opaque_alpha":{},"visible_bbox":{bbox},"unique_colors":{},"histogram_truncated":{},"histogram":[{histogram}]{pixels}{symbols}}}}}"#,
         stats.pixel_count,
         stats.zero_alpha,
         stats.partial_alpha,
