@@ -364,3 +364,115 @@ fn error_codes_match_proposed_interface_categories() {
         assert!(!err.to_string().is_empty());
     }
 }
+
+#[test]
+fn bounded_line_matches_independent_canonical_bresenham_in_all_octants() {
+    // Step-by-step oracle from the design's integer error recurrence. The
+    // implementation under test does not iterate off-canvas steps.
+    fn oracle(mut a: [i32; 2], mut b: [i32; 2]) -> Vec<[i32; 2]> {
+        if a > b {
+            std::mem::swap(&mut a, &mut b);
+        }
+        let dx = i64::from(b[0]) - i64::from(a[0]);
+        let dy = -(i64::from(b[1]) - i64::from(a[1])).abs();
+        let sy = if a[1] < b[1] { 1 } else { -1 };
+        let (mut x, mut y) = (i64::from(a[0]), i64::from(a[1]));
+        let (mut err, mut result) = (dx + dy, Vec::new());
+        loop {
+            result.push([x as i32, y as i32]);
+            if x == i64::from(b[0]) && y == i64::from(b[1]) {
+                break;
+            }
+            let e2 = 2 * err;
+            if e2 >= dy {
+                err += dy;
+                x += 1;
+            }
+            if e2 <= dx {
+                err += dx;
+                y += sy;
+            }
+        }
+        result
+    }
+
+    let color = [31, 97, 201, 0]; // Hidden RGB must be retained.
+    for x0 in -3..=4 {
+        for y0 in -3..=4 {
+            for x1 in -3..=4 {
+                for y1 in -3..=4 {
+                    let start = [x0, y0];
+                    let end = [x1, y1];
+                    let reference = oracle(start, end);
+                    let mut expected = vec![CLEAR; 49];
+                    let mut kept = 0u64;
+                    for [x, y] in &reference {
+                        if (0..7).contains(x) && (0..7).contains(y) {
+                            expected[*y as usize * 7 + *x as usize] = color;
+                            kept += 1;
+                        }
+                    }
+                    let mut actual = image(7, 7);
+                    let mut budget = Work::new(reference.len() as u64).unwrap();
+                    assert_eq!(
+                        actual.draw_line(start, end, color, true, &mut budget).unwrap(),
+                        reference.len() as u64 - kept,
+                        "{start:?} to {end:?}"
+                    );
+                    assert_eq!(budget.remaining(), 0);
+                    assert_eq!(actual.pixels(), expected, "{start:?} to {end:?}");
+
+                    let mut reversed = image(7, 7);
+                    reversed.draw_line(end, start, color, true, &mut work()).unwrap();
+                    assert_eq!(reversed, actual, "endpoint order changed pixels");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn clipped_lines_have_bounded_runtime_and_exact_work_accounting() {
+    let mut actual = image(9, 3);
+    let mut budget = Work::new(2_000_001).unwrap();
+    assert_eq!(
+        actual
+            .draw_line([-1_000_000, 1], [1_000_000, 1], BLUE, true, &mut budget)
+            .unwrap(),
+        2_000_001 - 9
+    );
+    assert_eq!(budget.remaining(), 0);
+    assert_eq!(actual.pixels()[9..18], [BLUE; 9]);
+    assert_eq!(actual.pixel(0, 0), Some(CLEAR));
+
+    let mut unchanged = image(9, 3);
+    let mut budget = Work::new(10).unwrap();
+    assert_eq!(
+        unchanged
+            .draw_line([i32::MIN, 1], [i32::MAX, 1], RED, true, &mut budget)
+            .unwrap_err(),
+        Error::Limit(Resource::Work)
+    );
+    assert_eq!(budget.remaining(), 10);
+    assert_eq!(unchanged.pixels(), &[CLEAR; 27]);
+}
+
+#[test]
+fn unclipped_line_bounds_and_single_pixel_are_transactional() {
+    let mut actual = image(4, 4);
+    let mut budget = Work::new(2).unwrap();
+    assert_eq!(
+        actual.draw_line([-1, 0], [2, 0], RED, false, &mut budget).unwrap_err(),
+        Error::Bounds
+    );
+    assert_eq!(budget.remaining(), 2);
+    assert_eq!(actual.pixels(), &[CLEAR; 16]);
+
+    let hidden = [43, 27, 99, 0];
+    assert_eq!(actual.draw_line([2, 3], [2, 3], hidden, false, &mut budget), Ok(0));
+    assert_eq!(budget.remaining(), 1);
+    assert_eq!(actual.pixel(2, 3), Some(hidden));
+    assert_eq!(actual.draw_line([-1, -1], [-1, -1], RED, true, &mut budget), Ok(1));
+    assert_eq!(budget.remaining(), 0);
+    assert_eq!(actual.pixel(2, 3), Some(hidden));
+}
