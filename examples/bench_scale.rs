@@ -10,8 +10,12 @@ fn two_buffers(image: &Image, factor: u32, work: &mut Work) -> Result<Image, Err
         return Err(Error::Dimensions);
     }
     let [width, height] = image.size();
-    let expanded_width = width.checked_mul(factor).ok_or(Error::Limit(Resource::Side))?;
-    let expanded_height = height.checked_mul(factor).ok_or(Error::Limit(Resource::Side))?;
+    let expanded_width = width
+        .checked_mul(factor)
+        .ok_or(Error::Limit(Resource::Side))?;
+    let expanded_height = height
+        .checked_mul(factor)
+        .ok_or(Error::Limit(Resource::Side))?;
     if expanded_width > 4096 || expanded_height > 4096 {
         return Err(Error::Limit(Resource::Side));
     }
@@ -20,7 +24,9 @@ fn two_buffers(image: &Image, factor: u32, work: &mut Work) -> Result<Image, Err
         return Err(Error::Limit(Resource::Pixels));
     }
     let mut pixels = Vec::new();
-    pixels.try_reserve_exact(count as usize).map_err(|_| Error::Allocation)?;
+    pixels
+        .try_reserve_exact(count as usize)
+        .map_err(|_| Error::Allocation)?;
     for y in 0..expanded_height {
         for x in 0..expanded_width {
             pixels.push(image.pixel(x / factor, y / factor).unwrap());
@@ -50,8 +56,7 @@ fn fixture(side: u32, noisy: bool) -> Image {
             if i % 19 == 0 { 0 } else { 255 },
         ]);
     }
-    Image::from_pixels(side, side, &pixels, Limits::default(), &mut Work::default())
-        .unwrap()
+    Image::from_pixels(side, side, &pixels, Limits::default(), &mut Work::default()).unwrap()
 }
 fn benchmark(mut run: impl FnMut(), rounds: usize) -> u128 {
     let now = Instant::now();
@@ -76,7 +81,11 @@ fn case(side: u32, factor: u32, noisy: bool, iterations: usize) {
     let old = two_buffers(&src, factor, &mut old_work).unwrap();
     let new = src.scaled_nearest(factor, &mut new_work).unwrap();
     assert_eq!(old, new, "scaled RGBA differs");
-    assert_eq!(old_work.remaining(), new_work.remaining(), "scaling work differs");
+    assert_eq!(
+        old_work.remaining(),
+        new_work.remaining(),
+        "scaling work differs"
+    );
     let (bytes_a, remain_a) = encoded(&old, old_work);
     let (bytes_b, remain_b) = encoded(&new, new_work);
     assert_eq!(bytes_a, bytes_b, "PNG output differs");

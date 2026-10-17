@@ -45,7 +45,10 @@ fn scale_rejects_zero_excessive_side_and_work_without_mutating() {
     let source = fixture();
     let before = source.try_copy(&mut Work::default()).unwrap();
     let mut budget = Work::new(10).unwrap();
-    assert_eq!(source.scaled_nearest(0, &mut budget), Err(Error::Dimensions));
+    assert_eq!(
+        source.scaled_nearest(0, &mut budget),
+        Err(Error::Dimensions)
+    );
     assert_eq!(
         source.scaled_nearest(u32::MAX, &mut budget),
         Err(Error::Limit(Resource::Side))

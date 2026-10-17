@@ -35,10 +35,8 @@ impl Image {
                 destination[target..target + repeat].fill(color);
             }
             for row in 1..repeat {
-                destination.copy_within(
-                    start..start + expanded_width,
-                    start + row * expanded_width,
-                );
+                destination
+                    .copy_within(start..start + expanded_width, start + row * expanded_width);
             }
         }
         Ok(output)
