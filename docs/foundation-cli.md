@@ -39,6 +39,14 @@ one cel**, with a matching canvas and stored cel size. It supports:
   frequency and RGB ascending on ties. Hidden RGB remains unchanged and is
   ignored for extraction. Empty or over-limit palettes fail explicitly;
   extraction never quantizes or truncates colors.
+- `palette.quantize` (Core subset) maps only visible pixels to the nearest
+  named-palette RGB entry by squared encoded-RGB distance, breaking ties in
+  palette order. Dither `none` is supported, and alpha and fully transparent
+  hidden RGB samples are unchanged. Optional regions constrain writes; masks
+  and ordered dithering are not supported yet. A 128-visible-pixel sample
+  selects a bounded 20 KiB stack cache for repeated colors or a direct scan
+  for varied colors; the work charge remains the same in either branch.
+  [Reproducible A/B and adaptive measurements](../benchmarks/quantization-decision.md).
 - Full-opacity same-cel `stamp` Copy now uses an overlap-safe, allocation-free
   row movement path; Over and partial-opacity Copy preserve their original
   immutable source snapshots. [Measured native A/B](../benchmarks/stamp-copy-decision.md).

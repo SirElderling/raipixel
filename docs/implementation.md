@@ -15,6 +15,10 @@ only the library functions listed below are available today. The API is unstable
 - Integer alpha/opacity rounding as specified in the architecture.
 - Exact, simultaneous RGB/RGBA recolor using bounded fixed-size lookup, alpha
   key and threshold operations that preserve all underlying RGB samples.
+- Exact nearest-palette quantization in the native API and AI JSON CLI, with
+  bounded selection between direct and fixed-cache RGB lookup and unchanged
+  alpha/hidden RGB; see [native comparisons](../benchmarks/quantization-decision.md).
+  This is an isolated Core capability, not a declaration that S1 is complete.
 - Full-opacity overlapping same-cel Copy optimized with safe row-wise memmove;
   immutable-source results, work and PNG bytes verified across three native targets.
 - Exact allocation-free whole-cel flips and 180-degree rotation with charged
