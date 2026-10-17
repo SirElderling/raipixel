@@ -61,7 +61,11 @@ Ordered named RGB palettes persist in JSON/PNG snapshots, resolve
 `@palette/entry` in drawing commands, and may be replaced without silently
 recoloring existing pixels. Reopen, edit, inspect and export are supported.
 Read-only inspection accepts bounded targeted pixel queries, deterministic
-histograms and project structure summaries. Unsupported fields and snapshot
+histograms and project structure summaries. Read-only `against` queries compare two
+snapshot targets of the same kind and dimensions, reporting exact RGBA,
+visible-color and alpha differences, an exact changed bounding box and whether
+non-pixel manifests match; comparison project paths are restricted to the query
+folder. Unsupported fields and snapshot
 semantics are rejected instead of discarded. A read-only single-frame
 compositor for multiple supplied layers exists in the library, but the
 CLI cannot yet manage layered projects or animations.

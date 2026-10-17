@@ -12,6 +12,7 @@ cargo run -- run edit.json --project art-v1 --out art-v2
 cargo run -- run art.json --out ignored --dry-run
 cargo run -- inspect art-v1
 cargo run -- inspect art-v1 --query region.json
+cargo run -- inspect art-v2 --query compare.json
 cargo run -- validate art-v1
 cargo run -- validate art-v1 --query checks.json
 cargo run -- help
@@ -57,6 +58,13 @@ one cel**, with a matching canvas and stored cel size. It supports:
   histogram of the selected cel/frame or image-local region. `pixels:true`
   returns row-major samples for at most 4,096 pixels; `symbols:true` returns
   character rows and a stable RGBA-sorted legend for at most 94 unique colors.
+  A query can also include `"against":{"project":"art-v1","target":"asset/layer/frame"}`
+  to compare exact old and new RGBA within the optional region. It reports
+  changed sample count (including hidden transparent RGB), changed visible
+  colors/visibility, changed alpha, the absolute changed bbox and whether
+  all non-pixel manifest fields match. Relative comparison project paths are
+  confined to the query directory; different target types or dimensions fail.
+  Comparisons use constant extra heap and charge every selected pixel.
   Histograms are limited to 1–256 entries, sorted by descending count and
   ascending RGBA on ties; truncation is reported. Unsupported comparison
   queries are rejected rather than approximated.
@@ -91,7 +99,9 @@ and `tests/palette_checks.rs` exercise new artwork, palette references,
 recoloring, alpha cleanup, read-only inspection, hidden transparent RGB,
 PNG import, independent decoded pixel expectations, snapshot reopen and
 correction without mutating its source, dry-run, unsupported snapshot content,
-and failure without destination creation. These tests require only the pinned
+and failure without destination creation. `tests/cli_compare.rs` verifies
+revision comparisons, hidden RGB, bounded regions, path rejection and unchanged
+source snapshots. These tests require only the pinned
 Rust toolchain and are invoked by `cargo test --locked --offline`.
 
 Next complete the job/manifest validator and build the general project model,
