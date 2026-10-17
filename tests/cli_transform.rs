@@ -97,3 +97,119 @@ fn json_transform_round_trip_and_rejected_kind_preserve_source() {
     assert!(!root.join("bad").exists());
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn json_quarter_turn_and_reopen_preserve_every_rgba_sample() {
+    let root = std::env::temp_dir().join(format!(
+        "raipixel-quarter-turn-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    fs::create_dir(&root).unwrap();
+    fs::write(
+        root.join("square.json"),
+        r##"{"interface":1,"semantics":"1.0","ops":[
+          {"op":"asset.create","name":"square","size":[3,3]},
+          {"op":"layer.create","asset":"square","name":"paint"},
+          {"op":"frame.create","asset":"square","name":"base"},
+          {"op":"cel.create","target":"square/paint/base"},
+          {"op":"grid","targets":["square/paint/base"],
+           "rows":["ABC","DEF","GHI"],
+           "symbols":{
+             "A":"#01020300","B":"#02030410","C":"#030405FF",
+             "D":"#04050640","E":"#05060780","F":"#06070800",
+             "G":"#070809FF","H":"#08090A08","I":"#090A0B00"
+           }}
+        ]}"##,
+    )
+    .unwrap();
+    let first = run(&root, &["run", "square.json", "--out", "original"]);
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    fs::write(
+        root.join("turn.json"),
+        r#"{"interface":1,"semantics":"1.0","ops":[
+          {"op":"transform","targets":["square/paint/base"],"kind":"rotate-90"}
+        ],"exports":[{"name":"game","kind":"frame","targets":["square/base"]}]}"#,
+    )
+    .unwrap();
+    let turn = run(
+        &root,
+        &[
+            "run",
+            "turn.json",
+            "--project",
+            "original",
+            "--out",
+            "clockwise",
+        ],
+    );
+    assert!(
+        turn.status.success(),
+        "{}",
+        String::from_utf8_lossy(&turn.stderr)
+    );
+    let bytes = fs::read(root.join("clockwise/artifacts/game/image.png")).unwrap();
+    let output = png::decode(&bytes, Limits::default(), &mut Work::default())
+        .unwrap()
+        .image;
+    let original = png::decode(
+        &fs::read(root.join("original/images/000000.png")).unwrap(),
+        Limits::default(),
+        &mut Work::default(),
+    )
+    .unwrap()
+    .image;
+    let expected = [
+        [7, 8, 9, 255],
+        [4, 5, 6, 64],
+        [1, 2, 3, 0],
+        [8, 9, 10, 8],
+        [5, 6, 7, 128],
+        [2, 3, 4, 16],
+        [9, 10, 11, 0],
+        [6, 7, 8, 0],
+        [3, 4, 5, 255],
+    ];
+    assert_eq!(output.pixels(), &expected);
+    fs::write(
+        root.join("reverse.json"),
+        r#"{"interface":1,"semantics":"1.0","ops":[
+          {"op":"transform","targets":["square/paint/base"],"kind":"rotate-270"}
+        ],"exports":[{"name":"game","kind":"frame","targets":["square/base"]}]}"#,
+    )
+    .unwrap();
+    let reversed = run(
+        &root,
+        &[
+            "run",
+            "reverse.json",
+            "--project",
+            "clockwise",
+            "--out",
+            "recovered",
+        ],
+    );
+    assert!(
+        reversed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&reversed.stderr)
+    );
+    let recovered = png::decode(
+        &fs::read(root.join("recovered/artifacts/game/image.png")).unwrap(),
+        Limits::default(),
+        &mut Work::default(),
+    )
+    .unwrap()
+    .image;
+    assert_eq!(recovered, original, "quarter-turns must be exact inverses");
+    assert_eq!(
+        fs::read(root.join("original/images/000000.png")).unwrap(),
+        fs::read(root.join("recovered/images/000000.png")).unwrap(),
+        "snapshot PNG output must be deterministic"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
