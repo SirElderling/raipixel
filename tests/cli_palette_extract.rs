@@ -1,17 +1,15 @@
 //! End-to-end AI palette extraction with deterministic names and exact pixels.
 use raipixel::{Image, Limits, Work, png};
-use std::{fs, path::PathBuf, process::Command};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::{fs, path::PathBuf, process::Command};
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
 struct Scratch(PathBuf);
 impl Scratch {
     fn new() -> Self {
         let i = NEXT.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "raipixel-extract-{}-{i}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("raipixel-extract-{}-{i}", std::process::id()));
         fs::create_dir(&path).unwrap();
         Self(path)
     }
@@ -93,7 +91,12 @@ fn palette_extract_counts_visible_rgb_orders_names_and_survives_reopen() {
     )
     .unwrap();
     let next = root.run(&[
-        "run", "edit.json", "--project", "initial", "--out", "reopened",
+        "run",
+        "edit.json",
+        "--project",
+        "initial",
+        "--out",
+        "reopened",
     ]);
     assert!(
         next.status.success(),
@@ -112,9 +115,8 @@ fn palette_extract_rejects_more_colors_than_limit_without_publication() {
     let pixels: Vec<_> = (0..257u16)
         .map(|i| [(i & 255) as u8, (i >> 8) as u8, 17, 255])
         .collect();
-    let image = Image::from_pixels(
-        257, 1, &pixels, Limits::default(), &mut Work::default(),
-    ).unwrap();
+    let image =
+        Image::from_pixels(257, 1, &pixels, Limits::default(), &mut Work::default()).unwrap();
     let mut encoded = Vec::new();
     png::encode(&image, &mut encoded, &mut Work::default()).unwrap();
     fs::write(root.file("input.png"), encoded).unwrap();
@@ -128,7 +130,8 @@ fn palette_extract_rejects_more_colors_than_limit_without_publication() {
           {"op":"palette.extract","source":"icon/paint/base",
            "name":"too_many","max_colors":256}
         ]}"#,
-    ).unwrap();
+    )
+    .unwrap();
     let result = root.run(&["run", "job.json", "--out", "rejected"]);
     assert!(!result.status.success());
     assert!(String::from_utf8_lossy(&result.stderr).contains("E_PALETTE_TOO_MANY"));

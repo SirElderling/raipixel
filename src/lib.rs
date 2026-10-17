@@ -10,8 +10,8 @@ pub mod inspect;
 pub mod json;
 mod limits;
 mod model;
-pub mod png;
 pub mod palette;
+pub mod png;
 mod raster;
 pub mod render;
 

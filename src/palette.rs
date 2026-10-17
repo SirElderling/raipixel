@@ -25,9 +25,7 @@ impl Image {
         }
         let count = self.pixels().len() as u64;
         // The live RGBA allocation plus one three-byte RGB key per pixel.
-        let logical_bytes = count
-            .checked_mul(7)
-            .ok_or(Error::Limit(Resource::Bytes))?;
+        let logical_bytes = count.checked_mul(7).ok_or(Error::Limit(Resource::Bytes))?;
         self.limits.check_buffer(logical_bytes)?;
         work.charge(count.saturating_mul(32))?;
         let mut pixels = Vec::<[u8; 3]>::new();
@@ -70,9 +68,7 @@ impl Image {
                 distinct,
             });
         }
-        palette.sort_unstable_by(|a, b| {
-            b.count.cmp(&a.count).then_with(|| a.rgb.cmp(&b.rgb))
-        });
+        palette.sort_unstable_by(|a, b| b.count.cmp(&a.count).then_with(|| a.rgb.cmp(&b.rgb)));
         Ok(palette)
     }
 }

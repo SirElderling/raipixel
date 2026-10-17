@@ -353,15 +353,14 @@ impl Document {
                     code: "E_REFERENCE",
                     message: "cel does not exist".into(),
                 })?;
-                let extracted = raster(image.extract_visible_palette(
-                    max_colors as usize,
-                    work,
-                ))?;
+                let extracted = raster(image.extract_visible_palette(max_colors as usize, work))?;
                 let mut entries = PaletteEntries::new();
-                entries.try_reserve_exact(extracted.len()).map_err(|_| Fault {
-                    code: "E_ALLOC",
-                    message: "extracted palette allocation".into(),
-                })?;
+                entries
+                    .try_reserve_exact(extracted.len())
+                    .map_err(|_| Fault {
+                        code: "E_ALLOC",
+                        message: "extracted palette allocation".into(),
+                    })?;
                 for (index, color) in extracted.into_iter().enumerate() {
                     entries.push((format!("c{index:03}"), color.rgb));
                 }
