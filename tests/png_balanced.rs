@@ -155,3 +155,103 @@ fn balanced_png_preserves_c24_independent_art_champions() {
         );
     }
 }
+
+#[test]
+fn balanced_handles_maximum_side_and_odd_indexed_rows() {
+    // Exact-RGBA profiles: one-row maximum width, one-column maximum height,
+    // and odd widths spanning all indexed bit depths (1, 2, 4, 8).
+    for (width, height, colors) in [
+        (4096usize, 1usize, 4usize),
+        (1, 4096, 5),
+        (257, 7, 256),
+        (13, 11, 3),
+        (17, 11, 5),
+        (7, 11, 1),
+    ] {
+        let mut pixels = Vec::new();
+        for y in 0..height {
+            for x in 0..width {
+                let i = (x + y * 13) % colors;
+                let value = i as u8;
+                pixels.push([
+                    value,
+                    value.wrapping_mul(37),
+                    value.wrapping_mul(83),
+                    [0, 64, 128, 255][i % 4],
+                ]);
+            }
+        }
+        let image = Image::from_pixels(
+            width as u32,
+            height as u32,
+            &pixels,
+            Limits::default(),
+            &mut Work::default(),
+        )
+        .unwrap();
+        let mut encoded = Vec::new();
+        assert!(png::encode_indexed_balanced(
+            &image,
+            &mut encoded,
+            &mut Work::default()
+        )
+        .unwrap());
+        let restored = png::decode(&encoded, Limits::default(), &mut Work::default())
+            .unwrap()
+            .image;
+        assert_eq!(restored, image, "indexed roundtrip failed at {width}x{height}");
+        let mut second = Vec::new();
+        assert!(png::encode_indexed_balanced(
+            &image,
+            &mut second,
+            &mut Work::default()
+        )
+        .unwrap());
+        assert_eq!(second, encoded, "non-deterministic PNG at {width}x{height}");
+    }
+}
+
+#[test]
+fn balanced_rejects_max_width_memory_shortfall_before_work() {
+    let pixels = vec![[11, 29, 41, 0]; 4096];
+    // The RGBA input fits in 64 KiB. The 3-mode encoder workspace does not.
+    let bounds = Limits::new(4096, 4096, 64 * 1024).unwrap();
+    let image = Image::from_pixels(
+        4096,
+        1,
+        &pixels,
+        bounds,
+        &mut Work::default(),
+    )
+    .unwrap();
+    let mut out = vec![0x5d, 0xfa];
+    let mut work = Work::default();
+    let before = work.remaining();
+    let err = png::encode_indexed_balanced(&image, &mut out, &mut work).unwrap_err();
+    assert_eq!(err.code(), "E_LIMIT");
+    assert_eq!(out, [0x5d, 0xfa]);
+    assert_eq!(work.remaining(), before);
+}
+
+#[test]
+fn balanced_outputs_are_crc_protected() {
+    let image = patterned_image(13, 11, 3);
+    let mut output = Vec::new();
+    assert!(png::encode_indexed_balanced(
+        &image,
+        &mut output,
+        &mut Work::default()
+    )
+    .unwrap());
+    // Signature (8) + IHDR (25) + PLTE chunk header (8) = 41.
+    assert_eq!(&output[37..41], b"PLTE");
+    let mut corrupted = output;
+    corrupted[41] ^= 1;
+    let err = png::decode(
+        &corrupted,
+        Limits::default(),
+        &mut Work::default(),
+    )
+    .unwrap_err();
+    assert_eq!(err.code(), "E_PNG_CRC");
+}
