@@ -122,3 +122,54 @@ fn quantize_rejects_invalid_palettes_before_modification() {
     assert_eq!(canvas.pixel(0, 0), Some([1, 2, 3, 255]));
     assert_eq!(work.remaining(), 1);
 }
+
+#[test]
+fn adaptive_cache_and_direct_paths_match_independent_distance_oracle() {
+    let palette: Vec<[u8; 3]> = (0..64u32)
+        .map(|i| {
+            let k = i.wrapping_mul(0x9E37_79B9);
+            [(k >> 16) as u8, (k >> 8) as u8, k as u8]
+        })
+        .collect();
+    for varied in [false, true] {
+        let samples: Vec<[u8; 4]> = (0..64u32 * 64)
+            .map(|i| {
+                let rgb = if varied {
+                    let k = i.wrapping_mul(0x7FEB_352D).rotate_left(9);
+                    [(k >> 16) as u8, (k >> 8) as u8, k as u8]
+                } else {
+                    palette[i as usize % palette.len()]
+                };
+                [rgb[0], rgb[1], rgb[2], if i % 9 == 0 { 0 } else { 201 }]
+            })
+            .collect();
+        let expected: Vec<[u8; 4]> = samples
+            .iter()
+            .copied()
+            .map(|pixel| {
+                if pixel[3] == 0 {
+                    return pixel;
+                }
+                let rgb = [pixel[0], pixel[1], pixel[2]];
+                let entry = palette.iter().min_by_key(|entry| {
+                    rgb.iter()
+                        .zip(entry.iter())
+                        .map(|(&a, &b)| {
+                            let difference = i32::from(a) - i32::from(b);
+                            difference * difference
+                        })
+                        .sum::<i32>()
+                }).unwrap();
+                [entry[0], entry[1], entry[2], pixel[3]]
+            })
+            .collect();
+        let mut canvas = image(64, 64, &samples);
+        let mut work = Work::new(64 * 64 * palette.len() as u64).unwrap();
+        assert_eq!(
+            canvas.quantize_nearest(&palette, None, &mut work),
+            Ok(samples.iter().zip(&expected).filter(|(a, b)| *a != *b).count() as u64)
+        );
+        assert_eq!(canvas.pixels(), expected);
+        assert_eq!(work.remaining(), 0);
+    }
+}
