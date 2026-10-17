@@ -42,7 +42,7 @@ fn linear(original: &[Pixel], pairs: &[(Pixel, Pixel)]) -> Vec<Pixel> {
     pixels
 }
 
-fn binary(original: &[Pixel], width: usize, pairs: &[(Pixel, Pixel)]) -> Vec<Pixel> {
+fn binary(original: &[Pixel], width: usize, pairs: &[(Pixel, Pixel)]) -> Image {
     let mut budget = Work::default();
     let mut image = Image::from_pixels(
         width as u32,
@@ -53,7 +53,7 @@ fn binary(original: &[Pixel], width: usize, pairs: &[(Pixel, Pixel)]) -> Vec<Pix
     )
     .unwrap();
     image.map_colors(pairs, true, None, &mut budget).unwrap();
-    image.pixels().to_vec()
+    image
 }
 
 fn hash(original: &[Pixel], pairs: &[(Pixel, Pixel)]) -> Vec<Pixel> {
@@ -86,12 +86,11 @@ fn hash(original: &[Pixel], pairs: &[(Pixel, Pixel)]) -> Vec<Pixel> {
 }
 
 fn execute(method: usize, original: &[Pixel], width: usize, pairs: &[(Pixel, Pixel)]) {
-    let pixels = match method {
-        0 => linear(original, pairs),
-        1 => binary(original, width, pairs),
-        _ => hash(original, pairs),
-    };
-    black_box(pixels);
+    match method {
+        0 => { black_box(linear(original, pairs)); }
+        1 => { black_box(binary(original, width, pairs)); }
+        _ => { black_box(hash(original, pairs)); }
+    }
 }
 
 fn median(mut samples: Vec<f64>) -> f64 {
@@ -103,7 +102,7 @@ fn bench_case(width: usize, height: usize, colors: usize) {
     let original = sample(width, height, colors);
     let pairs = mappings(colors);
     let reference = linear(&original, &pairs);
-    assert_eq!(binary(&original, width, &pairs), reference, "binary mismatch");
+    assert_eq!(binary(&original, width, &pairs).pixels(), reference, "binary mismatch");
     assert_eq!(hash(&original, &pairs), reference, "hash mismatch");
     let names = ["linear", "binary_native_api", "fixed_hash"];
     let mut batches: [Vec<f64>; 3] = std::array::from_fn(|_| Vec::new());
