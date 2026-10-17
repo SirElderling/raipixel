@@ -321,6 +321,40 @@ impl std::io::Write for Stage {
     fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
 }
 
+// Conservative capacity-planning gate, not an allocator-independent heap cap.
+// Allow room for both buffered PNG outputs, the input RGBA image, and the
+// fallibly reserved matcher history/links/tokens/Huffman scratch. A Vec's
+// actual capacity may exceed its requested reservation; true RSS limits
+// require allocation-level tracking beyond this deliberately simple gate.
+fn checked_balanced_memory_plan(image: &Image, raw: usize, ceiling: usize) -> Result<(), Error> {
+    let limit = || Error::Resource(crate::Error::Limit(crate::Resource::Bytes));
+    let block = raw.min(crate::deflate::BLOCK);
+    let joined = block.checked_add(32_768).ok_or_else(limit)?;
+    let rgba_pixels = (image.width as usize)
+        .checked_mul(image.height as usize)
+        .and_then(|pixels| pixels.checked_mul(4))
+        .ok_or_else(limit)?;
+    // Vec::try_reserve may grow geometrically. Allow up to 2x each of the
+    // best and current PNG staging buffers rather than just their lengths.
+    let output_capacity = ceiling.checked_mul(4).ok_or_else(limit)?;
+    let links = joined.checked_mul(std::mem::size_of::<u32>()).ok_or_else(limit)?;
+    let tokens = block.checked_mul(std::mem::size_of::<u16>()).ok_or_else(limit)?;
+    let encoder_output = block.checked_mul(9).and_then(|n| n.checked_div(8))
+        .and_then(|n| n.checked_add(16))
+        .ok_or_else(limit)?;
+    let rows = (image.width as usize).checked_mul(2).ok_or_else(limit)?;
+    let parts = [
+        rgba_pixels, output_capacity, block, joined, links, tokens,
+        encoder_output, 32_768, 8192 * 8, rows,
+        8192, // Palette, color table and stack hash slots.
+        256 * 1024, // Conservative per-block Huffman and allocator headroom.
+    ];
+    let planned = parts.into_iter().try_fold(0usize, |total, part| {
+        total.checked_add(part).ok_or_else(limit)
+    })?;
+    image.limits.check_buffer(planned as u64).map_err(Error::Resource)
+}
+
 /// Experimental opt-in balanced PNG compression.
 ///
 /// Uses three measured depth-64 lazy/dynamic Huffman modes, chooses the
@@ -360,6 +394,9 @@ fn encode_balanced_inner(
     let staging_max = ceiling.checked_mul(2)
         .ok_or(crate::Error::Limit(crate::Resource::Bytes))?;
     image.limits.check_buffer(staging_max as u64)?;
+    // Refuse infeasible aggregate scratch plans before charging Work or
+    // touching output. Conservative planning is not RSS certification.
+    checked_balanced_memory_plan(image, raw, ceiling)?;
 
     let mut best: Option<Vec<u8>> = None;
     for (pass, mode) in [Filter::None, Filter::Sub, Filter::Auto64].into_iter().enumerate() {
@@ -390,6 +427,37 @@ fn encode_balanced_inner(
 #[cfg(test)]
 mod fault_injection_tests {
     use super::*;
+
+    #[test]
+    fn scratch_capacity_preflight_rejects_before_work_or_publication() {
+        let samples = vec![[23, 57, 91, 0]; 16 * 16];
+        let constrained = crate::Limits::new(64, 4096, 256 * 1024).unwrap();
+        let image = Image::from_pixels(
+            16, 16, &samples, constrained, &mut Work::default()
+        ).unwrap();
+        let mut writer = vec![0xfa, 0xce];
+        let mut work = Work::default();
+        let before = work.remaining();
+        let error = encode_indexed_balanced(&image, &mut writer, &mut work).unwrap_err();
+        assert_eq!(error.code(), "E_LIMIT");
+        assert_eq!(writer, [0xfa, 0xce]);
+        assert_eq!(work.remaining(), before, "preflight consumed Work units");
+
+        let roomy = crate::Limits::new(64, 4096, 1024 * 1024).unwrap();
+        let image = Image::from_pixels(
+            16, 16, &samples, roomy, &mut Work::default()
+        ).unwrap();
+        let mut png = Vec::new();
+        assert!(encode_indexed_balanced(
+            &image, &mut png, &mut Work::default()
+        ).unwrap());
+        assert_eq!(
+            crate::png::decode(
+                &png, crate::Limits::default(), &mut Work::default()
+            ).unwrap().image,
+            image
+        );
+    }
 
     #[test]
     fn every_staging_allocation_failure_is_a_resource_error_without_publication() {
