@@ -24,6 +24,14 @@ Use std-only `#[test]` and integration tests. Tests may invoke the built CLI wit
 
 Run native stable tests on aarch64-apple-darwin, x86_64-unknown-linux-gnu and x86_64-pc-windows-msvc; broaden target support based on demand. Compare canonical fixture bytes directly, not only CRCs. Record skipped OS capabilities honestly. Normal OS/CRT/toolchain facilities do not violate independence; test clean environments instead of promising universal static linking.
 
+## Mandatory two-implementation acceptance rule (PR #2)
+
+Follow [the two-implementation measurement protocol](../two-implementation-rule.md)
+for every substantive implementation choice. Compare at least two genuine
+approaches on identical workloads, verify exact outputs and limits, benchmark
+native release runtime and memory, select the overall best design and record
+both accepted and rejected evidence. Do not declare an unmeasured winner.
+
 ## Measure before committing
 
 No credible fixed LOC, binary-size or completion-time commitment exists before the first integrated codec/authoring slice. Earlier whole-suite ranges are retired because they excluded the risk of the revised import-first path and treated unvalidated Advanced work as mandatory. This is an uncertainty statement, not a claim that implementation is cheap.
