@@ -39,6 +39,9 @@ one cel**, with a matching canvas and stored cel size. It supports:
   frequency and RGB ascending on ties. Hidden RGB remains unchanged and is
   ignored for extraction. Empty or over-limit palettes fail explicitly;
   extraction never quantizes or truncates colors.
+- Full-opacity same-cel `stamp` Copy now uses an overlap-safe, allocation-free
+  row movement path; Over and partial-opacity Copy preserve their original
+  immutable source snapshots. [Measured native A/B](../benchmarks/stamp-copy-decision.md).
 - `transform` supports whole-cel `flip-x`, `flip-y` and `rotate-180` as
   deterministic in-place permutations; other kinds (including quarter-turn
   and crop) remain unsupported. [Native two-implementation measurements](../benchmarks/transform-decision.md)
