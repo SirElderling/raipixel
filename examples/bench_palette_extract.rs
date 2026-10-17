@@ -71,6 +71,47 @@ fn counted(image: &Image, work: &mut Work) -> Result<Vec<PaletteColor>, Error> {
     Ok(result)
 }
 
+// Frozen algorithm A: whole-image RGB scratch + unstable sort, the former
+// production implementation. Do not substitute the currently selected public
+// API here: otherwise this A/B benchmark would compare B against itself.
+fn sorted(image: &Image, work: &mut Work) -> Result<Vec<PaletteColor>, Error> {
+    let count = image.pixels().len() as u64;
+    work.charge(count.saturating_mul(32))?;
+    let mut rgb = Vec::new();
+    rgb.try_reserve_exact(image.pixels().len())
+        .map_err(|_| Error::Allocation)?;
+    for &sample in image.pixels() {
+        if sample[3] != 0 {
+            rgb.push([sample[0], sample[1], sample[2]]);
+        }
+    }
+    if rgb.is_empty() {
+        return Err(Error::PaletteEmpty);
+    }
+    rgb.sort_unstable();
+    let mut out = Vec::new();
+    out.try_reserve_exact(256).map_err(|_| Error::Allocation)?;
+    let mut index = 0;
+    let mut distinct = 0u32;
+    while index < rgb.len() {
+        let sample = rgb[index];
+        let from = index;
+        index += 1;
+        while index < rgb.len() && rgb[index] == sample {
+            index += 1;
+        }
+        distinct += 1;
+        if distinct <= 256 {
+            out.push(PaletteColor { rgb: sample, count: (index - from) as u64 });
+        }
+    }
+    if distinct > 256 {
+        return Err(Error::PaletteTooMany { limit: 256, distinct });
+    }
+    out.sort_unstable_by(|a, b| b.count.cmp(&a.count).then_with(|| a.rgb.cmp(&b.rgb)));
+    Ok(out)
+}
+
 fn make_image(side: u32, unique: usize) -> Image {
     let mut pixels = Vec::with_capacity((side as usize) * (side as usize));
     for index in 0..(side as usize * side as usize) {
@@ -104,7 +145,7 @@ fn run_case(name: &str, side: u32, colors: usize, iterations: usize) {
     let image = make_image(side, colors);
     let mut a_work = Work::default();
     let mut b_work = Work::default();
-    let expected = image.extract_visible_palette(256, &mut a_work);
+    let expected = sorted(&image, &mut a_work);
     let actual = counted(&image, &mut b_work);
     assert_eq!(expected, actual, "{name}: output mismatch");
     assert_eq!(
@@ -168,7 +209,7 @@ fn main() {
 
     let blank = Image::new(16, 16, Limits::default(), &mut Work::default()).unwrap();
     assert_eq!(
-        blank.extract_visible_palette(256, &mut Work::default()),
+        sorted(&blank, &mut Work::default()),
         counted(&blank, &mut Work::default()),
         "transparent-only case"
     );
@@ -179,7 +220,7 @@ fn main() {
     let overflow =
         Image::from_pixels(257, 1, &many, Limits::default(), &mut Work::default()).unwrap();
     assert_eq!(
-        overflow.extract_visible_palette(256, &mut Work::default()),
+        sorted(&overflow, &mut Work::default()),
         counted(&overflow, &mut Work::default()),
         "overflow must report the exact distinct count"
     );
