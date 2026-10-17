@@ -16,7 +16,7 @@ pub struct ImageDiff {
 }
 
 impl Image {
-    /// Compare all four bytes at every sample without allocating scratch.
+    /// Compare exact RGBA samples, skipping unchanged rows without heap scratch.
     ///
     /// Different canvas dimensions or out-of-bounds regions fail before work
     /// is spent. Every selected pixel charges one work unit, even on equality.
@@ -46,6 +46,11 @@ impl Image {
             let offset = self.index(x0, y);
             let first = &self.pixels()[offset..offset + width as usize];
             let second = &other.pixels()[offset..offset + width as usize];
+            // Typical AI corrections leave most rows intact; changed rows
+            // still receive an exact pixel-by-pixel comparison.
+            if first == second {
+                continue;
+            }
             for (column, (&a, &b)) in first.iter().zip(second).enumerate() {
                 if a == b {
                     continue;

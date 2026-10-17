@@ -3,7 +3,7 @@
 use raipixel::{Error, Image, Limits, Rect, Work, compare::ImageDiff};
 use std::{hint::black_box, time::Instant};
 
-fn row_skip(
+fn full_scan(
     left: &Image,
     right: &Image,
     region: Option<[u32; 4]>,
@@ -31,9 +31,6 @@ fn row_skip(
         let offset = (yy as usize * w as usize) + x as usize;
         let a = &left.pixels()[offset..offset + rw as usize];
         let b = &right.pixels()[offset..offset + rw as usize];
-        if a == b {
-            continue;
-        }
         for (xx, (&old, &new)) in a.iter().zip(b).enumerate() {
             if old == new {
                 continue;
@@ -120,8 +117,8 @@ fn case(name: &str, side: u32, changed: usize, hidden_only: bool, partial: bool)
     let rect = region.map(|[x, y, w, h]| Rect::new(x as i32, y as i32, w, h).unwrap());
     let mut a_work = Work::default();
     let mut b_work = Work::default();
-    let a_result = left.compare(&right, rect, &mut a_work);
-    let b_result = row_skip(&left, &right, region, &mut b_work);
+    let a_result = full_scan(&left, &right, region, &mut a_work);
+    let b_result = left.compare(&right, rect, &mut b_work);
     assert_eq!(a_result, b_result, "{name}: exact result");
     assert_eq!(
         a_work.remaining(),
@@ -138,10 +135,10 @@ fn case(name: &str, side: u32, changed: usize, hidden_only: bool, partial: bool)
     let mut b_times = Vec::new();
     for round in 0..7 {
         let a = || {
-            black_box(left.compare(&right, rect, &mut Work::default()).unwrap());
+            black_box(full_scan(&left, &right, region, &mut Work::default()).unwrap());
         };
         let b = || {
-            black_box(row_skip(&left, &right, region, &mut Work::default()).unwrap());
+            black_box(left.compare(&right, rect, &mut Work::default()).unwrap());
         };
         if round % 2 == 0 {
             a_times.push(nanos_per_iteration(a, iterations));
@@ -182,8 +179,8 @@ fn main() {
             for region in [None, Some([size / 4, size / 4, size / 2, size / 2])] {
                 let rect = region.map(|[x, y, w, h]| Rect::new(x as i32, y as i32, w, h).unwrap());
                 assert_eq!(
+                    full_scan(&left, &right, region, &mut Work::default()),
                     left.compare(&right, rect, &mut Work::default()),
-                    row_skip(&left, &right, region, &mut Work::default()),
                     "adversarial {size} / {changed}",
                 );
             }
