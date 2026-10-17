@@ -304,16 +304,32 @@ impl std::io::Write for Stage {
             self.exhausted = true;
             return Err(std::io::Error::other("balanced PNG staging limit"));
         }
-        // A forced failure exercises the same error plumbing as try_reserve,
-        // but is not a substitute for process-level allocator fault injection.
-        if self.fail_next_reserve {
-            self.fail_next_reserve = false;
-            self.allocation_failed = true;
-            return Err(std::io::Error::other("injected PNG staging allocation failure"));
-        }
-        if self.bytes.try_reserve(data.len()).is_err() {
-            self.allocation_failed = true;
-            return Err(std::io::Error::other("balanced PNG staging allocation"));
+        if self.bytes.len() + data.len() > self.bytes.capacity() {
+            // Explicitly bound requested capacity. A fallible exact reserve
+            // avoids unconstrained geometric overgrowth in the staged PNG.
+            let needed = self.bytes.len() + data.len();
+            let desired = self.bytes.capacity()
+                .saturating_mul(2)
+                .max(4096)
+                .max(needed)
+                .min(self.max);
+            // Fault injection targets an actual growth request, not writes
+            // already covered by an existing allocation.
+            if self.fail_next_reserve {
+                self.fail_next_reserve = false;
+                self.allocation_failed = true;
+                return Err(std::io::Error::other("injected PNG staging allocation failure"));
+            }
+            if self.bytes.try_reserve_exact(desired - self.bytes.len()).is_err() {
+                self.allocation_failed = true;
+                return Err(std::io::Error::other("balanced PNG staging allocation"));
+            }
+            // Allocators may report more capacity than requested even for
+            // try_reserve_exact. Treat that as an over-limit resource failure.
+            if self.bytes.capacity() > self.max {
+                self.exhausted = true;
+                return Err(std::io::Error::other("balanced PNG staging capacity limit"));
+            }
         }
         self.bytes.extend_from_slice(data);
         Ok(data.len())
@@ -427,6 +443,23 @@ fn encode_balanced_inner(
 #[cfg(test)]
 mod fault_injection_tests {
     use super::*;
+
+    #[test]
+    fn staged_output_growth_stays_within_reported_byte_capacity() {
+        use std::io::Write;
+
+        let mut stage = Stage::new(8192, false);
+        for _ in 0..32 {
+            stage.write_all(&[17; 256]).unwrap();
+            assert!(stage.bytes.capacity() <= stage.max);
+        }
+        assert_eq!(stage.bytes.len(), 8192);
+        let former = stage.bytes.clone();
+        assert!(stage.write_all(&[1]).is_err());
+        assert_eq!(stage.bytes, former, "size-limit rejection altered staged bytes");
+        assert!(stage.exhausted);
+        assert!(!stage.allocation_failed);
+    }
 
     #[test]
     fn scratch_capacity_preflight_rejects_before_work_or_publication() {
