@@ -628,6 +628,27 @@ impl Document {
                 )?;
                 Ok(())
             }
+            "palette.quantize" => {
+                allowed(operation, &["op", "targets", "palette", "region", "dither"])?;
+                let target = single_target(operation)?;
+                if let Some(dither) = operation.get("dither") {
+                    if string(dither)? != "none" {
+                        return capability("only dither=none is supported");
+                    }
+                }
+                let palette_name = text(operation, "palette")?;
+                let entries = self.palettes.get(palette_name).ok_or_else(|| Fault {
+                    code: "E_REFERENCE",
+                    message: "unknown quantization palette".into(),
+                })?;
+                let colors: Vec<[u8; 3]> = entries.iter().map(|(_, rgb)| *rgb).collect();
+                let region = operation.get("region").map(rect).transpose()?;
+                raster(
+                    self.image_mut(&target)?
+                        .quantize_nearest(&colors, region, work),
+                )?;
+                Ok(())
+            }
             "alpha" => {
                 allowed(
                     operation,

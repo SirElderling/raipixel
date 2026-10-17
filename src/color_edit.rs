@@ -111,6 +111,41 @@ impl Image {
         })
     }
 
+    /// Map each visible RGB sample to the nearest supplied palette color.
+    ///
+    /// Squared Euclidean distance in encoded RGB8 (no color-space conversion).
+    /// Equidistant candidates choose the earliest palette entry. Alpha, and
+    /// all four bytes of fully transparent pixels, remain unchanged.
+    /// Charges worst-case comparisons before modifying any pixels.
+    pub fn quantize_nearest(
+        &mut self,
+        palette: &[[u8; 3]],
+        region: Option<Rect>,
+        work: &mut Work,
+    ) -> Result<u64, Error> {
+        if palette.is_empty() || palette.len() > 256 {
+            return Err(Error::PixelCount);
+        }
+        self.edit_region_with_cost(region, palette.len() as u64, work, |sample| {
+            if sample[3] == 0 {
+                return sample;
+            }
+            let mut best = palette[0];
+            let mut distance = u32::MAX;
+            for &rgb in palette {
+                let dr = i32::from(sample[0]) - i32::from(rgb[0]);
+                let dg = i32::from(sample[1]) - i32::from(rgb[1]);
+                let db = i32::from(sample[2]) - i32::from(rgb[2]);
+                let candidate = (dr * dr + dg * dg + db * db) as u32;
+                if candidate < distance {
+                    distance = candidate;
+                    best = rgb;
+                }
+            }
+            [best[0], best[1], best[2], sample[3]]
+        })
+    }
+
     /// Set alpha to zero for exact RGB or RGBA matches, retaining all RGB bytes.
     pub fn alpha_key(
         &mut self,
@@ -177,13 +212,26 @@ impl Image {
         &mut self,
         region: Option<Rect>,
         work: &mut Work,
+        transform: impl FnMut(Pixel) -> Pixel,
+    ) -> Result<u64, Error> {
+        self.edit_region_with_cost(region, 1, work, transform)
+    }
+
+    fn edit_region_with_cost(
+        &mut self,
+        region: Option<Rect>,
+        comparisons_per_pixel: u64,
+        work: &mut Work,
         mut transform: impl FnMut(Pixel) -> Pixel,
     ) -> Result<u64, Error> {
         let [x0, y0, x1, y1] = match region {
             Some(rect) => self.coverage(rect, false)?,
             None => [0, 0, self.width, self.height],
         };
-        work.charge(u64::from(x1 - x0) * u64::from(y1 - y0))?;
+        let total = u64::from(x1 - x0) * u64::from(y1 - y0);
+        work.charge(total.checked_mul(comparisons_per_pixel).ok_or(
+            Error::Limit(crate::Resource::Work),
+        )?)?;
         let mut changed = 0u64;
         for y in y0..y1 {
             let start = self.index(x0, y);
