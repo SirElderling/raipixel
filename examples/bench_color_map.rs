@@ -108,16 +108,16 @@ fn bench_case(width: usize, height: usize, colors: usize) {
     let mut batches: [Vec<f64>; 3] = std::array::from_fn(|_| Vec::new());
     // Calibrate batches separately, then rotate order over nine rounds.
     let mut repetitions = [1usize; 3];
-    for method in 0..3 {
+    for (method, count) in repetitions.iter_mut().enumerate() {
         loop {
             let start = Instant::now();
-            for _ in 0..repetitions[method] {
+            for _ in 0..*count {
                 execute(method, &original, width, &pairs);
             }
-            if start.elapsed() >= Duration::from_millis(20) || repetitions[method] >= 1024 {
+            if start.elapsed() >= Duration::from_millis(20) || *count >= 1024 {
                 break;
             }
-            repetitions[method] *= 2;
+            *count *= 2;
         }
     }
     for round in 0..9 {
