@@ -631,10 +631,10 @@ impl Document {
             "palette.quantize" => {
                 allowed(operation, &["op", "targets", "palette", "region", "dither"])?;
                 let target = single_target(operation)?;
-                if let Some(dither) = operation.get("dither") {
-                    if string(dither)? != "none" {
-                        return capability("only dither=none is supported");
-                    }
+                if let Some(dither) = operation.get("dither")
+                    && string(dither)? != "none"
+                {
+                    return capability("only dither=none is supported");
                 }
                 let palette_name = text(operation, "palette")?;
                 let entries = self.palettes.get(palette_name).ok_or_else(|| Fault {
