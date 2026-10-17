@@ -104,7 +104,7 @@ fn bench_case(width: usize, height: usize, colors: usize) {
     let reference = linear(&original, &pairs);
     assert_eq!(binary(&original, width, &pairs).pixels(), reference.as_slice(), "binary mismatch");
     assert_eq!(hash(&original, &pairs), reference, "hash mismatch");
-    let names = ["linear", "binary_native_api", "fixed_hash"];
+    let names = ["linear", "native_map_colors", "fixed_hash"];
     let mut batches: [Vec<f64>; 3] = std::array::from_fn(|_| Vec::new());
     // Calibrate batches separately, then rotate order over nine rounds.
     let mut repetitions = [1usize; 3];
