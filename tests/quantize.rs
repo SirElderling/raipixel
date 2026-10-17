@@ -151,15 +151,18 @@ fn adaptive_cache_and_direct_paths_match_independent_distance_oracle() {
                     return pixel;
                 }
                 let rgb = [pixel[0], pixel[1], pixel[2]];
-                let entry = palette.iter().min_by_key(|entry| {
-                    rgb.iter()
-                        .zip(entry.iter())
-                        .map(|(&a, &b)| {
-                            let difference = i32::from(a) - i32::from(b);
-                            difference * difference
-                        })
-                        .sum::<i32>()
-                }).unwrap();
+                let entry = palette
+                    .iter()
+                    .min_by_key(|entry| {
+                        rgb.iter()
+                            .zip(entry.iter())
+                            .map(|(&a, &b)| {
+                                let difference = i32::from(a) - i32::from(b);
+                                difference * difference
+                            })
+                            .sum::<i32>()
+                    })
+                    .unwrap();
                 [entry[0], entry[1], entry[2], pixel[3]]
             })
             .collect();
@@ -167,7 +170,11 @@ fn adaptive_cache_and_direct_paths_match_independent_distance_oracle() {
         let mut work = Work::new(64 * 64 * palette.len() as u64).unwrap();
         assert_eq!(
             canvas.quantize_nearest(&palette, None, &mut work),
-            Ok(samples.iter().zip(&expected).filter(|(a, b)| *a != *b).count() as u64)
+            Ok(samples
+                .iter()
+                .zip(&expected)
+                .filter(|(a, b)| *a != *b)
+                .count() as u64)
         );
         assert_eq!(canvas.pixels(), expected);
         assert_eq!(work.remaining(), 0);
