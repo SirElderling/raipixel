@@ -64,7 +64,14 @@ fn single_cel_jobs_reopen_with_exact_transparent_rgb_and_no_partial_publication(
     fs::write(root.join("edit.json"), updated).unwrap();
     let result = invoke(
         &root,
-        &["run", "edit.json", "--project", "initial", "--out", "edited"],
+        &[
+            "run",
+            "edit.json",
+            "--project",
+            "initial",
+            "--out",
+            "edited",
+        ],
     );
     assert!(
         result.status.success(),
@@ -83,15 +90,32 @@ fn single_cel_jobs_reopen_with_exact_transparent_rgb_and_no_partial_publication(
     assert_eq!(reopened.pixel(0, 1), Some([0, 17, 34, 0]));
     assert_eq!(reopened.pixel(1, 1), Some([1, 2, 3, 0]));
 
-    let dry = invoke(&root, &["run", "edit.json", "--project", "initial", "--out", "dry", "--dry-run"]);
+    let dry = invoke(
+        &root,
+        &[
+            "run",
+            "edit.json",
+            "--project",
+            "initial",
+            "--out",
+            "dry",
+            "--dry-run",
+        ],
+    );
     assert!(dry.status.success());
     assert!(!root.join("dry").exists(), "dry-run published an output");
 
-    fs::write(root.join("invalid.json"), r#"{"interface":1,"semantics":"1.0","ops":[{"op":"unknown"}]}"#)
-        .unwrap();
+    fs::write(
+        root.join("invalid.json"),
+        r#"{"interface":1,"semantics":"1.0","ops":[{"op":"unknown"}]}"#,
+    )
+    .unwrap();
     let rejected = invoke(&root, &["run", "invalid.json", "--out", "rejected"]);
     assert!(!rejected.status.success());
-    assert!(!root.join("rejected").exists(), "invalid job published output");
+    assert!(
+        !root.join("rejected").exists(),
+        "invalid job published output"
+    );
 
     fs::remove_dir_all(&root).unwrap();
 }
