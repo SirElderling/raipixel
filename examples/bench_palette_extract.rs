@@ -159,6 +159,9 @@ fn main() {
         std::env::consts::ARCH
     );
     run_case("tiny_4", 16, 4, 1000);
+    run_case("small_4", 32, 4, 450);
+    run_case("small_16", 32, 16, 450);
+    run_case("middle_16", 48, 16, 250);
     run_case("icon_16", 64, 16, 150);
     run_case("sheet_16", 1024, 16, 8);
     run_case("sheet_256", 1024, 256, 8);
