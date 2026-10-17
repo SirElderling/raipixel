@@ -64,15 +64,23 @@ cargo test --locked --offline
 cargo clippy --locked --offline --all-targets -- -D warnings
 ```
 
-`tests/raster.rs` contains 22 integration tests using hand-authored sample
+`tests/raster.rs` now contains 32 integration tests using hand-authored sample
 expectations: transparent RGB, row order, selection preservation, copy alignment,
-overlap, alpha rounding, bounds and the specified limits. One small exhaustive
-alpha/opacity check covers the byte-valued compositing domain. `tests/json.rs`
+overlap, alpha rounding, bounds, exhaustive small-coordinate line coverage,
+ASCII grid validation, flood-fill connectivity and the specified limits. One
+small exhaustive alpha/opacity check covers the byte-valued compositing domain.
+`tests/raster_png_workflow.rs` independently asserts authored pixels for a
+border, exact hidden-RGB fill, line and grid correction, then encodes and
+reopens the image through stored, compact and indexed PNG writers. It also
+checks deterministic bytes and transactional edit rejection. This demonstrates
+a static in-memory workflow, **not** a typed CLI or editable-project snapshot. `tests/json.rs`
 adds 19 tests for the specified JSON syntax, Unicode, limits, exact integer
 ranges, emission and the real proposed command schema. Ten PNG integration tests, two PNG filter unit tests, ten DEFLATE unit tests
 and five checksum tests add the
-independently generated codec corpus and exhaustive encoder-code checks. All 68 tests
-need only the Rust toolchain and run offline.
+independently generated codec corpus and exhaustive encoder-code checks. The
+original 68-test checkpoint is historical; additional raster, optional-quality
+and cross-format tests have since been added. Core tests need only the Rust
+toolchain and run offline.
 
 TDD history starts with tests against an empty library: `cargo test --offline`
 failed with unresolved raster API imports. The following implementation made
@@ -111,6 +119,15 @@ change production behavior.
 Toolchain installation uses the network; Cargo build/test commands run offline.
 The workflow runs on pull requests and pushes to main/feat branches.
 
-Next, improve the measured codec throughput, then implement typed job validation
-and the creation/import/edit/inspect/save/reopen/export workflow.
+The optional, feature-gated indexed Balanced PNG encoder has been measured
+against the public `png 0.18.1` reference on Linux x86-64, macOS ARM64 and
+Windows MSVC. See the separate integrated native CI, including complete input
+and output checks. Its conservative capacity planning is **not** a measured
+peak-RSS ceiling. Do not promote that opt-in to a default or claim universal
+compression parity from the current finite fixture set.
+
+Next, implement typed job/schema validation and a minimal create/import/edit/
+inspect/save/reopen/export workflow with structured errors and atomic
+publication. Avoid further codec micro-optimizations until this complete S1
+workflow is available.
 No extra backend abstraction or package split is needed for those additions.
