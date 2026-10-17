@@ -453,13 +453,18 @@ impl Document {
                     operation,
                     &[
                         "op", "targets", "shape", "at", "points", "rect", "color", "clip",
+                        "filled",
                     ],
                 )?;
                 let target = single_target(operation)?;
                 let clip = boolean(operation, "clip", false)?;
+                let shape = text(operation, "shape")?;
+                if shape != "ellipse" && operation.contains_key("filled") {
+                    return argument("filled is only supported for ellipse drawing");
+                }
                 let sample = self.resolve_color(field(operation, "color")?)?;
                 let image = self.image_mut(&target)?;
-                match text(operation, "shape")? {
+                match shape {
                     "pixel" => {
                         if operation.contains_key("points") || operation.contains_key("rect") {
                             return argument("pixel uses at only");
@@ -493,6 +498,14 @@ impl Document {
                             clip,
                             work,
                         ))?;
+                    }
+                    "ellipse" => {
+                        if operation.contains_key("at") || operation.contains_key("points") {
+                            return argument("ellipse uses rect only");
+                        }
+                        let bounds = rect(field(operation, "rect")?)?;
+                        let filled = boolean(operation, "filled", true)?;
+                        raster(image.ellipse(bounds, sample, filled, clip, work))?;
                     }
                     other => return capability(format!("unsupported shape: {other}")),
                 }
