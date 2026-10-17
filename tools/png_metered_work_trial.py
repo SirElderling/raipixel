@@ -607,6 +607,12 @@ def make_metered(encoder,png):
             raise ValueError(f"work-metering anchor count {count}: {old[:90]!r}")
         return text.replace(old,new)
 
+    def maybe(text,old,new):
+        count=text.count(old)
+        if count>1:
+            raise ValueError(f"optional lazy metering anchor duplicated: {old[:80]!r}")
+        return text.replace(old,new) if count==1 else text
+
     encoder=one(encoder,
         "pub(crate) fn block_history(&mut self, data: &[u8], last: bool) -> Result<&[u8], Error>",
         "pub(crate) fn block_history(&mut self, data: &[u8], last: bool, work: &mut crate::Work) -> Result<&[u8], Error>")
@@ -643,25 +649,24 @@ def make_metered(encoder,png):
                 // Updating hashes for interior match bytes also consumes work.
                 work.charge((best - 1) as u64)?;
                 pos += 1;""")
-    if "if best >= 3 && best < 258 && pos + 4 <= joined.len()" in encoder:
-        encoder=one(encoder,
-            """            if best >= 3 && best < 258 && pos + 4 <= joined.len() {
-                    let next = pos + 1;""",
-            """            if best >= 3 && best < 258 && pos + 4 <= joined.len() {
-                    work.charge(4)?;
-                    let next = pos + 1;""")
-        encoder=one(encoder,
-            """                    if joined[candidate..candidate+3] == joined[next..next+3] {""",
-            """                    work.charge(4)?;
-                        if joined[candidate..candidate+3] == joined[next..next+3] {""")
-        encoder=one(encoder,
-            """                            &joined[next+3..next+max_next],
-                            );
-                            next_best = next_best.max(length);""",
-            """                            &joined[next+3..next+max_next],
-                            );
-                            work.charge((length + 16) as u64)?;
-                            next_best = next_best.max(length);""")
+    encoder=maybe(encoder,
+        """            if best >= 3 && best < 258 && pos + 4 <= joined.len() {
+                let next = pos + 1;""",
+        """            if best >= 3 && best < 258 && pos + 4 <= joined.len() {
+                work.charge(4)?;
+                let next = pos + 1;""")
+    encoder=maybe(encoder,
+        """                    if joined[candidate..candidate+3] == joined[next..next+3] {""",
+        """                    work.charge(4)?;
+                    if joined[candidate..candidate+3] == joined[next..next+3] {""")
+    encoder=maybe(encoder,
+        """                            &joined[next+3..next+max_next],
+                        );
+                        next_best = next_best.max(length);""",
+        """                            &joined[next+3..next+max_next],
+                        );
+                        work.charge((length + 16) as u64)?;
+                        next_best = next_best.max(length);""")
     png=one(png,
         "encoder.block_history(&raw, offset + len == raw_size)?",
         "encoder.block_history(&raw, offset + len == raw_size, work)?")
