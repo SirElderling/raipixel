@@ -60,6 +60,20 @@ fn validate_reports_palette_violations_without_changing_existing_files() {
     assert_eq!(fs::read(root.join("changed/images/000000.png")).unwrap(), before);
 
     fs::write(
+        root.join("export.json"),
+        r#"{"interface":1,"semantics":"1.0","ops":[],"checks":["structure"],
+            "exports":[{"name":"png","kind":"frame","targets":["icon/base"]}]}"#,
+    )
+    .unwrap();
+    let forbidden = invoke(
+        &root,
+        &["run", "export.json", "--project", "changed", "--out", "forbidden"],
+    );
+    assert!(!forbidden.status.success());
+    assert!(!root.join("forbidden").exists());
+    assert_eq!(fs::read(root.join("changed/images/000000.png")).unwrap(), before);
+
+    fs::write(
         root.join("query.json"),
         r#"{"asset":"icon","checks":["structure","bounds"]}"#,
     )
