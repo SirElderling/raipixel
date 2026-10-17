@@ -7,6 +7,7 @@ mod color_edit;
 pub mod compare;
 mod deflate;
 mod error;
+mod ellipse;
 pub mod inspect;
 pub mod json;
 mod limits;
