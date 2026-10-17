@@ -88,6 +88,12 @@ pub struct Decoded {
     pub trailing_idat_bytes: usize,
 }
 
+#[cfg(feature = "experimental-quality")]
+#[path = "png/quality.rs"]
+mod quality;
+#[cfg(feature = "experimental-quality")]
+pub use quality::encode_indexed_balanced;
+
 const SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
 const MAX_INPUT: usize = 128 * 1024 * 1024;
 const ADAM7: [[usize; 4]; 7] = [
