@@ -323,8 +323,7 @@ impl Image {
                     } else {
                         y0 + step
                     };
-                    let sy =
-                        (i64::from(rect.y) + i64::from(y) - i64::from(target.y)) as u32;
+                    let sy = (i64::from(rect.y) + i64::from(y) - i64::from(target.y)) as u32;
                     let from = self.index(sx, sy);
                     let to = self.index(x0, y);
                     self.pixels_mut().copy_within(from..from + len, to);

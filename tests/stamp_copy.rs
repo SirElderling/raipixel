@@ -37,8 +37,14 @@ fn exact_copy_matches_immutable_source_for_every_small_overlap_and_clip() {
                             let mut expected = original.try_copy(&mut Work::default()).unwrap();
                             let mut a = Work::default();
                             let mut b = Work::default();
-                            let got =
-                                actual.stamp_within(source, [dx, dy], Blend::Copy, 255, true, &mut a);
+                            let got = actual.stamp_within(
+                                source,
+                                [dx, dy],
+                                Blend::Copy,
+                                255,
+                                true,
+                                &mut a,
+                            );
                             let want = expected.stamp(
                                 &original,
                                 source,
@@ -55,7 +61,8 @@ fn exact_copy_matches_immutable_source_for_every_small_overlap_and_clip() {
                             );
                             assert_eq!(
                                 a.remaining(),
-                                Work::default().remaining() - u64::from(width) * u64::from(height) * 2
+                                Work::default().remaining()
+                                    - u64::from(width) * u64::from(height) * 2
                             );
                         }
                     }
@@ -94,7 +101,15 @@ fn partial_alpha_copy_keeps_exact_copy_opacity_semantics() {
         .unwrap();
     let mut expected = original.try_copy(&mut Work::default()).unwrap();
     expected
-        .stamp(&original, rect, [1, 1], Blend::Copy, 128, false, &mut Work::default())
+        .stamp(
+            &original,
+            rect,
+            [1, 1],
+            Blend::Copy,
+            128,
+            false,
+            &mut Work::default(),
+        )
         .unwrap();
     assert_eq!(img, expected);
 }
