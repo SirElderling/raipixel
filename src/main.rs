@@ -167,7 +167,11 @@ fn read_palette_entries(values: &[json::Value]) -> Result<PaletteEntries> {
             return argument("duplicate palette entry name");
         }
         let rgb = color_literal(field(item, "rgb")?, true)?;
-        entries.push((entry_name, [rgb[0], rgb[1], rgb[2]]));
+        let rgb = [rgb[0], rgb[1], rgb[2]];
+        if entries.iter().any(|(_, existing)| *existing == rgb) {
+            return argument("duplicate palette RGB value");
+        }
+        entries.push((entry_name, rgb));
     }
     Ok(entries)
 }
