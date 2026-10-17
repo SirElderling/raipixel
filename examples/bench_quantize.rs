@@ -73,6 +73,35 @@ fn cached(input: &[Pixel], palette: &[[u8; 3]]) -> Vec<Pixel> {
     output
 }
 
+/// C: choose the exact cache only after a bounded repetition probe.
+fn adaptive(input: &[Pixel], palette: &[[u8; 3]]) -> Vec<Pixel> {
+    if input.len() < 4096 || palette.len() < 8 {
+        return direct(input, palette);
+    }
+    let mut sampled = [0u32; 128];
+    let mut distinct = 0usize;
+    let mut seen = 0usize;
+    for pixel in input {
+        if pixel[3] == 0 {
+            continue;
+        }
+        let rgb = u32::from_be_bytes([0, pixel[0], pixel[1], pixel[2]]);
+        if !sampled[..distinct].contains(&rgb) {
+            sampled[distinct] = rgb;
+            distinct += 1;
+        }
+        seen += 1;
+        if seen == sampled.len() {
+            break;
+        }
+    }
+    if seen >= 64 && distinct * 4 <= seen * 3 {
+        cached(input, palette)
+    } else {
+        direct(input, palette)
+    }
+}
+
 fn median(mut samples: Vec<u128>) -> u128 {
     samples.sort_unstable();
     samples[samples.len() / 2]
@@ -111,7 +140,9 @@ fn run_case(width: u32, height: u32, colors: usize, varied: bool, reps: usize) {
     let (input, palette) = fixture(width, height, colors, varied);
     let expected = direct(&input, &palette);
     let alternative = cached(&input, &palette);
+    let adaptive_result = adaptive(&input, &palette);
     assert_eq!(expected, alternative, "cache changed exact RGBA");
+    assert_eq!(expected, adaptive_result, "selector changed exact RGBA");
     let source = Image::from_pixels(
         width,
         height,
@@ -145,6 +176,7 @@ fn run_case(width: u32, height: u32, colors: usize, varied: bool, reps: usize) {
 
     let mut a = Vec::new();
     let mut b = Vec::new();
+    let mut c = Vec::new();
     for i in 0..7 {
         if i % 2 == 0 {
             a.push(sample(
@@ -159,10 +191,22 @@ fn run_case(width: u32, height: u32, colors: usize, varied: bool, reps: usize) {
                 },
                 reps,
             ));
+            c.push(sample(
+                || {
+                    black_box(adaptive(black_box(&input), black_box(&palette)));
+                },
+                reps,
+            ));
         } else {
             b.push(sample(
                 || {
                     black_box(cached(black_box(&input), black_box(&palette)));
+                },
+                reps,
+            ));
+            c.push(sample(
+                || {
+                    black_box(adaptive(black_box(&input), black_box(&palette)));
                 },
                 reps,
             ));
@@ -178,12 +222,13 @@ fn run_case(width: u32, height: u32, colors: usize, varied: bool, reps: usize) {
     // so the decision is not based solely on a hot inner loop.
     let mut full_a = Vec::new();
     let mut full_b = Vec::new();
+    let mut full_c = Vec::new();
     for round in 0..7 {
         let completed = |cache: bool| {
-            let pixels = if cache {
-                cached(&input, &palette)
-            } else {
-                direct(&input, &palette)
+            let pixels = match cache {
+                0 => direct(&input, &palette),
+                1 => cached(&input, &palette),
+                _ => adaptive(&input, &palette),
             };
             let image = Image::from_pixels(
                 width,
@@ -198,20 +243,24 @@ fn run_case(width: u32, height: u32, colors: usize, varied: bool, reps: usize) {
             black_box(bytes);
         };
         if round % 2 == 0 {
-            full_a.push(sample(|| completed(false), 1));
-            full_b.push(sample(|| completed(true), 1));
+            full_a.push(sample(|| completed(0), 1));
+            full_b.push(sample(|| completed(1), 1));
+            full_c.push(sample(|| completed(2), 1));
         } else {
-            full_b.push(sample(|| completed(true), 1));
-            full_a.push(sample(|| completed(false), 1));
+            full_b.push(sample(|| completed(1), 1));
+            full_c.push(sample(|| completed(2), 1));
+            full_a.push(sample(|| completed(0), 1));
         }
     }
-    let (a, b) = (median(a), median(b));
-    let (fa, fb) = (median(full_a), median(full_b));
+    let (a, b, c) = (median(a), median(b), median(c));
+    let (fa, fb, fc) = (median(full_a), median(full_b), median(full_c));
     println!(
-        "width={width} height={height} palette={colors} data={} direct_ns={a} cached_ns={b} cached/direct={:.3} full_direct_ns={fa} full_cached_ns={fb} full_cached/direct={:.3} png_bytes={} identical_rgba=true identical_png=true equal_work=true scratch_direct_bytes=0 scratch_cached_max_bytes={} memory=logical_not_rss",
+        "width={width} height={height} palette={colors} data={} direct_ns={a} cached_ns={b} cached/direct={:.3} adaptive_ns={c} adaptive/direct={:.3} full_direct_ns={fa} full_cached_ns={fb} full_cached/direct={:.3} full_adaptive_ns={fc} full_adaptive/direct={:.3} png_bytes={} identical_rgba=true identical_png=true equal_work=true scratch_direct_bytes=0 scratch_cached_max_bytes={} memory=logical_not_rss",
         if varied { "varied" } else { "repeated" },
         b as f64 / a as f64,
+        c as f64 / a as f64,
         fb as f64 / fa as f64,
+        fc as f64 / fa as f64,
         png_a.len(),
         std::mem::size_of::<[Option<([u8; 3], u8)>; CACHE_SLOTS]>()
     );
