@@ -60,18 +60,18 @@ fn text<'a>(object: &'a Map, key: &str) -> Result<&'a str> {
     string(field(object, key)?)
 }
 fn unsigned(value: &json::Value) -> Result<u32> {
-    if let json::Value::Number(number) = value {
-        if let Some(n) = number.as_u64().and_then(|n| u32::try_from(n).ok()) {
-            return Ok(n);
-        }
+    if let json::Value::Number(number) = value
+        && let Some(n) = number.as_u64().and_then(|n| u32::try_from(n).ok())
+    {
+        return Ok(n);
     }
     argument("expected unsigned 32-bit integer")
 }
 fn signed(value: &json::Value) -> Result<i32> {
-    if let json::Value::Number(number) = value {
-        if let Some(n) = number.as_i64().and_then(|n| i32::try_from(n).ok()) {
-            return Ok(n);
-        }
+    if let json::Value::Number(number) = value
+        && let Some(n) = number.as_i64().and_then(|n| i32::try_from(n).ok())
+    {
+        return Ok(n);
     }
     argument("expected signed 32-bit integer")
 }
@@ -390,11 +390,25 @@ impl Document {
         }
     }
     fn manifest(&self) -> Result<String> {
-        let asset = self.asset.as_deref().ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing asset".into() })?;
-        let layer = self.layer.as_deref().ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing layer".into() })?;
-        let frame = self.frame.as_deref().ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing frame".into() })?;
-        let [w, h] = self.size.ok_or_else(|| Fault { code: "E_ARGUMENT", message: "missing size".into() })?;
-        if self.image.as_ref().is_some_and(|i| i.size() != [w, h]) { return argument("mismatched editable cel"); }
+        let asset = self.asset.as_deref().ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "missing asset".into(),
+        })?;
+        let layer = self.layer.as_deref().ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "missing layer".into(),
+        })?;
+        let frame = self.frame.as_deref().ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "missing frame".into(),
+        })?;
+        let [w, h] = self.size.ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "missing size".into(),
+        })?;
+        if self.image.as_ref().is_some_and(|i| i.size() != [w, h]) {
+            return argument("mismatched editable cel");
+        }
         // Names are validated restricted ASCII, so insertion into JSON is safe.
         Ok(format!(
             r#"{{"format":"raipixel-project","version":1,"semantics":"1.0","images":[{{"id":"i000000","file":"images/000000.png","size":[{w},{h}]}}],"palettes":[],"styles":[],"assets":[{{"name":"{asset}","size":[{w},{h}],"pivot":[{px},{py}],"palette":null,"style":null,"layers":[{{"name":"{layer}","visible":true,"opacity":255}}],"frames":[{{"name":"{frame}","duration_ms":100,"cels":[{{"layer":"{layer}","image":"i000000","offset":[0,0]}}],"anchors":{{}},"metadata":{{}}}}],"clips":[],"metadata":{{}}}}],"metadata":{{}}}}"#,
@@ -487,15 +501,21 @@ fn load_snapshot(dir: &Path, work: &mut Work) -> Result<Document> {
     // This prevents accidentally erasing unknown palettes, metadata or clips.
     let expected = document.manifest()?;
     let baseline = parse_json(expected.as_bytes(), work)?;
-    if baseline != root { return capability("snapshot contains unsupported or altered fields"); }
+    if baseline != root {
+        return capability("snapshot contains unsupported or altered fields");
+    }
     let bytes = read_input(dir, "images/000000.png", 128 * 1024 * 1024)?;
     let decoded = codec(png::decode(&bytes, Limits::default(), work))?;
-    if Some(decoded.image.size()) != document.size { return argument("snapshot image dimensions disagree with manifest"); }
+    if Some(decoded.image.size()) != document.size {
+        return argument("snapshot image dimensions disagree with manifest");
+    }
     document.image = Some(decoded.image);
     Ok(document)
 }
 fn export_image(image: &Image, scale: u32, work: &mut Work) -> Result<Vec<u8>> {
-    if !(1..=16).contains(&scale) { return argument("scale must be 1..16"); }
+    if !(1..=16).contains(&scale) {
+        return argument("scale must be 1..16");
+    }
     // A normal-size export needs no second RGBA allocation or copy.
     if scale == 1 {
         let mut png_bytes = Vec::new();
@@ -504,20 +524,30 @@ fn export_image(image: &Image, scale: u32, work: &mut Work) -> Result<Vec<u8>> {
     }
     let [width, height] = image.size();
     let scaled = [width.checked_mul(scale), height.checked_mul(scale)];
-    let [Some(w), Some(h)] = scaled else { return fail("E_LIMIT", "scaled dimensions overflow"); };
+    let [Some(w), Some(h)] = scaled else {
+        return fail("E_LIMIT", "scaled dimensions overflow");
+    };
     // Preflight the per-side limit before materializing any expanded pixels.
     if w > 4096 || h > 4096 {
         return fail("E_LIMIT", "scaled dimensions exceed image side ceiling");
     }
     let count = u64::from(w) * u64::from(h);
-    if count > 16_777_216 { return fail("E_LIMIT", "scaled image exceeds pixel ceiling"); }
+    if count > 16_777_216 {
+        return fail("E_LIMIT", "scaled image exceeds pixel ceiling");
+    }
     let mut pixels = Vec::new();
-    pixels.try_reserve_exact(count as usize)
-        .map_err(|_| Fault { code: "E_ALLOC", message: "pixel allocation".into() })?;
+    pixels
+        .try_reserve_exact(count as usize)
+        .map_err(|_| Fault {
+            code: "E_ALLOC",
+            message: "pixel allocation".into(),
+        })?;
     for y in 0..h {
         for x in 0..w {
-            pixels.push(image.pixel(x / scale, y / scale)
-                .ok_or_else(|| Fault { code: "E_INTERNAL", message: "pixel index".into() })?);
+            pixels.push(image.pixel(x / scale, y / scale).ok_or_else(|| Fault {
+                code: "E_INTERNAL",
+                message: "pixel index".into(),
+            })?);
         }
     }
     let scaled_image = raster(Image::from_pixels(w, h, &pixels, Limits::default(), work))?;
@@ -560,16 +590,31 @@ fn build_outputs(
     }
     Ok(outputs)
 }
-fn run_job(job_file: &Path, output_dir: &Path, project: Option<&Path>, dry_run: bool) -> Result<()> {
-    if output_dir.exists() { return argument("output directory already exists"); }
+fn run_job(
+    job_file: &Path,
+    output_dir: &Path,
+    project: Option<&Path>,
+    dry_run: bool,
+) -> Result<()> {
+    if output_dir.exists() {
+        return argument("output directory already exists");
+    }
     let mut work = Work::default();
     let job_base = job_file
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or(Path::new("."));
-    let bytes = read_input(job_base,
-        job_file.file_name().and_then(|s| s.to_str()).ok_or_else(|| Fault { code: "E_ARGUMENT", message: "invalid job filename".into() })?,
-        8 * 1024 * 1024)?;
+    let bytes = read_input(
+        job_base,
+        job_file
+            .file_name()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| Fault {
+                code: "E_ARGUMENT",
+                message: "invalid job filename".into(),
+            })?,
+        8 * 1024 * 1024,
+    )?;
     let input = parse_json(&bytes, &mut work)?;
     let job = obj(&input)?;
     allowed(job, &["interface", "semantics", "ops", "checks", "exports"])?;
@@ -585,11 +630,17 @@ fn run_job(job_file: &Path, output_dir: &Path, project: Option<&Path>, dry_run: 
             }
         }
     }
-    let mut document = if let Some(path) = project { load_snapshot(path, &mut work)? } else { Document::default() };
+    let mut document = if let Some(path) = project {
+        load_snapshot(path, &mut work)?
+    } else {
+        Document::default()
+    };
     for op in arr(field(job, "ops")?)? {
         document.apply(obj(op)?, job_base, &mut work)?;
     }
-    if document.image.is_none() { return argument("missing editable cel"); }
+    if document.image.is_none() {
+        return argument("missing editable cel");
+    }
     let manifest = document.manifest()?;
     let exports = build_outputs(&document, job, &mut work)?;
     let snapshot = export_image(
