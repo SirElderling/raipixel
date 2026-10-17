@@ -308,6 +308,31 @@ impl Image {
             .checked_mul(2)
             .ok_or(Error::Limit(Resource::Work))?;
         work.charge(units)?;
+        if matches!(mode, Blend::Copy) && opacity == 255 {
+            // Copy each visible row using memmove semantics. Direction across
+            // rows protects unread source pixels during vertical overlap;
+            // copy_within handles overlapping source/destination in each row.
+            let [x0, y0, x1, y1] = coverage;
+            let len = (x1 - x0) as usize;
+            if len != 0 {
+                let sx = (i64::from(rect.x) + i64::from(x0) - i64::from(target.x)) as u32;
+                let rows = y1 - y0;
+                for step in 0..rows {
+                    let y = if target.y > rect.y {
+                        y1 - 1 - step
+                    } else {
+                        y0 + step
+                    };
+                    let sy =
+                        (i64::from(rect.y) + i64::from(y) - i64::from(target.y)) as u32;
+                    let from = self.index(sx, sy);
+                    let to = self.index(x0, y);
+                    self.pixels_mut().copy_within(from..from + len, to);
+                }
+            }
+            return Ok(discarded(target, coverage));
+        }
+        // Other modes and partial opacity still need a frozen source snapshot.
         // Source validity implies area <= this image's checked allocation length.
         let mut snapshot = reserve(rect.area() as usize)?;
         for y in rect.y as u32..rect.y as u32 + rect.height {
