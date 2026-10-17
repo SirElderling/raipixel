@@ -378,8 +378,27 @@ fn trial_match_score(length: usize, distance: usize) -> i64 {
 
 DRIVER = r'''
 #![forbid(unsafe_code)]
-use std::{hint::black_box, time::{Duration, Instant}};
+use std::{hint::black_box, io::Cursor, time::{Duration, Instant}};
 type E = Box<dyn std::error::Error>;
+fn reference_rgba(data:&[u8])->Result<(u32,u32,Vec<u8>),E>{
+    let mut decoder=png::Decoder::new(Cursor::new(data));
+    decoder.set_transformations(png::Transformations::EXPAND);
+    decoder.ignore_checksums(false);
+    decoder.set_ignore_text_chunk(true);
+    decoder.set_ignore_iccp_chunk(true);
+    let mut reader=decoder.read_info()?;
+    let mut output=vec![0u8;reader.output_buffer_size().ok_or("reference decode size")?];
+    let info=reader.next_frame(&mut output)?;
+    output.truncate(info.buffer_size());
+    reader.finish()?;
+    let rgba=match info.color_type {
+        png::ColorType::Rgba => output,
+        png::ColorType::Rgb => output.chunks_exact(3)
+            .flat_map(|x|[x[0],x[1],x[2],255]).collect(),
+        _ => return Err("reference decoder did not expand exact palette".into()),
+    };
+    Ok((info.width,info.height,rgba))
+}
 fn main()->Result<(),E>{
     for path in std::env::args().skip(1) {
         let source=std::fs::read(&path)?;
@@ -433,6 +452,10 @@ fn main()->Result<(),E>{
         };
         for mode in 0..outputs.len() {
             assert_eq!(raipixel::png::decode(&outputs[mode],raipixel::Limits::default(),&mut raipixel::Work::default())?.image,base,"RGBA mismatch mode {}",mode);
+            let (rw,rh,rgba)=reference_rgba(&outputs[mode])?;
+            assert_eq!([rw,rh],[width,height],"reference dimensions differ mode {}",mode);
+            assert_eq!(rgba.as_slice(),base.pixels().as_flattened(),
+                       "independent reference PNG decoder differs mode {}",mode);
             assert_eq!(once(mode)?,outputs[mode],"non-deterministic mode {}",mode);
             let mut bad=outputs[mode].clone();bad[29]^=1;
             assert!(matches!(raipixel::png::decode(&bad,raipixel::Limits::default(),&mut raipixel::Work::default()),Err(raipixel::png::Error::Crc)),"invalid CRC accepted in mode {}",mode);
@@ -458,6 +481,8 @@ fn main()->Result<(),E>{
         assert_eq!(selected.len(),outputs.iter().map(Vec::len).min().unwrap());
         assert_eq!(raipixel::png::decode(&selected,raipixel::Limits::default(),
             &mut raipixel::Work::default())?.image,base,"best-of-seven lost RGBA");
+        assert_eq!(reference_rgba(&selected)?.2.as_slice(),base.pixels().as_flattened(),
+                   "reference decoder rejected selected PNG");
         let batch=|mode:usize,n:usize|->Result<Duration,E>{
             let started=Instant::now();
             for _ in 0..n{black_box(once(mode)?);}
@@ -520,7 +545,7 @@ def independent_rgba_fixture(folder, colors, width, height):
 
 with tempfile.TemporaryDirectory(prefix="raipixel-quality-mix-") as temp:
     folder=Path(temp)
-    deps=['raipixel={path='+json.dumps(str(ROOT))+'}']
+    deps=['raipixel={path='+json.dumps(str(ROOT))+'}','png="=0.18.1"']
     hashes={}
     configs=[("c64flat",64,"longest","none"),
              ("c32sub",32,"longest","sub"),
@@ -544,7 +569,7 @@ with tempfile.TemporaryDirectory(prefix="raipixel-quality-mix-") as temp:
         '[package]\nname="raipixel-quality-mix"\nversion="0.0.0"\nedition="2024"\n'
         '[dependencies]\n'+'\n'.join(deps)+'\n',encoding="utf-8")
     (folder/"src/main.rs").write_text(DRIVER,encoding="utf-8")
-    subprocess.run(["cargo","build","--release","--offline","--manifest-path",str(folder/"Cargo.toml")],check=True)
+    subprocess.run(["cargo","build","--release","--manifest-path",str(folder/"Cargo.toml")],check=True)
     exe=folder/"target/release"/("raipixel-quality-mix.exe" if sys.platform=="win32" else "raipixel-quality-mix")
     paths=list(sys.argv[1:])
     paths.extend(independent_rgba_fixture(folder,colors,width,height)
@@ -587,5 +612,6 @@ with tempfile.TemporaryDirectory(prefix="raipixel-quality-mix-") as temp:
           compiler=subprocess.check_output(["rustc","--version","--verbose"],text=True),
           rounds=7,batch_min_ms=25,
           includes_actual_combined_candidate_rgba_crc_determinism_checks=True,
+          independently_decoded_by_png_0_18_1_public_api=True,
           candidate_extra_scratch_not_production_accounted=True,
           production_changed=False,cases=cases)))
