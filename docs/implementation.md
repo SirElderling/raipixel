@@ -49,10 +49,20 @@ destination pixels. Failed work charges leave the budget unchanged; allocation
 failure after a successful charge may consume work.
 
 These are local raster safeguards. JSON and PNG have their own charged work
-and local allocation checks. Aggregate live project memory, structural model,
-shared cels, job rollback and file publication remain for their implementations. The library performs no file or process I/O.
-There is no CLI, typed job/schema validation, layered frame renderer or
-persistence yet.
+and local allocation checks. The library performs no file or process I/O.
+A separate minimal CLI now supports one asset, one layer, one frame and one
+editable cel: create or import a static PNG, draw pixels/lines/rectangles or
+symbolic grids, flood-fill, export PNG, save a single-cel JSON/PNG snapshot
+and reopen it for further edits. Unsupported v1 operations and snapshot fields
+are rejected rather than discarded. A read-only single-frame compositor for
+multiple supplied layers is available as a library function, but the CLI
+cannot yet manage layered projects.
+
+CLI output is staged in a sibling directory and renamed on success, and dry-run
+creates no output. This is not a certified cross-process no-clobber protocol,
+and the CLI still lacks the complete typed diagnostics, exit-code categories,
+inspection/validation commands and full S1 project model. Aggregate live
+project memory and process-wide RSS remain unverified.
 
 ## Develop
 
@@ -126,8 +136,10 @@ and output checks. Its conservative capacity planning is **not** a measured
 peak-RSS ceiling. Do not promote that opt-in to a default or claim universal
 compression parity from the current finite fixture set.
 
-Next, implement typed job/schema validation and a minimal create/import/edit/
-inspect/save/reopen/export workflow with structured errors and atomic
-publication. Avoid further codec micro-optimizations until this complete S1
-workflow is available.
+Next, extend the now-working single-cel command workflow to an independently
+reopenable multi-layer model with complete typed field validation, read-only
+inspection and deterministic project publication. Use the existing frame
+renderer for flattening. Add resource accounting and path/no-clobber tests
+before claiming the whole S1 Foundation milestone. Avoid further codec
+micro-optimizations until this complete workflow is available.
 No extra backend abstraction or package split is needed for those additions.
