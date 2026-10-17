@@ -807,6 +807,82 @@ pub fn encode_indexed(
     Ok(true)
 }
 
+/// Encode an exact-color indexed PNG without publishing partial bytes on
+/// encoding, allocation, or work-budget failure.
+///
+/// This transactional output wrapper preserves the existing indexed encoder's
+/// output bytes and compression strategy. A false return means >256 exact RGBA
+/// samples; no bytes are written. An error from the caller's output writer
+/// during the final commit can still leave partial output.
+///
+/// Its logical staging cap is bounded by the worst-case indexed PNG size.
+/// This is not a strict process-wide heap or RSS guarantee.
+pub fn encode_indexed_staged(
+    image: &Image,
+    output: &mut impl std::io::Write,
+    work: &mut Work,
+) -> Result<bool, Error> {
+    let width = image.width as usize;
+    let height = image.height as usize;
+    let max_raw = width.checked_add(1)
+        .and_then(|stride| stride.checked_mul(height))
+        .ok_or(crate::Error::Limit(crate::Resource::Bytes))?;
+    let blocks = max_raw.div_ceil(crate::deflate::BLOCK);
+    // 8-bit indexed input is the largest packed palette representation.
+    // Stored DEFLATE needs 5 extra bytes per block, IDAT adds 12;
+    // 2048 covers header, palette, transparency, zlib, Adler and IEND.
+    let max_output = blocks.checked_mul(17)
+        .and_then(|v| v.checked_add(max_raw))
+        .and_then(|v| v.checked_add(2048))
+        .ok_or(crate::Error::Limit(crate::Resource::Bytes))?;
+    image.limits.check_buffer(max_output as u64)?;
+
+    // The flags preserve resource-error identity through the Write trait.
+    struct Stage {
+        bytes: Vec<u8>,
+        max: usize,
+        exhausted: bool,
+        allocation_failed: bool,
+    }
+    impl std::io::Write for Stage {
+        fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+            if self.bytes.len().checked_add(data.len())
+                .is_none_or(|n| n > self.max)
+            {
+                self.exhausted = true;
+                return Err(std::io::Error::other("indexed PNG staging limit"));
+            }
+            if self.bytes.try_reserve(data.len()).is_err() {
+                self.allocation_failed = true;
+                return Err(std::io::Error::other("indexed PNG staging allocation"));
+            }
+            self.bytes.extend_from_slice(data);
+            Ok(data.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+    }
+    let mut stage = Stage {
+        bytes: Vec::new(),
+        max: max_output,
+        exhausted: false,
+        allocation_failed: false,
+    };
+    match encode_indexed(image, &mut stage, work) {
+        Ok(false) => Ok(false),
+        Ok(true) => {
+            output.write_all(&stage.bytes)?;
+            Ok(true)
+        }
+        Err(_) if stage.allocation_failed => {
+            Err(crate::Error::Allocation.into())
+        }
+        Err(_) if stage.exhausted => {
+            Err(crate::Error::Limit(crate::Resource::Bytes).into())
+        }
+        Err(error) => Err(error),
+    }
+}
+
 fn encode_filtered<const COMPACT: bool>(
     image: &Image,
     output: &mut impl std::io::Write,
