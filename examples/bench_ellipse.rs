@@ -66,6 +66,46 @@ fn span(y: i64, geometry: [i64; 4]) -> Option<(i64, i64)> {
     Some((left, rx + width - 1 - left))
 }
 
+/// A: evaluate every pixel centre and emit contiguous runs via the checked
+/// public fill API. Only the benchmark retains this scalar reference algorithm.
+fn scalar_scan(
+    canvas: &mut Image,
+    rect: [i32; 4],
+    color: Pixel,
+    filled: bool,
+    work: &mut Work,
+) {
+    let [rx, ry, width, height] = rect;
+    let geometry = [i64::from(rx), i64::from(ry), i64::from(width), i64::from(height)];
+    work.charge(width as u64 * height as u64).unwrap();
+    for y in i64::from(ry)..i64::from(ry) + i64::from(height) {
+        let mut run_start = None;
+        for x in i64::from(rx)..i64::from(rx) + i64::from(width) + 1 {
+            let selected = contains(x, y, geometry)
+                && (filled
+                    || !contains(x - 1, y, geometry)
+                    || !contains(x + 1, y, geometry)
+                    || !contains(x, y - 1, geometry)
+                    || !contains(x, y + 1, geometry));
+            if selected && run_start.is_none() {
+                run_start = Some(x);
+            }
+            if !selected {
+                if let Some(start) = run_start.take() {
+                    canvas
+                        .fill(
+                            Rect::new(start as i32, y as i32, (x - start) as u32, 1).unwrap(),
+                            color,
+                            false,
+                            &mut Work::default(),
+                        )
+                        .unwrap();
+                }
+            }
+        }
+    }
+}
+
 fn row_spans(canvas: &mut Image, rect: [i32; 4], color: Pixel, filled: bool, work: &mut Work) {
     let [rx, ry, w, h] = rect;
     let geometry = [i64::from(rx), i64::from(ry), i64::from(w), i64::from(h)];
@@ -140,9 +180,14 @@ fn run_case(width: u32, height: u32, filled: bool, iterations: usize) {
     let mut b = source.try_copy(&mut Work::default()).unwrap();
     let mut wa = Work::default();
     let mut wb = Work::default();
-    a.ellipse(shape, color, filled, false, &mut wa).unwrap();
+    scalar_scan(&mut a, bounds, color, filled, &mut wa);
     row_spans(&mut b, bounds, color, filled, &mut wb);
     assert_eq!(a, b, "raster differs {width}x{height} filled={filled}");
+    let mut native = source.try_copy(&mut Work::default()).unwrap();
+    let mut native_work = Work::default();
+    native.ellipse(shape, color, filled, false, &mut native_work).unwrap();
+    assert_eq!(native, a, "native row-span code differs from independent scalar oracle");
+    assert_eq!(native_work.remaining(), wa.remaining(), "native budget differs");
     assert_eq!(wa.remaining(), wb.remaining(), "charged work differs");
     let encoded = png_bytes(&a);
     assert_eq!(encoded, png_bytes(&b), "PNG differs");
@@ -154,9 +199,7 @@ fn run_case(width: u32, height: u32, filled: bool, iterations: usize) {
     for round in 0..7 {
         let mut method_a = || {
             let mut working = source.try_copy(&mut Work::default()).unwrap();
-            working
-                .ellipse(shape, color, filled, false, &mut Work::default())
-                .unwrap();
+            scalar_scan(&mut working, bounds, color, filled, &mut Work::default());
             black_box(working);
         };
         let mut method_b = || {
@@ -166,9 +209,7 @@ fn run_case(width: u32, height: u32, filled: bool, iterations: usize) {
         };
         let mut full_a = || {
             let mut working = source.try_copy(&mut Work::default()).unwrap();
-            working
-                .ellipse(shape, color, filled, false, &mut Work::default())
-                .unwrap();
+            scalar_scan(&mut working, bounds, color, filled, &mut Work::default());
             black_box(png_bytes(&working));
         };
         let mut full_b = || {
