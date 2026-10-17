@@ -82,9 +82,15 @@ jobs:
         run: python tools/png_cost_parse_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
 
       - name: Screen quality-first lazy PNG None Sub Up Paeth and best-of-seven
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_lazy_filter_bestof_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Screen per-scanline adaptive filters against C13 frozen best-of-seven
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_adaptive_row_filter_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
 
       - name: Test frequency-ordered exact RGBA palettes against existing indexed writer
         if: github.event_name == 'workflow_dispatch'
