@@ -48,7 +48,13 @@ fn source(width: usize, height: usize) -> Vec<Pixel> {
         .collect()
 }
 
-fn full(src: &[Pixel], width: usize, height: usize, clockwise: bool, method: Rotation) -> (usize, u8) {
+fn full(
+    src: &[Pixel],
+    width: usize,
+    height: usize,
+    clockwise: bool,
+    method: Rotation,
+) -> (usize, u8) {
     let pixels = method(black_box(src), width, height, clockwise);
     let checksum = pixels[0][0];
     let image = Image::from_pixels(
@@ -115,7 +121,11 @@ fn main() {
             .unwrap();
             actual
                 .transform(
-                    if clockwise { Transform::Rotate90 } else { Transform::Rotate270 },
+                    if clockwise {
+                        Transform::Rotate90
+                    } else {
+                        Transform::Rotate270
+                    },
                     &mut Work::default(),
                 )
                 .unwrap();
@@ -125,11 +135,21 @@ fn main() {
             let mut left = Vec::new();
             let mut right = Vec::new();
             let one = Image::from_pixels(
-                height as u32, width as u32, &a, Limits::default(), &mut Work::default(),
-            ).unwrap();
+                height as u32,
+                width as u32,
+                &a,
+                Limits::default(),
+                &mut Work::default(),
+            )
+            .unwrap();
             let two = Image::from_pixels(
-                height as u32, width as u32, &b, Limits::default(), &mut Work::default(),
-            ).unwrap();
+                height as u32,
+                width as u32,
+                &b,
+                Limits::default(),
+                &mut Work::default(),
+            )
+            .unwrap();
             png::encode_compressed(&one, &mut left, &mut Work::default()).unwrap();
             png::encode_compressed(&two, &mut right, &mut Work::default()).unwrap();
             assert_eq!(left, right);
@@ -153,7 +173,13 @@ fn main() {
                 }
                 for method in order {
                     let value = measure(
-                        &samples, width, height, clockwise, method, full_repeats, true
+                        &samples,
+                        width,
+                        height,
+                        clockwise,
+                        method,
+                        full_repeats,
+                        true,
                     );
                     if std::ptr::fn_addr_eq(method, gather as Rotation) {
                         complete_a.push(value);
@@ -163,13 +189,23 @@ fn main() {
                 }
             }
             let (ka, kb, fa, fb) = (
-                median(rotate_a), median(rotate_b),
-                median(complete_a), median(complete_b),
+                median(rotate_a),
+                median(rotate_b),
+                median(complete_a),
+                median(complete_b),
             );
             println!(
                 "{}x{} {} pixels: kernel A={:.3} B={:.3} B/A={:.3}; full A={:.3} B={:.3} B/A={:.3}; PNG={} bytes",
-                width, height, if clockwise { "CW" } else { "CCW" },
-                ka, kb, kb / ka, fa, fb, fb / fa, left.len()
+                width,
+                height,
+                if clockwise { "CW" } else { "CCW" },
+                ka,
+                kb,
+                kb / ka,
+                fa,
+                fb,
+                fb / fa,
+                left.len()
             );
         }
     }

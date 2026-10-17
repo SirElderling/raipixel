@@ -111,7 +111,9 @@ fn quarter_turns_are_exact_inverses_on_all_small_rectangles() {
             }
             let mut canvas = source.try_copy(&mut Work::default()).unwrap();
             for _ in 0..4 {
-                canvas.transform(Transform::Rotate90, &mut Work::default()).unwrap();
+                canvas
+                    .transform(Transform::Rotate90, &mut Work::default())
+                    .unwrap();
             }
             assert_eq!(canvas, source);
         }
@@ -131,7 +133,8 @@ fn quarter_turn_rejects_budget_without_altering_cel() {
     assert_eq!(canvas, original);
 
     let limits = Limits::new(3, 6, 24).unwrap();
-    let mut limited = Image::from_pixels(3, 2, &[A, B, C, D, E, F], limits, &mut Work::default()).unwrap();
+    let mut limited =
+        Image::from_pixels(3, 2, &[A, B, C, D, E, F], limits, &mut Work::default()).unwrap();
     let mut enough = Work::new(6).unwrap();
     assert_eq!(limited.transform(Transform::Rotate270, &mut enough), Ok(()));
     assert_eq!(enough.remaining(), 0);
