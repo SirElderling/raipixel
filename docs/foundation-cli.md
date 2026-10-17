@@ -12,6 +12,8 @@ cargo run -- run edit.json --project art-v1 --out art-v2
 cargo run -- run art.json --out ignored --dry-run
 cargo run -- inspect art-v1
 cargo run -- inspect art-v1 --query region.json
+cargo run -- validate art-v1
+cargo run -- validate art-v1 --query checks.json
 cargo run -- help
 ```
 
@@ -34,6 +36,14 @@ one cel**, with a matching canvas and stored cel size. It supports:
   `project.json`, `images/000000.png`, and
   `artifacts/EXPORT_NAME/image.png` for requested frame exports.
 - `--dry-run` computes the edits and PNG bytes without creating an output.
+- `validate SNAPSHOT` reports supported checks for structure, dimensions,
+  visible-palette membership, alpha, bounds and metadata. A visible palette
+  violation yields an error diagnostic and exit code 3; transparent pixels'
+  hidden RGB remains unconstrained. Animation/registration/style validation
+  and full invalid-snapshot reporting remain incomplete.
+- A job can request `checks:["palette"]`. Frame exports additionally enforce
+  the declared visible RGB palette even without an explicit check, while
+  snapshot-only jobs can preserve unfinished artwork for later correction.
 - `inspect SNAPSHOT` reports bounded project structure. With `--query`, it can
   report exact alpha counts, nontransparent bounds, distinct RGBA count and a
   histogram of the selected cel/frame or image-local region. `pixels:true`
@@ -67,8 +77,8 @@ full Foundation publication guarantee is **not** accepted.
 
 ## Tests and missing scope
 
-`tests/foundation_cli.rs`, `tests/cli_color_edit.rs`, `tests/cli_palettes.rs`
-and `tests/cli_inspect.rs` exercise new artwork, palette references,
+`tests/foundation_cli.rs`, `tests/cli_color_edit.rs`, `tests/cli_palettes.rs`,
+`tests/cli_inspect.rs` and `tests/palette_checks.rs` exercise new artwork, palette references,
 recoloring, alpha cleanup, read-only inspection, hidden transparent RGB,
 PNG import, independent decoded pixel expectations, snapshot reopen and
 correction without mutating its source, dry-run, unsupported snapshot content,
@@ -79,6 +89,6 @@ Next complete the job/manifest validator and build the general project model,
 including multiple layered cels and frame rendering, before claiming scenarios
 A–E or full S1 acceptance. Persist and validate unknown-but-supported Core
 fields without dropping them. Implement atomic no-clobber publication and
-read-only `validate` and remaining inspection comparisons; add broader CLI malformed/path/concurrency
+remaining validation and inspection comparisons; add broader CLI malformed/path/concurrency
 tests and native CI confirmation. Do not treat this executable as production-safe
 for adversarial concurrent filesystem mutation.
