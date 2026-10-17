@@ -324,23 +324,31 @@ fn load_snapshot(dir: &Path, work: &mut Work) -> Result<Document> {
 }
 fn export_image(image: &Image, scale: u32, work: &mut Work) -> Result<Vec<u8>> {
     if !(1..=16).contains(&scale) { return argument("scale must be 1..16"); }
+    // A normal-size export needs no second RGBA allocation or copy.
+    if scale == 1 {
+        let mut png_bytes = Vec::new();
+        codec(png::encode_compressed(image, &mut png_bytes, work))?;
+        return Ok(png_bytes);
+    }
     let [width, height] = image.size();
     let scaled = [width.checked_mul(scale), height.checked_mul(scale)];
     let [Some(w), Some(h)] = scaled else { return fail("E_LIMIT", "scaled dimensions overflow"); };
-    let scaled_image = if scale == 1 {
-        raster(image.try_copy(work))?
-    } else {
-        let count = u64::from(w) * u64::from(h);
-        if count > 16_777_216 { return fail("E_LIMIT", "scaled image exceeds pixel ceiling"); }
-        let mut pixels = Vec::new();
-        pixels.try_reserve_exact(count as usize).map_err(|_| Fault { code: "E_ALLOC", message: "pixel allocation".into() })?;
-        for y in 0..h {
-            for x in 0..w {
-                pixels.push(image.pixel(x / scale, y / scale).ok_or_else(|| Fault { code: "E_INTERNAL", message: "pixel index".into() })?);
-            }
+    // Preflight the per-side limit before materializing any expanded pixels.
+    if w > 4096 || h > 4096 {
+        return fail("E_LIMIT", "scaled dimensions exceed image side ceiling");
+    }
+    let count = u64::from(w) * u64::from(h);
+    if count > 16_777_216 { return fail("E_LIMIT", "scaled image exceeds pixel ceiling"); }
+    let mut pixels = Vec::new();
+    pixels.try_reserve_exact(count as usize)
+        .map_err(|_| Fault { code: "E_ALLOC", message: "pixel allocation".into() })?;
+    for y in 0..h {
+        for x in 0..w {
+            pixels.push(image.pixel(x / scale, y / scale)
+                .ok_or_else(|| Fault { code: "E_INTERNAL", message: "pixel index".into() })?);
         }
-        raster(Image::from_pixels(w, h, &pixels, Limits::default(), work))?
-    };
+    }
+    let scaled_image = raster(Image::from_pixels(w, h, &pixels, Limits::default(), work))?;
     let mut png_bytes = Vec::new();
     codec(png::encode_compressed(&scaled_image, &mut png_bytes, work))?;
     Ok(png_bytes)
