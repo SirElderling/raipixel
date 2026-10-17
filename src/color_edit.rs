@@ -3,6 +3,23 @@ use crate::{Error, Image, Pixel, Rect, Work};
 
 const HASH_SLOTS: usize = 2048;
 
+#[inline]
+fn nearest_rgb(rgb: [u8; 3], palette: &[[u8; 3]]) -> usize {
+    let mut best = 0usize;
+    let mut distance = u32::MAX;
+    for (index, &entry) in palette.iter().enumerate() {
+        let dr = i32::from(rgb[0]) - i32::from(entry[0]);
+        let dg = i32::from(rgb[1]) - i32::from(entry[1]);
+        let db = i32::from(rgb[2]) - i32::from(entry[2]);
+        let candidate = (dr * dr + dg * dg + db * db) as u32;
+        if candidate < distance {
+            distance = candidate;
+            best = index;
+        }
+    }
+    best
+}
+
 // Pack RGB into low bytes rather than [R,G,B,0], which hashes poorly;
 // fold all channels when performing exact RGBA matching.
 #[inline]
@@ -126,23 +143,86 @@ impl Image {
         if palette.is_empty() || palette.len() > 256 {
             return Err(Error::PixelCount);
         }
-        self.edit_region_with_cost(region, palette.len() as u64, work, |sample| {
-            if sample[3] == 0 {
-                return sample;
-            }
-            let mut best = palette[0];
-            let mut distance = u32::MAX;
-            for &rgb in palette {
-                let dr = i32::from(sample[0]) - i32::from(rgb[0]);
-                let dg = i32::from(sample[1]) - i32::from(rgb[1]);
-                let db = i32::from(sample[2]) - i32::from(rgb[2]);
-                let candidate = (dr * dr + dg * dg + db * db) as u32;
-                if candidate < distance {
-                    distance = candidate;
-                    best = rgb;
+        // A 128-pixel probe separates the common few-color sprite from varied
+        // imagery. On small edits it is cheaper simply to scan the palette.
+        let [x0, y0, x1, y1] = match region {
+            Some(rect) => self.coverage(rect, false)?,
+            None => [0, 0, self.width, self.height],
+        };
+        let pixels = u64::from(x1 - x0) * u64::from(y1 - y0);
+        let mut seen = 0usize;
+        let mut distinct = 0usize;
+        let mut sampled = [0u32; 128];
+        if pixels >= 4096 && palette.len() >= 8 {
+            'probe: for y in y0..y1 {
+                let start = self.index(x0, y);
+                let end = start + (x1 - x0) as usize;
+                for pixel in &self.pixels()[start..end] {
+                    if pixel[3] == 0 {
+                        continue;
+                    }
+                    let packed = u32::from_be_bytes([0, pixel[0], pixel[1], pixel[2]]);
+                    if !sampled[..distinct].contains(&packed) {
+                        sampled[distinct] = packed;
+                        distinct += 1;
+                    }
+                    seen += 1;
+                    if seen == sampled.len() {
+                        break 'probe;
+                    }
                 }
             }
-            [best[0], best[1], best[2], sample[3]]
+        }
+        let use_cache = seen >= 64 && distinct * 4 <= seen * 3;
+        if !use_cache {
+            return self.edit_region_with_cost(region, palette.len() as u64, work, |pixel| {
+                if pixel[3] == 0 {
+                    return pixel;
+                }
+                let rgb = [pixel[0], pixel[1], pixel[2]];
+                let match_rgb = palette[nearest_rgb(rgb, palette)];
+                [match_rgb[0], match_rgb[1], match_rgb[2], pixel[3]]
+            });
+        }
+
+        // Fixed-size, allocation-free cache. A bounded collision probe always
+        // falls back to the exact scan; no input can alter quantization semantics.
+        const CACHE_SLOTS: usize = 4096;
+        let mut cache = [None::<([u8; 3], u8)>; CACHE_SLOTS];
+        self.edit_region_with_cost(region, palette.len() as u64, work, |pixel| {
+            if pixel[3] == 0 {
+                return pixel;
+            }
+            let rgb = [pixel[0], pixel[1], pixel[2]];
+            let key = u32::from_be_bytes([0, rgb[0], rgb[1], rgb[2]]);
+            let mut slot = (key.wrapping_mul(0x9E37_79B1) as usize) & (CACHE_SLOTS - 1);
+            let mut found = None;
+            let mut empty = None;
+            for _ in 0..8 {
+                match cache[slot] {
+                    Some((cached, index)) if cached == rgb => {
+                        found = Some(index as usize);
+                        break;
+                    }
+                    None => {
+                        empty = Some(slot);
+                        break;
+                    }
+                    _ => slot = (slot + 1) & (CACHE_SLOTS - 1),
+                }
+            }
+            let index = match found {
+                Some(index) => index,
+                None => {
+                    let index = nearest_rgb(rgb, palette);
+                    if let Some(free) = empty {
+                        cache[free] = Some((rgb, index as u8));
+                    }
+                    index
+                }
+            };
+            let match_rgb = palette[index];
+            [match_rgb[0], match_rgb[1], match_rgb[2], pixel[3]]
         })
     }
 
