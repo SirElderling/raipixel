@@ -68,15 +68,14 @@ fn span(y: i64, geometry: [i64; 4]) -> Option<(i64, i64)> {
 
 /// A: evaluate every pixel centre and emit contiguous runs via the checked
 /// public fill API. Only the benchmark retains this scalar reference algorithm.
-fn scalar_scan(
-    canvas: &mut Image,
-    rect: [i32; 4],
-    color: Pixel,
-    filled: bool,
-    work: &mut Work,
-) {
+fn scalar_scan(canvas: &mut Image, rect: [i32; 4], color: Pixel, filled: bool, work: &mut Work) {
     let [rx, ry, width, height] = rect;
-    let geometry = [i64::from(rx), i64::from(ry), i64::from(width), i64::from(height)];
+    let geometry = [
+        i64::from(rx),
+        i64::from(ry),
+        i64::from(width),
+        i64::from(height),
+    ];
     work.charge(width as u64 * height as u64).unwrap();
     for y in i64::from(ry)..i64::from(ry) + i64::from(height) {
         let mut run_start = None;
@@ -185,9 +184,18 @@ fn run_case(width: u32, height: u32, filled: bool, iterations: usize) {
     assert_eq!(a, b, "raster differs {width}x{height} filled={filled}");
     let mut native = source.try_copy(&mut Work::default()).unwrap();
     let mut native_work = Work::default();
-    native.ellipse(shape, color, filled, false, &mut native_work).unwrap();
-    assert_eq!(native, a, "native row-span code differs from independent scalar oracle");
-    assert_eq!(native_work.remaining(), wa.remaining(), "native budget differs");
+    native
+        .ellipse(shape, color, filled, false, &mut native_work)
+        .unwrap();
+    assert_eq!(
+        native, a,
+        "native row-span code differs from independent scalar oracle"
+    );
+    assert_eq!(
+        native_work.remaining(),
+        wa.remaining(),
+        "native budget differs"
+    );
     assert_eq!(wa.remaining(), wb.remaining(), "charged work differs");
     let encoded = png_bytes(&a);
     assert_eq!(encoded, png_bytes(&b), "PNG differs");
