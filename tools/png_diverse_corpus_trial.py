@@ -406,7 +406,7 @@ fn main()->Result<(),E>{
         let source=std::fs::read(&path)?;
         let base=raipixel::png::decode(&source,raipixel::Limits::default(),&mut raipixel::Work::default())?.image;
         let [width,height]=base.size();
-        if path.contains("indexed-case-") {
+        if path.contains("indexed-case-") || path.contains("art-") {
             let expected=std::fs::read(format!("{path}.rgba"))?;
             assert_eq!(base.pixels().as_flattened(),expected.as_slice(),"independent input RGBA mismatch");
         }
@@ -573,7 +573,7 @@ def art_fixture(folder, name, colors, width, height, pattern, seed):
         z=(z*0x846ca68b)&0xffffffff
         return (z^(z>>16))&0xffffffff
     palette=[(i&255,(i*37+seed*3)&255,(i*83+seed*7)&255,
-              (0,64,128,255)[(i+seed)%4]) for i in range(colors)]
+              (0,64,128,255)[(i+seed+(i//256))%4]) for i in range(colors)]
     rgba=bytearray()
     for y in range(height):
         for x in range(width):
@@ -675,6 +675,8 @@ with tempfile.TemporaryDirectory(prefix="raipixel-quality-mix-") as temp:
         case=json.loads(line)
         case["input"]=path
         case["input_sha256"]=hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        if "art-unsupported-" in path and case["supported"]:
+            raise ValueError("257 exactly distinct RGBA entries were silently accepted")
         if case["supported"]:
             case["best_bytes"]=min(case["bytes"])
             case["five_bytes"]=case["best_5_bytes"]
