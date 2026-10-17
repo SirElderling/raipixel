@@ -7,6 +7,8 @@ use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
 type Map = BTreeMap<String, json::Value>;
+type PaletteEntries = Vec<(String, [u8; 3])>;
+type Palettes = BTreeMap<String, PaletteEntries>;
 type Result<T> = std::result::Result<T, Fault>;
 
 #[derive(Debug)]
@@ -148,7 +150,7 @@ fn color_literal(value: &json::Value, rgb_only: bool) -> Result<Pixel> {
     }
     color(value)
 }
-fn read_palette_entries(values: &[json::Value]) -> Result<Vec<(String, [u8; 3])>> {
+fn read_palette_entries(values: &[json::Value]) -> Result<PaletteEntries> {
     if values.is_empty() || values.len() > 256 {
         return argument("palette entries must contain 1..256 named RGB colors");
     }
@@ -169,7 +171,7 @@ fn read_palette_entries(values: &[json::Value]) -> Result<Vec<(String, [u8; 3])>
     }
     Ok(entries)
 }
-fn read_palettes(values: &[json::Value]) -> Result<BTreeMap<String, Vec<(String, [u8; 3])>>> {
+fn read_palettes(values: &[json::Value]) -> Result<Palettes> {
     if values.len() > 256 {
         return fail("E_LIMIT", "too many named palettes");
     }
@@ -233,7 +235,7 @@ struct Document {
     size: Option<[u32; 2]>,
     pivot: [i32; 2],
     palette_ref: Option<String>,
-    palettes: BTreeMap<String, Vec<(String, [u8; 3])>>,
+    palettes: Palettes,
     image: Option<Image>,
 }
 impl Document {
