@@ -498,7 +498,7 @@ fn staged_indexed_preserves_legacy_bytes_and_exact_transparent_rgba() {
                 v,
                 v.wrapping_mul(23),
                 v.wrapping_mul(71),
-                if v % 2 == 0 { 0 } else { 255 },
+                if v.is_multiple_of(2) { 0 } else { 255 },
             ]
         })
         .collect();
