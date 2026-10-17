@@ -7,6 +7,7 @@ on:
       - 'src/ellipse.rs'
       - 'examples/bench_ellipse.rs'
       - 'tests/ellipse.rs'
+      - 'tests/cli_ellipse.rs'
       - '.github/workflows/ellipse-compare.yml'
   workflow_dispatch:
 
