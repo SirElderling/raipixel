@@ -1,4 +1,6 @@
 //! A/B: full exact RGBA revision comparison versus equality-skipping rows.
+//! A is a frozen full-scan reference; B uses the selected public Image::compare.
+//! Keep the algorithms separate to avoid benchmarking the selected method twice.
 //! cargo run --release --locked --offline --example bench_image_compare
 use raipixel::{Error, Image, Limits, Rect, Work, compare::ImageDiff};
 use std::{hint::black_box, time::Instant};
