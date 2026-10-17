@@ -76,12 +76,7 @@ fn exact_symbolic_artwork_survives_all_static_png_writers_and_reopen() {
             0 => png::encode(&image, &mut again, &mut Work::default()).unwrap(),
             1 => png::encode_compact(&image, &mut again, &mut Work::default()).unwrap(),
             _ => {
-                assert!(png::encode_indexed(
-                    &image,
-                    &mut again,
-                    &mut Work::default()
-                )
-                .unwrap());
+                assert!(png::encode_indexed(&image, &mut again, &mut Work::default()).unwrap());
             }
         }
         assert_eq!(*bytes, again, "nondeterministic PNG writer {writer}");
@@ -93,27 +88,31 @@ fn exact_symbolic_artwork_survives_all_static_png_writers_and_reopen() {
         .image;
     let before = reopened.try_copy(&mut Work::default()).unwrap();
     let mut limited_work = Work::new(5).unwrap();
-    assert!(reopened
-        .draw_grid(
-            [1, 1],
-            &["??"],
-            &[(b'#', Some(LINE))],
-            false,
-            &mut limited_work,
-        )
-        .is_err());
+    assert!(
+        reopened
+            .draw_grid(
+                [1, 1],
+                &["??"],
+                &[(b'#', Some(LINE))],
+                false,
+                &mut limited_work,
+            )
+            .is_err()
+    );
     assert_eq!(limited_work.remaining(), 5);
     assert_eq!(reopened, before);
 
     // Bounds rejection likewise leaves the edited RGBA intact.
-    assert!(reopened
-        .fill(
-            Rect::new(6, 6, 2, 2).unwrap(),
-            LINE,
-            false,
-            &mut limited_work,
-        )
-        .is_err());
+    assert!(
+        reopened
+            .fill(
+                Rect::new(6, 6, 2, 2).unwrap(),
+                LINE,
+                false,
+                &mut limited_work,
+            )
+            .is_err()
+    );
     assert_eq!(limited_work.remaining(), 5);
     assert_eq!(reopened, before);
 }
