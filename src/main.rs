@@ -1109,7 +1109,14 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
     let query = obj(&parsed)?;
     allowed(
         query,
-        &["target", "region", "pixels", "symbols", "histogram_limit"],
+        &[
+            "target",
+            "region",
+            "pixels",
+            "symbols",
+            "histogram_limit",
+            "against",
+        ],
     )?;
     let want_symbols = boolean(query, "symbols", false)?;
     let target = query.get("target").map(string).transpose()?;
@@ -1118,6 +1125,7 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
             || query.contains_key("region")
             || query.contains_key("pixels")
             || query.contains_key("histogram_limit")
+            || query.contains_key("against")
         {
             return argument("inspection region and pixel options require a target");
         }
@@ -1254,8 +1262,76 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
         symbols.push_str("]}");
     }
 
+
+    // Comparisons are read-only and preserve all exact RGBA samples, including
+    // RGB under zero alpha. The other project is confined to the query folder.
+    let mut against = String::new();
+    if let Some(requested) = query.get("against") {
+        let spec = obj(requested)?;
+        allowed(spec, &["project", "target"])?;
+        let requested_path = Path::new(text(spec, "project")?);
+        if requested_path.as_os_str().is_empty()
+            || requested_path
+                .components()
+                .any(|part| !matches!(part, Component::Normal(_) | Component::CurDir))
+        {
+            return argument("comparison project must be a relative path without parent traversal");
+        }
+        let source = query_file.ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "comparison needs a saved query file".into(),
+        })?;
+        let query_root = source
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or(Path::new("."))
+            .canonicalize()
+            .map_err(|error| Fault {
+                code: "E_IO",
+                message: error.to_string(),
+            })?;
+        let other_path = query_root
+            .join(requested_path)
+            .canonicalize()
+            .map_err(|error| Fault {
+                code: "E_IO",
+                message: error.to_string(),
+            })?;
+        if !other_path.starts_with(&query_root) || !other_path.is_dir() {
+            return argument("comparison project escapes its query directory");
+        }
+        let other = load_snapshot(&other_path, &mut work)?;
+        let other_target = text(spec, "target")?;
+        let left_is_cel = target == document.cel_name()?;
+        let right_is_cel = other_target == other.cel_name()?;
+        let right_is_frame = other_target == other.frame_name()?;
+        if !right_is_cel && !right_is_frame {
+            return fail("E_REFERENCE", "unknown comparison target");
+        }
+        if left_is_cel != right_is_cel {
+            return argument("comparison requires the same cel or frame target type");
+        }
+        let other_image = other.image.as_ref().ok_or_else(|| Fault {
+            code: "E_ARGUMENT",
+            message: "comparison snapshot has no cel".into(),
+        })?;
+        let diff = raster(image.compare(other_image, region, &mut work))?;
+        let change_bbox = match diff.changed_bbox {
+            Some([cx, cy, cw, ch]) => format!("[{cx},{cy},{cw},{ch}]"),
+            None => String::from("null"),
+        };
+        let same_state = document.manifest()? == other.manifest()?;
+        let _ = write!(
+            against,
+            r#","against":{{"target":"{other_target}","changed_samples":{},"changed_visible_colors":{},"changed_alpha":{},"changed_bbox":{change_bbox},"unrelated_state_equal":{same_state}}}"#,
+            diff.changed_samples,
+            diff.changed_visible_colors,
+            diff.changed_alpha
+        );
+    }
+
     println!(
-        r#"{{"schema":1,"ok":true,"action":"inspect","result":{{"target":"{target}","size":[{image_width},{image_height}],"region":[{x},{y},{w},{h}],"pixel_count":{},"zero_alpha":{},"partial_alpha":{},"opaque_alpha":{},"visible_bbox":{bbox},"unique_colors":{},"histogram_truncated":{},"histogram":[{histogram}]{pixels}{symbols}}}}}"#,
+        r#"{{"schema":1,"ok":true,"action":"inspect","result":{{"target":"{target}","size":[{image_width},{image_height}],"region":[{x},{y},{w},{h}],"pixel_count":{},"zero_alpha":{},"partial_alpha":{},"opaque_alpha":{},"visible_bbox":{bbox},"unique_colors":{},"histogram_truncated":{},"histogram":[{histogram}]{pixels}{symbols}{against}}}}}"#,
         stats.pixel_count,
         stats.zero_alpha,
         stats.partial_alpha,
