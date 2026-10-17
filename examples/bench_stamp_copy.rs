@@ -6,7 +6,12 @@ fn fixture(side: u32) -> Image {
     let data: Vec<_> = (0..side * side)
         .map(|n| {
             let v = n.wrapping_mul(0x9E37_79B9).rotate_left(9);
-            [v as u8, (v >> 8) as u8, (v >> 16) as u8, if n % 7 == 0 { 0 } else { 255 }]
+            [
+                v as u8,
+                (v >> 8) as u8,
+                (v >> 16) as u8,
+                if n % 7 == 0 { 0 } else { 255 },
+            ]
         })
         .collect();
     Image::from_pixels(side, side, &data, Limits::default(), &mut Work::default()).unwrap()
@@ -22,9 +27,12 @@ fn scenario(name: &str) -> (u32, Rect, [i32; 2]) {
         _ => panic!("unknown case"),
     }
 }
-fn task(source: &Image, rect: Rect, at: [i32; 2], encode: bool)
-    -> (Image, u64, u64, Option<Vec<u8>>)
-{
+fn task(
+    source: &Image,
+    rect: Rect,
+    at: [i32; 2],
+    encode: bool,
+) -> (Image, u64, u64, Option<Vec<u8>>) {
     let mut output = source.try_copy(&mut Work::default()).unwrap();
     let mut budget = Work::default();
     let discarded = output
@@ -40,9 +48,13 @@ fn task(source: &Image, rect: Rect, at: [i32; 2], encode: bool)
     (output, budget.remaining(), discarded, png_bytes)
 }
 fn fingerprint(image: &Image) -> u64 {
-    image.pixels().iter().flatten().fold(0xcbf29ce484222325u64, |h, b| {
-        (h ^ u64::from(*b)).wrapping_mul(0x100000001b3)
-    })
+    image
+        .pixels()
+        .iter()
+        .flatten()
+        .fold(0xcbf29ce484222325u64, |h, b| {
+            (h ^ u64::from(*b)).wrapping_mul(0x100000001b3)
+        })
 }
 fn main() {
     let mut args = std::env::args().skip(1);
