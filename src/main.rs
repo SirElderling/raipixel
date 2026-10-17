@@ -148,6 +148,43 @@ fn color_literal(value: &json::Value, rgb_only: bool) -> Result<Pixel> {
     }
     color(value)
 }
+fn read_palette_entries(values: &[json::Value]) -> Result<Vec<(String, [u8; 3])>> {
+    if values.is_empty() || values.len() > 256 {
+        return argument("palette entries must contain 1..256 named RGB colors");
+    }
+    let mut entries = Vec::new();
+    entries.try_reserve_exact(values.len()).map_err(|_| Fault {
+        code: "E_ALLOC",
+        message: "palette entry allocation".into(),
+    })?;
+    for value in values {
+        let item = obj(value)?;
+        allowed(item, &["name", "rgb"])?;
+        let entry_name = name(text(item, "name")?)?;
+        if entries.iter().any(|(other, _)| other == &entry_name) {
+            return argument("duplicate palette entry name");
+        }
+        let rgb = color_literal(field(item, "rgb")?, true)?;
+        entries.push((entry_name, [rgb[0], rgb[1], rgb[2]]));
+    }
+    Ok(entries)
+}
+fn read_palettes(values: &[json::Value]) -> Result<BTreeMap<String, Vec<(String, [u8; 3])>>> {
+    if values.len() > 256 {
+        return fail("E_LIMIT", "too many named palettes");
+    }
+    let mut palettes = BTreeMap::new();
+    for value in values {
+        let item = obj(value)?;
+        allowed(item, &["name", "entries"])?;
+        let palette_name = name(text(item, "name")?)?;
+        let entries = read_palette_entries(arr(field(item, "entries")?)?)?;
+        if palettes.insert(palette_name, entries).is_some() {
+            return argument("duplicate palette name");
+        }
+    }
+    Ok(palettes)
+}
 fn allowed(map: &Map, names: &[&str]) -> Result<()> {
     for key in map.keys() {
         if !names.contains(&key.as_str()) {
@@ -195,9 +232,53 @@ struct Document {
     frame: Option<String>,
     size: Option<[u32; 2]>,
     pivot: [i32; 2],
+    palette_ref: Option<String>,
+    palettes: BTreeMap<String, Vec<(String, [u8; 3])>>,
     image: Option<Image>,
 }
 impl Document {
+    fn resolve_color(&self, value: &json::Value) -> Result<Pixel> {
+        let raw = string(value)?;
+        if raw.starts_with('#') {
+            return color(value);
+        }
+        let Some((palette, entry)) = raw.strip_prefix('@').and_then(|s| s.split_once('/'))
+        else {
+            return argument("color must be a literal or @palette/entry");
+        };
+        let rgb = self.palettes.get(palette).and_then(|entries| {
+            entries.iter().find(|(name, _)| name == entry).map(|(_, rgb)| rgb)
+        });
+        match rgb {
+            Some(&[r, g, b]) => Ok([r, g, b, 255]),
+            None => fail("E_REFERENCE", format!("unknown palette color: {raw}")),
+        }
+    }
+
+    fn palettes_json(&self) -> String {
+        use std::fmt::Write as _;
+        let mut json = String::from("[");
+        for (index, (palette, entries)) in self.palettes.iter().enumerate() {
+            if index != 0 {
+                json.push(',');
+            }
+            let _ = write!(json, r#"{{"name":"{palette}","entries":["#);
+            for (position, (name, rgb)) in entries.iter().enumerate() {
+                if position != 0 {
+                    json.push(',');
+                }
+                let _ = write!(
+                    json,
+                    r#"{{"name":"{name}","rgb":"#{:02X}{:02X}{:02X}"}}"#,
+                    rgb[0], rgb[1], rgb[2]
+                );
+            }
+            json.push_str("]}");
+        }
+        json.push(']');
+        json
+    }
+
     fn cel_name(&self) -> Result<String> {
         match (&self.asset, &self.layer, &self.frame) {
             (Some(a), Some(l), Some(f)) => Ok(format!("{a}/{l}/{f}")),
@@ -221,16 +302,45 @@ impl Document {
     }
     fn apply(&mut self, operation: &Map, base: &Path, work: &mut Work) -> Result<()> {
         match text(operation, "op")? {
+            "palette.set" => {
+                allowed(operation, &["op", "name", "entries", "replace"])?;
+                let palette = name(text(operation, "name")?)?;
+                let replace = boolean(operation, "replace", false)?;
+                let exists = self.palettes.contains_key(&palette);
+                if replace && !exists {
+                    return fail("E_REFERENCE", "cannot replace an unknown palette");
+                }
+                if !replace && exists {
+                    return fail("E_EXISTS", "palette already exists");
+                }
+                if !exists && self.palettes.len() >= 256 {
+                    return fail("E_LIMIT", "too many named palettes");
+                }
+                let entries = read_palette_entries(arr(field(operation, "entries")?)?)?;
+                self.palettes.insert(palette, entries);
+                Ok(())
+            }
             "asset.create" => {
-                allowed(operation, &["op", "name", "size", "pivot"])?;
+                allowed(operation, &["op", "name", "size", "pivot", "palette"])?;
                 if self.asset.is_some() {
                     return capability("this first slice supports one asset");
                 }
                 let extent = size(field(operation, "size")?)?;
                 let pivot = optional_point(operation, "pivot", [0, 0])?;
+                let selected_palette = match operation.get("palette") {
+                    None | Some(json::Value::Null) => None,
+                    Some(value) => {
+                        let selected = name(string(value)?)?;
+                        if !self.palettes.contains_key(&selected) {
+                            return fail("E_REFERENCE", "asset refers to unknown palette");
+                        }
+                        Some(selected)
+                    }
+                };
                 self.asset = Some(name(text(operation, "name")?)?);
                 self.size = Some(extent);
                 self.pivot = pivot;
+                self.palette_ref = selected_palette;
                 Ok(())
             }
             "layer.create" => {
@@ -300,7 +410,7 @@ impl Document {
                 )?;
                 let target = single_target(operation)?;
                 let clip = boolean(operation, "clip", false)?;
-                let sample = color(field(operation, "color")?)?;
+                let sample = self.resolve_color(field(operation, "color")?)?;
                 let image = self.image_mut(&target)?;
                 match text(operation, "shape")? {
                     "pixel" => {
@@ -359,7 +469,7 @@ impl Document {
                     if key.len() != 1 || !key.is_ascii() {
                         return argument("grid symbols must be one ASCII byte");
                     }
-                    symbols.push((key.as_bytes()[0], Some(color(val)?)));
+                    symbols.push((key.as_bytes()[0], Some(self.resolve_color(val)?)));
                 }
                 if let Some(v) = operation.get("skip") {
                     let skip = string(v)?;
@@ -389,7 +499,7 @@ impl Document {
                     })?,
                 ];
                 let region = operation.get("region").map(rect).transpose()?;
-                let pixel = color(field(operation, "color")?)?;
+                let pixel = self.resolve_color(field(operation, "color")?)?;
                 raster(self.image_mut(&target)?.flood_fill(at, pixel, region, work))?;
                 Ok(())
             }
@@ -452,7 +562,7 @@ impl Document {
                             Some(v) if string(v)? == "rgba" => true,
                             _ => return argument("alpha match must be rgb or rgba"),
                         };
-                        let key = color(field(operation, "color")?)?;
+                        let key = self.resolve_color(field(operation, "color")?)?;
                         raster(
                             self.image_mut(&target)?
                                 .alpha_key(key, match_alpha, region, work),
@@ -499,9 +609,14 @@ impl Document {
         if self.image.as_ref().is_some_and(|i| i.size() != [w, h]) {
             return argument("mismatched editable cel");
         }
+        let palettes = self.palettes_json();
+        let asset_palette = match &self.palette_ref {
+            Some(value) => format!(r#""{value}""#),
+            None => String::from("null"),
+        };
         // Names are validated restricted ASCII, so insertion into JSON is safe.
         Ok(format!(
-            r#"{{"format":"raipixel-project","version":1,"semantics":"1.0","images":[{{"id":"i000000","file":"images/000000.png","size":[{w},{h}]}}],"palettes":[],"styles":[],"assets":[{{"name":"{asset}","size":[{w},{h}],"pivot":[{px},{py}],"palette":null,"style":null,"layers":[{{"name":"{layer}","visible":true,"opacity":255}}],"frames":[{{"name":"{frame}","duration_ms":100,"cels":[{{"layer":"{layer}","image":"i000000","offset":[0,0]}}],"anchors":{{}},"metadata":{{}}}}],"clips":[],"metadata":{{}}}}],"metadata":{{}}}}"#,
+            r#"{{"format":"raipixel-project","version":1,"semantics":"1.0","images":[{{"id":"i000000","file":"images/000000.png","size":[{w},{h}]}}],"palettes":{palettes},"styles":[],"assets":[{{"name":"{asset}","size":[{w},{h}],"pivot":[{px},{py}],"palette":{asset_palette},"style":null,"layers":[{{"name":"{layer}","visible":true,"opacity":255}}],"frames":[{{"name":"{frame}","duration_ms":100,"cels":[{{"layer":"{layer}","image":"i000000","offset":[0,0]}}],"anchors":{{}},"metadata":{{}}}}],"clips":[],"metadata":{{}}}}],"metadata":{{}}}}"#,
             px = self.pivot[0],
             py = self.pivot[1]
         ) + "\n")
@@ -567,6 +682,7 @@ fn load_snapshot(dir: &Path, work: &mut Work) -> Result<Document> {
     {
         return capability("unsupported project snapshot version");
     }
+    let palettes = read_palettes(arr(field(object, "palettes")?)?)?;
     let assets = arr(field(object, "assets")?)?;
     if assets.len() != 1 {
         return capability("only one asset snapshot is supported");
@@ -585,8 +701,16 @@ fn load_snapshot(dir: &Path, work: &mut Work) -> Result<Document> {
         frame: Some(name(text(f, "name")?)?),
         size: Some(size(field(a, "size")?)?),
         pivot: point(field(a, "pivot")?)?,
+        palette_ref: match field(a, "palette")? {
+            json::Value::Null => None,
+            value => Some(name(string(value)?)?),
+        },
+        palettes,
         image: None,
     };
+    if document.palette_ref.as_ref().is_some_and(|selected| !document.palettes.contains_key(selected)) {
+        return fail("E_REFERENCE", "snapshot refers to an unknown palette");
+    }
     // Round-trip only snapshots whose complete semantic structure is supported.
     // This prevents accidentally erasing unknown palettes, metadata or clips.
     let expected = document.manifest()?;
