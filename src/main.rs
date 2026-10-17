@@ -588,10 +588,23 @@ impl Document {
                     "flip-x" => Transform::FlipX,
                     "flip-y" => Transform::FlipY,
                     "rotate-180" => Transform::Rotate180,
+                    "rotate-90" => Transform::Rotate90,
+                    "rotate-270" => Transform::Rotate270,
                     other => {
                         return capability(format!("unsupported transform kind: {other}"));
                     }
                 };
+                // The current snapshot profile requires full-canvas cels.
+                // Rectangular turns wait for independently sized cels and offsets.
+                if matches!(kind, Transform::Rotate90 | Transform::Rotate270) {
+                    let image = self.image_mut(&target)?;
+                    let [width, height] = image.size();
+                    if width != height {
+                        return capability(
+                            "rectangular quarter-turn requires independently sized cels",
+                        );
+                    }
+                }
                 raster(self.image_mut(&target)?.transform(kind, work))?;
                 Ok(())
             }

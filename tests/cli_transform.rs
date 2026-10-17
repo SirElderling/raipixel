@@ -85,7 +85,7 @@ fn json_transform_round_trip_and_rejected_kind_preserve_source() {
     fs::write(
         root.join("invalid.json"),
         r#"{"interface":1,"semantics":"1.0","ops":[
-          {"op":"transform","targets":["sprite/paint/base"],"kind":"rotate-90"}
+          {"op":"transform","targets":["sprite/paint/base"],"kind":"rotate-45"}
         ]}"#,
     )
     .unwrap();

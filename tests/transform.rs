@@ -75,3 +75,65 @@ fn budget_failures_are_transactional_and_not_charged() {
     assert_eq!(work.remaining(), 5);
     assert_eq!(canvas, before);
 }
+
+#[test]
+fn quarter_turns_match_independent_rectangular_vectors() {
+    let original = [A, B, C, D, E, F];
+    for (kind, expected) in [
+        (Transform::Rotate90, [D, A, E, B, F, C]),
+        (Transform::Rotate270, [C, F, B, E, A, D]),
+    ] {
+        let mut canvas = image(&original, 3, 2);
+        let mut budget = Work::new(6).unwrap();
+        assert_eq!(canvas.transform(kind, &mut budget), Ok(()));
+        assert_eq!(canvas.size(), [2, 3]);
+        assert_eq!(canvas.pixels(), &expected);
+        assert_eq!(budget.remaining(), 0);
+    }
+}
+
+#[test]
+fn quarter_turns_are_exact_inverses_on_all_small_rectangles() {
+    for width in 1..=8 {
+        for height in 1..=9 {
+            let original: Vec<_> = (0..width * height)
+                .map(|n| [n as u8, (n * 13) as u8, (n * 29) as u8, (n % 5) as u8])
+                .collect();
+            let source = image(&original, width, height);
+            for (first, second) in [
+                (Transform::Rotate90, Transform::Rotate270),
+                (Transform::Rotate270, Transform::Rotate90),
+            ] {
+                let mut canvas = source.try_copy(&mut Work::default()).unwrap();
+                canvas.transform(first, &mut Work::default()).unwrap();
+                canvas.transform(second, &mut Work::default()).unwrap();
+                assert_eq!(canvas, source, "{width} x {height}, {first:?}");
+            }
+            let mut canvas = source.try_copy(&mut Work::default()).unwrap();
+            for _ in 0..4 {
+                canvas.transform(Transform::Rotate90, &mut Work::default()).unwrap();
+            }
+            assert_eq!(canvas, source);
+        }
+    }
+}
+
+#[test]
+fn quarter_turn_rejects_budget_without_altering_cel() {
+    let mut canvas = image(&[A, B, C, D, E, F], 3, 2);
+    let original = canvas.try_copy(&mut Work::default()).unwrap();
+    let mut small = Work::new(5).unwrap();
+    assert_eq!(
+        canvas.transform(Transform::Rotate90, &mut small),
+        Err(Error::Limit(Resource::Work))
+    );
+    assert_eq!(small.remaining(), 5);
+    assert_eq!(canvas, original);
+
+    let limits = Limits::new(3, 6, 24).unwrap();
+    let mut limited = Image::from_pixels(3, 2, &[A, B, C, D, E, F], limits, &mut Work::default()).unwrap();
+    let mut enough = Work::new(6).unwrap();
+    assert_eq!(limited.transform(Transform::Rotate270, &mut enough), Ok(()));
+    assert_eq!(enough.remaining(), 0);
+    assert_eq!(limited.size(), [2, 3]);
+}
