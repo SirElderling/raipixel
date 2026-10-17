@@ -1,9 +1,16 @@
 name: Rust CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main, 'feat/**']
+
+# Push and PR events share the same branch group. Avoid duplicate/obsolete
+# cross-platform builds during incremental implementation.
+concurrency:
+  group: rust-ci-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -42,61 +49,76 @@ jobs:
       - name: Clippy
         run: cargo +1.99.1 clippy --locked --offline --all-targets --target ${{ matrix.target }} -- -D warnings
       - name: Compare checksum throughput (informational)
+        if: github.event_name == 'workflow_dispatch'
         run: |
           rustc +1.99.1 --edition=2024 -O tools/png_checksum_bench.rs -o png-checksum-bench.exe
           ./png-checksum-bench.exe
       - name: Paired full-codec timings and exact output comparison (informational)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_timings.py --baseline 9122259844497a57149dbe6ba7fa0ef708398c46 --batch-ms 100 --output png-timings.json
       - name: Paired candidate-versus-accepted PNG timings (informational)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_timings.py --baseline 7717618f3c56c244283c773425eae1b68c3d1d16 --batch-ms 100 --output png-candidate-timings.json
       - name: Isolate target-specific CRC from the unchanged encoder (informational)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_timings.py --baseline 9734e8102eb3624fb7324561e32031112c0e838c --batch-ms 25 --output png-arch-crc-timings.json
       - name: Compare original mixed-filter corpus, samples, flags and work (informational)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_timings.py --baseline 9122259844497a57149dbe6ba7fa0ef708398c46 --corpus benchmarks/png/original-inputs.json --batch-ms 100 --output png-original-timings.json
       - name: Restore recorded original PNG inputs
+        if: github.event_name == 'workflow_dispatch'
         run: python -c "import json;from pathlib import Path;p=Path('png-original-inputs');p.mkdir(exist_ok=True);[(p / (c['name'] + '.png')).write_bytes(bytes.fromhex(c['png_hex'])) for c in json.loads(Path('benchmarks/png/original-inputs.json').read_text())['cases']]"
       - name: Codec stage probes (informational)
+        if: github.event_name == 'workflow_dispatch'
         run: |
           cargo +1.99.1 run --release --locked --offline --example png_bench -- --export png-stage-inputs
           cargo +1.99.1 run --release --locked --offline --example png_stages -- png-stage-inputs/sheet-1024-compressed.png
           cargo +1.99.1 run --release --locked --offline --example png_stages -- png-stage-inputs/texture-1024-compressed.png
       - name: Screen CRC headroom and Paeth decode candidates (informational)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_hotpath_trial.py png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
       - name: Profile actual decoder stages (informational)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_decode_stages.py png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
       - name: Screen safe CRC slicing widths (informational)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_crc_trial.py
       - name: Profile actual writer stages (informational)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_writer_profile.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png
       - name: Screen token emission separately from matching (informational)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_token_replay.py png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
       - name: Compare matching and Adler stages against baseline (informational)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_bottleneck_compare.py --baseline 27243e606e9c5c3ef6fddc0c645255570be75be7 png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png
       - name: Compare complete codecs under matched build profiles (informational)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_build_profiles.py --output png-build-profiles.json png-stage-inputs/icon-64-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-stage-inputs/noise-256-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
       - name: Measure checksum parity against crc32fast public API (informational)
+        if: github.event_name == 'workflow_dispatch'
         env:
           RUSTUP_TOOLCHAIN: '1.99.1'
         run: python tools/png_crc_reference_api.py
