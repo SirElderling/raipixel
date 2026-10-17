@@ -1,0 +1,16 @@
+[package]
+name = "raipixel"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+description = "Deterministic pixel-art engine for agent-driven workflows"
+publish = false
+
+[features]
+# Quality codec remains explicit while native integration and memory tests mature.
+experimental-quality = []
+
+[dependencies]
+
+[lints.rust]
+unsafe_code = "forbid"

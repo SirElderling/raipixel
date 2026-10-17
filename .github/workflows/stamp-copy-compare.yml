@@ -1,0 +1,43 @@
+name: Same-cel copy A/B
+on:
+  push:
+    branches: ['feat/**']
+    paths:
+      - 'src/raster.rs'
+      - 'examples/bench_stamp_copy.rs'
+      - 'tools/bench_stamp_compare.py'
+      - '.github/workflows/stamp-copy-compare.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    name: Copy / ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Linux x86_64
+            runner: ubuntu-24.04
+          - os: macOS ARM64
+            runner: macos-15
+          - os: Windows MSVC
+            runner: windows-2022
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install Rust
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt
+      - name: Format
+        run: cargo +1.99.1 fmt --all -- --check
+      - name: Compare original and updated exact copying
+        run: python tools/bench_stamp_compare.py --output stamp-compare.json
+      - name: Upload raw samples
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stamp-compare-${{ matrix.os }}
+          path: stamp-compare.json

@@ -1,0 +1,907 @@
+{
+  "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "compiler": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "driver_sha256": "b6b379f289bb25478e46834d33e3ff8d82aeb02c6cb8f3fdf3f3fafea0354a97",
+  "library_sources_sha256": {
+    "src/checksum.rs": "7bb256aeadd77da7319d2b07523e4c892e48849a99d41aa332012dd40e50eaee",
+    "src/deflate/encode.rs": "1b6c7ff677fad7d990b2fc48e7f11e8f80ed050d7911de612be77376eb8bef80",
+    "src/deflate.rs": "e781706e1afeac51743058960b34dfbd8340a8afb0a83308673e0bab0fa8fea0",
+    "src/error.rs": "fbe14d7a97c9e5313f74229ad8bd4c45af17f73db44fb9be8f45ce7f3a2228e5",
+    "src/json.rs": "53f6386ccb398b5e1a59fbd89fbed786fe2c1cbbbda6be7105e4817e9d60fc42",
+    "src/lib.rs": "f5e78a7f3639baa53c566e13318dc433ca9b033ced58d624283a40aba98aa109",
+    "src/limits.rs": "7ef9e8e9187b18f5f7765b8f4053ee9273cc3413a79f12ac68fa90b118f488df",
+    "src/model.rs": "363658e428ee47b96d6d4be79f6e8344161e1ac1e30727b6c26f4563601aa7e1",
+    "src/png.rs": "85b609ff6846c22dfbbcac8727c8ba8d3757e41484bb67b911f7d2c4a242da3e",
+    "src/raster.rs": "2395ee02a406c37b44668eeb28459d8cc971e4106e92046576c8f7188d62128d"
+  },
+  "host": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "reference": "png 0.18.1, locked default features",
+  "raipixel_commit": "aa0e755265fcc3d07fc36e55165a783e48f67e22",
+  "working_tree": " M .github/workflows/ci.yml\n M benchmarks/png/algorithm-notes.md\n M benchmarks/png/timing.md\n?? benchmarks/png/candidates/lookup-and-stage-tests.md\n?? benchmarks/png/decoder-profile.json\n?? benchmarks/png/decoder-recompressed-profile.json\n?? benchmarks/png/encoder-stage-baseline.json\n?? benchmarks/png/filter-adler-trial.json\n?? benchmarks/png/lookup-match-screen.json\n?? benchmarks/png/match-trial.json\n?? benchmarks/png/native-lookup-linux.json\n?? benchmarks/png/native-lookup-macos.json\n?? benchmarks/png/native-lookup-packed-linux.json\n?? benchmarks/png/native-lookup-packed-macos.json\n?? benchmarks/png/native-lookup-packed-windows.json\n?? benchmarks/png/native-lookup-windows.json\n?? benchmarks/png/run-lookup-short-batches.json\n?? benchmarks/png/run-lookup.json\n?? benchmarks/png/timing-lookup.json\n?? tools/png_token_replay.py\n",
+  "timing_order": [
+    "ours_decode",
+    "reference_decode",
+    "ours_encode",
+    "reference_no_compression",
+    "reference_fast",
+    "reference_balanced",
+    "ours_compressed_encode"
+  ],
+  "profile": [
+    {
+      "name": "color0-depth1-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth1-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth2-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth2-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth4-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth4-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth8-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color0-depth8-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color2-depth8-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color2-depth8-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth1-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth1-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth2-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth2-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth4-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth4-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth8-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color3-depth8-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color4-depth8-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color4-depth8-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "color6-depth8-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "color6-depth8-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "empty-and-split-IDAT",
+      "reference": "exact"
+    },
+    {
+      "name": "uninterpreted-color",
+      "reference": "exact"
+    },
+    {
+      "name": "skipped-ancillary",
+      "reference": "exact"
+    },
+    {
+      "name": "trailing-zlib-bytes",
+      "reference": "exact"
+    },
+    {
+      "name": "one-pixel-adam0",
+      "reference": "exact"
+    },
+    {
+      "name": "one-pixel-adam1",
+      "reference": "exact"
+    },
+    {
+      "name": "masked-tRNS-gray",
+      "reference": "pixels differ"
+    },
+    {
+      "name": "masked-tRNS-rgb",
+      "reference": "exact"
+    },
+    {
+      "name": "reserved-ancillary",
+      "reference": "exact"
+    }
+  ],
+  "measurements": [
+    {
+      "width": 16,
+      "height": 16,
+      "input_bytes": 187,
+      "iterations": 2000,
+      "iterations_per_operation": [
+        32000,
+        16000,
+        32000,
+        32000,
+        16000,
+        2000,
+        16000
+      ],
+      "minimum_batch_ms": 25,
+      "samples_us": [
+        [
+          1.27532140625,
+          1.1977990312500002,
+          1.17576296875,
+          1.2543981874999999,
+          1.16453446875,
+          1.1273440000000001,
+          1.21474271875
+        ],
+        [
+          2.0933953124999998,
+          2.1434483125,
+          2.0659363749999997,
+          2.176367375,
+          2.0956731250000002,
+          2.323388875,
+          2.195939375
+        ],
+        [
+          1.1063435937500001,
+          1.0765630000000002,
+          1.04930440625,
+          1.2171504375,
+          1.1024764687500002,
+          1.22308875,
+          1.13100075
+        ],
+        [
+          0.9727244999999999,
+          0.8860850625,
+          0.907619125,
+          0.89095959375,
+          1.0120159687499999,
+          0.9747960625,
+          0.9259749375
+        ],
+        [
+          1.8522678125,
+          1.7819035625,
+          2.1726154375,
+          1.8739861875,
+          2.0383209375,
+          2.0062200625,
+          2.21275225
+        ],
+        [
+          85.270125,
+          83.5363465,
+          88.614036,
+          94.130753,
+          88.7786765,
+          89.3941675,
+          85.836742
+        ],
+        [
+          2.4175355,
+          2.603887875,
+          2.7103265624999997,
+          2.653626,
+          2.583924,
+          2.6272105625,
+          2.8711823750000005
+        ]
+      ],
+      "us": [
+        1.1978,
+        2.1434,
+        1.1063,
+        0.926,
+        2.0062,
+        88.614,
+        2.6272
+      ],
+      "bytes": {
+        "ours": 1132,
+        "none": 1108,
+        "fast": 279,
+        "default": 198,
+        "compressed": 228
+      },
+      "name": "icon-16",
+      "sha256": {
+        "ours": "02dc2a543292b884093363a513810df6f24b9e71770b62dfdb79bb7f9057831a",
+        "none": "2447a547ae6c07542ca0ead4894d0bc2f808667ce0ac7a8e460d3a70b5fab0c8",
+        "fast": "0d0eb4924d36e2b5795086c182b47f74d980640d91d48a75f4f01735727a27c7",
+        "default": "66efa8c1179739474f0a2ae4c30f4ae339bbaf4b839d75639f7eb7aa45d3f3e2",
+        "compressed": "574478a42322fb288ab0e78e6ba4181953a5c41bc038ed9d7220995f25844c70"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    },
+    {
+      "width": 32,
+      "height": 32,
+      "input_bytes": 214,
+      "iterations": 1000,
+      "iterations_per_operation": [
+        8000,
+        8000,
+        8000,
+        16000,
+        16000,
+        1000,
+        4000
+      ],
+      "minimum_batch_ms": 25,
+      "samples_us": [
+        [
+          3.4336621249999997,
+          2.955244125,
+          2.8660082499999997,
+          2.8906642500000004,
+          3.01964125,
+          3.066971375,
+          2.972865625
+        ],
+        [
+          4.107999125,
+          3.10594025,
+          3.014125375,
+          2.9272381249999997,
+          2.985317,
+          3.04023725,
+          3.168294375
+        ],
+        [
+          3.844568125,
+          3.4461371250000004,
+          3.14515675,
+          3.175123375,
+          3.22033275,
+          3.148085125,
+          3.107279875
+        ],
+        [
+          1.4942215625,
+          1.3910733750000002,
+          1.360447875,
+          1.349725375,
+          1.39027525,
+          1.373670875,
+          1.397483625
+        ],
+        [
+          3.07043725,
+          2.8754111874999997,
+          2.8496636250000003,
+          2.7749509375,
+          2.7613416875000003,
+          2.816634375,
+          2.7369774375
+        ],
+        [
+          107.94940799999999,
+          102.947042,
+          100.74150499999999,
+          100.756237,
+          101.42325300000002,
+          100.45554299999999,
+          101.28447299999999
+        ],
+        [
+          3.83353775,
+          3.6275695,
+          3.7411735000000004,
+          3.7080284999999997,
+          3.6735439999999997,
+          3.75581325,
+          3.68113525
+        ]
+      ],
+      "us": [
+        2.9729,
+        3.0402,
+        3.1751,
+        1.3903,
+        2.8166,
+        101.2845,
+        3.708
+      ],
+      "bytes": {
+        "ours": 4220,
+        "none": 4196,
+        "fast": 355,
+        "default": 224,
+        "compressed": 300
+      },
+      "name": "icon-32",
+      "sha256": {
+        "ours": "b816f040483c4ef8c68bc7191c1b59cbe35f739c1b9e35c907452a79175b9c1a",
+        "none": "ee72cab0a2bb71486f84fb76bf63be4087310131fd37e7dd011f23da78e77988",
+        "fast": "9a6835fe234d3ad7f18c632d78d31e391eec7f159871e411291adc6e4374127c",
+        "default": "74bb716357ad6f3ca31e6708fa820dd0da69d138127b1b8e2a837cf83659bc13",
+        "compressed": "0aa10f258d4b8a14cdcbad5a962878bb41ad2a9427d0ce5d9f855f14ddebfa95"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    },
+    {
+      "width": 64,
+      "height": 64,
+      "input_bytes": 340,
+      "iterations": 500,
+      "iterations_per_operation": [
+        4000,
+        4000,
+        2000,
+        8000,
+        8000,
+        500,
+        4000
+      ],
+      "minimum_batch_ms": 25,
+      "samples_us": [
+        [
+          10.53353825,
+          10.224836,
+          10.0668015,
+          9.8745365,
+          9.644973,
+          10.820277999999998,
+          9.639154249999999
+        ],
+        [
+          9.5167045,
+          8.965112500000002,
+          9.450191499999999,
+          9.277886500000001,
+          9.063766,
+          9.64688825,
+          9.87045025
+        ],
+        [
+          12.8655505,
+          13.5869685,
+          13.37545,
+          12.684091999999998,
+          12.4107995,
+          13.306610999999998,
+          17.586026
+        ],
+        [
+          3.1968856249999997,
+          3.26142675,
+          3.502330125,
+          3.21707875,
+          3.191604,
+          3.283557625,
+          3.3340013749999997
+        ],
+        [
+          6.257778875,
+          6.891218,
+          6.251136249999999,
+          5.928745,
+          5.7996553749999995,
+          6.209503499999999,
+          5.988864375
+        ],
+        [
+          175.184036,
+          155.557064,
+          149.82691,
+          143.312402,
+          150.536638,
+          139.877902,
+          146.497606
+        ],
+        [
+          8.88045475,
+          9.449392750000001,
+          9.11879925,
+          8.840842499999999,
+          8.789988000000001,
+          10.257024750000001,
+          9.445979999999999
+        ]
+      ],
+      "us": [
+        10.0668,
+        9.4502,
+        13.3066,
+        3.2614,
+        6.2095,
+        149.8269,
+        9.1188
+      ],
+      "bytes": {
+        "ours": 16540,
+        "none": 16516,
+        "fast": 470,
+        "default": 301,
+        "compressed": 479
+      },
+      "name": "icon-64",
+      "sha256": {
+        "ours": "58ece1207d873ff189dbb689ba216bf9ddf31aec8014c4d429b6de84dc0ba09d",
+        "none": "1ec25d604c61d92671e91b364fbec5af3e39eef74d4007b42683a029c74eb1b5",
+        "fast": "dd15b6102bbf403257993454e1a6824262b78926b20e46bde6966e0f5088cd71",
+        "default": "4d77f0166d9292b4ea43e6978c769898f96f58ee876210aafc7be8425a6f9f5d",
+        "compressed": "e1f60351615969e7c3e5ac5b525ca27827b6945fd68c64f9a36ddb50609efc4f"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    },
+    {
+      "width": 256,
+      "height": 256,
+      "input_bytes": 1549,
+      "iterations": 50,
+      "iterations_per_operation": [
+        400,
+        400,
+        200,
+        1600,
+        800,
+        50,
+        400
+      ],
+      "minimum_batch_ms": 25,
+      "samples_us": [
+        [
+          108.68393250000001,
+          108.7007725,
+          106.7791,
+          120.8012025,
+          134.027905,
+          104.388995,
+          116.6074
+        ],
+        [
+          65.51517,
+          65.28065000000001,
+          69.169765,
+          68.6398425,
+          75.7126625,
+          64.9700325,
+          91.1530025
+        ],
+        [
+          203.743895,
+          206.95389000000003,
+          216.95182,
+          186.02576999999997,
+          259.47070499999995,
+          190.90918500000004,
+          192.32587
+        ],
+        [
+          26.961846875000003,
+          28.227405625000003,
+          30.572593124999997,
+          28.076540625000003,
+          26.695619999999998,
+          28.296009375000004,
+          28.305649375
+        ],
+        [
+          64.222405,
+          58.69645500000001,
+          61.19142,
+          60.77388375,
+          61.247916249999996,
+          74.7689875,
+          58.17695875
+        ],
+        [
+          837.57126,
+          872.10996,
+          847.2418399999999,
+          978.25208,
+          875.0662400000001,
+          824.56966,
+          985.20156
+        ],
+        [
+          107.1279525,
+          101.33539,
+          105.49949499999998,
+          103.55240749999999,
+          115.69107,
+          131.86106,
+          103.63831250000001
+        ]
+      ],
+      "us": [
+        108.7008,
+        68.6398,
+        203.7439,
+        28.2274,
+        61.1914,
+        872.11,
+        105.4995
+      ],
+      "bytes": {
+        "ours": 262560,
+        "none": 262488,
+        "fast": 3911,
+        "default": 1513,
+        "compressed": 3908
+      },
+      "name": "sheet-256",
+      "sha256": {
+        "ours": "164f2cdffbf1b73b658b313bd40364f33e239ab29d1069ab59569c465772b816",
+        "none": "cdf82bce49774f04e583bbc72f99fae7fc5436c57d0e38b2b807525a13747b6f",
+        "fast": "296442ae6c778ea3c58cfabdc61d319afe17fced1256a35a24a80aed65a8dfb9",
+        "default": "67fc8954fca3e4a3c1693a0df649d4ebd95d221463dfef0341f9678cd1c8dbc9",
+        "compressed": "51e49bbf9363d2aea6b552be1add6d48849d2b52c70da5e8ba8bbda36f97e8db"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    },
+    {
+      "width": 1024,
+      "height": 1024,
+      "input_bytes": 12203,
+      "iterations": 10,
+      "iterations_per_operation": [
+        20,
+        40,
+        10,
+        20,
+        40,
+        10,
+        20
+      ],
+      "minimum_batch_ms": 25,
+      "samples_us": [
+        [
+          1544.3556,
+          1597.1022,
+          1620.39585,
+          1559.48545,
+          1553.63515,
+          1594.07065,
+          1692.9037
+        ],
+        [
+          829.9694749999999,
+          853.7030500000001,
+          900.7049499999999,
+          834.735925,
+          843.6125750000001,
+          842.0224250000001,
+          903.531725
+        ],
+        [
+          2944.3045,
+          3044.5806999999995,
+          3095.793,
+          3128.1448000000005,
+          3125.2083,
+          3253.0021,
+          3140.221
+        ],
+        [
+          2151.0168,
+          2246.8002500000002,
+          2330.5641,
+          2292.37955,
+          2078.93955,
+          2135.9666,
+          2341.3359
+        ],
+        [
+          801.8541,
+          791.930375,
+          809.958075,
+          813.0101500000001,
+          819.2603499999999,
+          827.6044249999999,
+          954.51235
+        ],
+        [
+          9013.497800000001,
+          9193.6014,
+          9193.6545,
+          9151.1253,
+          8916.586599999999,
+          9096.4049,
+          8857.4224
+        ],
+        [
+          1432.1423499999999,
+          1412.6875,
+          1483.4167499999999,
+          1522.66695,
+          1422.5664000000002,
+          1604.2504999999999,
+          1641.9112999999998
+        ]
+      ],
+      "us": [
+        1594.0706,
+        843.6126,
+        3125.2083,
+        2246.8003,
+        813.0102,
+        9096.4049,
+        1483.4167
+      ],
+      "bytes": {
+        "ours": 4196508,
+        "none": 4195716,
+        "fast": 53405,
+        "default": 11233,
+        "compressed": 52549
+      },
+      "name": "sheet-1024",
+      "sha256": {
+        "ours": "39903c94668ea6c6ca375de82f28e124faf133391ba22f0329ba383db97c0970",
+        "none": "f42293c3e2416ce34866068fe3cc1e6ce0893f03fe84c43509b2e943a2b66e8a",
+        "fast": "ecbbf78a9c65a59c9f5c8bfdd6ef264d9429a0356bea90626f45a9741a7914ae",
+        "default": "0206c72f8e9773128b56b3e79616631fd0901f5e5252e9cc4675191d49fa687d",
+        "compressed": "e4979657ab2fa46587ebc8e039fce81298899823193cfcae0337224b7569b3d7"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    },
+    {
+      "width": 256,
+      "height": 256,
+      "input_bytes": 1255,
+      "iterations": 50,
+      "iterations_per_operation": [
+        400,
+        400,
+        200,
+        1600,
+        100,
+        50,
+        400
+      ],
+      "minimum_batch_ms": 25,
+      "samples_us": [
+        [
+          67.5929125,
+          66.653645,
+          65.36009250000001,
+          68.59990499999999,
+          65.744325,
+          65.35341,
+          77.1486275
+        ],
+        [
+          114.114465,
+          113.64047500000001,
+          116.65595000000002,
+          117.59218499999999,
+          111.36346250000001,
+          113.37334500000001,
+          119.3013375
+        ],
+        [
+          196.74578499999998,
+          181.04044,
+          181.37489999999997,
+          179.226505,
+          179.71615000000003,
+          182.55738499999998,
+          184.64413000000002
+        ],
+        [
+          25.091750625,
+          25.226685000000003,
+          25.6624175,
+          24.899798124999997,
+          24.832865625,
+          25.06082875,
+          27.002883750000002
+        ],
+        [
+          344.518,
+          353.92649,
+          342.27711999999997,
+          344.99712,
+          351.66518,
+          359.15837999999997,
+          363.56252
+        ],
+        [
+          850.0192400000001,
+          823.83634,
+          828.09696,
+          878.4551200000001,
+          828.7840000000001,
+          850.83748,
+          898.53082
+        ],
+        [
+          104.49648,
+          105.2215475,
+          105.7435375,
+          103.6539125,
+          105.2302625,
+          106.6499525,
+          107.71173
+        ]
+      ],
+      "us": [
+        66.6536,
+        114.1145,
+        181.3749,
+        25.0918,
+        351.6652,
+        850.0192,
+        105.2303
+      ],
+      "bytes": {
+        "ours": 262560,
+        "none": 262488,
+        "fast": 207670,
+        "default": 1241,
+        "compressed": 5734
+      },
+      "name": "texture-256",
+      "sha256": {
+        "ours": "eb8afe9f8b76ab895fd3fffabeadcebbf15c323a8ad4d234d752a83708bf003d",
+        "none": "790e8fd581e33658411e4fcf5e6bc8ef47ebd2469fcf436839845420395fb04b",
+        "fast": "d3304638ce8a71719afd24cd46a86540f64c44d121cff69e2182eaf856b8de7f",
+        "default": "5691b63e4e31b021888fbccfbe0099544d2eed26ef7bb73889b14720ffb2584d",
+        "compressed": "077fe46a862f07998cfd9e14b5b000aa1c43627ba1b4a93096b924d6d525eb9d"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    },
+    {
+      "width": 1024,
+      "height": 1024,
+      "input_bytes": 12551,
+      "iterations": 10,
+      "iterations_per_operation": [
+        40,
+        20,
+        10,
+        10,
+        10,
+        10,
+        20
+      ],
+      "minimum_batch_ms": 25,
+      "samples_us": [
+        [
+          1023.8357,
+          1030.7839250000002,
+          1073.8336,
+          1119.63395,
+          1503.2815249999999,
+          1078.6779000000001,
+          1082.254075
+        ],
+        [
+          2009.9004,
+          1983.5791500000003,
+          2149.70075,
+          2316.10075,
+          2076.41675,
+          2053.5467500000004,
+          1962.9379999999996
+        ],
+        [
+          3180.6398999999997,
+          2942.7642,
+          2957.5543,
+          3426.675,
+          3394.1649999999995,
+          3128.3460999999998,
+          3150.8485000000005
+        ],
+        [
+          414.68449999999996,
+          372.6802,
+          372.7813,
+          400.451,
+          390.72839999999997,
+          396.9278,
+          371.64459999999997
+        ],
+        [
+          5277.0533000000005,
+          5147.7543,
+          5182.9023,
+          6110.3102,
+          6125.919800000001,
+          5356.1396,
+          5447.4804
+        ],
+        [
+          10567.0321,
+          9734.4572,
+          9817.167,
+          11234.082400000001,
+          14432.272700000001,
+          9881.6983,
+          10199.274399999998
+        ],
+        [
+          1585.9033000000002,
+          1575.66735,
+          1749.0088500000002,
+          1797.6732,
+          1661.33355,
+          1630.6433,
+          1734.31565
+        ]
+      ],
+      "us": [
+        1078.6779,
+        2053.5468,
+        3150.8485,
+        390.7284,
+        5356.1396,
+        10199.2744,
+        1661.3336
+      ],
+      "bytes": {
+        "ours": 4196508,
+        "none": 4195716,
+        "fast": 3316027,
+        "default": 12533,
+        "compressed": 83186
+      },
+      "name": "texture-1024",
+      "sha256": {
+        "ours": "f6c6c012a78a81c97515b051e1884cfa60459b2d06643832ab23054feddd11a0",
+        "none": "feaff6282fe74b4aaa256966037f4398a5b1ab999c43cc57e011cf4c96a93977",
+        "fast": "0dcc422547369d8e4c582338e3e9e4c7b941a85516deb30be2cf640c3a1ebc56",
+        "default": "2397fe9f87434dca15b0fd3768d21ce2395a8533d844d39c894f1b792bb693a6",
+        "compressed": "f142fa1b01b46ac81fd1a41b2db15582a29c7f899dee33d33f8b19c8de6841b9"
+      },
+      "ours_byte_identical_to_baseline": true,
+      "compressed_byte_identical_to_baseline": true
+    }
+  ]
+}

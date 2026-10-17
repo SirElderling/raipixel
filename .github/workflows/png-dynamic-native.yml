@@ -1,0 +1,195 @@
+name: PNG dynamic Huffman native trial
+
+on:
+  push:
+    branches: [feat/raster-foundation]
+    paths-ignore:
+      - benchmarks/png/experiment-register.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Only the newest branch revision should run resource-intensive scratch trials.
+concurrency:
+  group: png-native-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Historical/rejected screens remain reproducible with workflow_dispatch but
+# do not rerun on every code push. Normal branch CI checks the fresh contenders.
+jobs:
+  native:
+    name: Dynamic Huffman / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Linux
+            runner: ubuntu-24.04
+          - os: Windows
+            runner: windows-2022
+          - os: macOS ARM64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install exact Rust compiler
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Compiler verification
+        run: rustc +1.99.1 --version --verbose
+      - name: Export deterministic compressed PNGs
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: cargo run --release --locked --offline --example png_bench -- --export png-stage-inputs
+      - name: Restore independent mixed-filter corpus
+        run: python -c "import json;from pathlib import Path;p=Path('png-original-inputs');p.mkdir(exist_ok=True);[(p / (c['name'] + '.png')).write_bytes(bytes.fromhex(c['png_hex'])) for c in json.loads(Path('benchmarks/png/original-inputs.json').read_text())['cases']]"
+      - name: Match indexed PNG against png 0.18.1 public writer
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_indexed_reference.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+      - name: Measure indexed PNG filter size ceiling (diagnostic; verify exact RGBA)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_compression_ceiling.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Benchmark streaming indexed Sub filter (informational)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_indexed_sub_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Cross-block 32 KiB history and bounded 1/8/16-chain match screen
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_history_native_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Test deeper 16/32/64 LZ history and mixed PNG filter choices (fully verified)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_quality_mix_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Screen size-preserving cost-aware and lazy parsing against depth64 best
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_cost_parse_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Screen quality-first lazy PNG None Sub Up Paeth and best-of-seven
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_lazy_filter_bestof_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Screen per-scanline adaptive filters against C13 frozen best-of-seven
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_adaptive_row_filter_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Compare native five-versus-seven exact indexed PNG modes with external decoding
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_bestof5_paired_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Differential PNG quality selection across 15 seeded pixel-art patterns
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_diverse_corpus_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Test six-mode lossless PNG selection against seven on diverse pixel-art corpus
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_six_mode_quality_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Test fallible scratch allocations against frozen exact PNG sizes and public decoder
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_fallible_buffers_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Reuse preallocated scratch encoder workspaces and verify byte-identical PNGs
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_workspace_reuse_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Transactional staged PNG export with resource and writer-failure injection
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_atomic_staging_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Meter LZ history and lazy matches and enforce exact Work budgets before PNG commit
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_metered_work_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Share one monotonic Work budget across six staged PNG quality candidates
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_shared_work_budget_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Paired native complete PNG quality encoding vs png 0.18.1 default and Fast
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_quality_vs_reference_speed_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Benchmark three-mode balanced PNG vs six-mode and public png 0.18.1
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_balanced_three_speed_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Test frequency-ordered exact RGBA palettes against existing indexed writer
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_palette_frequency_native_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/sheet-1024-compressed.png png-original-inputs/comparison-sheet-1024.png
+
+      - name: Native safe Rust dynamic-Huffman size, speed and correctness
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_dynamic_native_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+
+      - name: Compare single-pass token-buffered dynamic Huffman (informational)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_dynamic_single_pass_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+
+      - name: Screen binary-heap Huffman tree construction (informational)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_dynamic_heap_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+
+      - name: Test compact 16-bit tokens with heap Huffman construction (informational)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_dynamic_packed_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+
+      - name: Combine indexed-color PNG and dynamic Huffman (informational)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_dynamic_indexed_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+
+      - name: Skip dynamic Huffman on small indexed blocks (informational)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_dynamic_indexed_guard_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png

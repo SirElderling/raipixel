@@ -105,7 +105,7 @@ run result: operations, per-target changes (write_events, changed_write_events, 
 | 0 | Successful action, including no-op and dry-run |
 | 2 | E_USAGE, E_JSON, E_ARGUMENT, E_REFERENCE, E_EXISTS, E_CONFLICT, E_VERSION, E_CAPABILITY |
 | 3 | E_BOUNDS, E_MASK, E_STYLE, E_PALETTE_EMPTY/TOO_MANY, E_ANIMATION, E_SHEET, E_PROJECT; other technical validation diagnostics |
-| 4 | E_IO, E_OUTPUT, E_PNG_SIGNATURE/CHUNK/CRC/FILTER/DEFLATE/ADLER, E_UNSUPPORTED_DEPTH/ANIMATION |
+| 4 | E_IO, E_OUTPUT, E_PNG_SIGNATURE/CHUNK/CRC/FILTER/DEFLATE/ADLER, E_UNSUPPORTED_DEPTH/ANIMATION/PNG |
 | 5 | E_LIMIT, E_ALLOC, including bounded parser/decoder work exhaustion |
 | 70 | E_INTERNAL: detected implementation invariant defect |
 

@@ -1,0 +1,82 @@
+name: PNG hotspot experiment
+
+on:
+  push:
+    branches: [feat/raster-foundation]
+
+permissions:
+  contents: read
+
+jobs:
+  screen:
+    name: Hotpath / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Linux
+            runner: ubuntu-24.04
+          - os: macOS
+            runner: macos-15
+          - os: Windows
+            runner: windows-2022
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.99.1
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Verify pinned toolchain
+        run: rustc +1.99.1 --version --verbose
+      - name: Screen safe CRC XOR reduction schedules
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_crc_reduction_trial.py
+      - name: Screen wide CRC transition thresholds (informational)
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_crc_threshold_trial.py
+      - name: Export deterministic PNG inputs
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: cargo run --release --locked --offline --example png_bench -- --export png-stage-inputs
+      - name: Restore independent mixed-filter inputs
+        run: python -c "import json;from pathlib import Path;p=Path('png-original-inputs');p.mkdir(exist_ok=True);[(p / (c['name'] + '.png')).write_bytes(bytes.fromhex(c['png_hex'])) for c in json.loads(Path('benchmarks/png/original-inputs.json').read_text())['cases']]"
+      - name: Compare valid full-PNG decoding across CRC thresholds
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_crc_threshold_fullcodec.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+      - name: Compare PNG compressed-writer Sub/Up policy (informational)
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_filter_policy_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+      - name: Measure sampled filter choice with the compact PNG writer
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_compact_filter_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+      - name: Recode exact raipixel LZ tokens with dynamic Huffman (informational)
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_dynamic_tokens_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+      - name: Measure dynamic DEFLATE and indexed-color size headroom
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_compression_ceiling.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+      - name: Measure own safe indexed-PNG writer against compact RGBA
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_palette_native_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+      - name: Compare fixed-Huffman match selection and compressed file sizes
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_match_depth_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+      - name: Screen DEFLATE short-distance overlap copying
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_overlap_trial.py png-stage-inputs/icon-64-compressed.png png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png
+      - name: Compare CRC headroom and Paeth variants
+        env:
+          RUSTUP_TOOLCHAIN: '1.99.1'
+        run: python tools/png_hotpath_trial.py png-stage-inputs/noise-256-compressed.png png-stage-inputs/sheet-1024-compressed.png png-stage-inputs/texture-1024-compressed.png png-original-inputs/comparison-sheet-1024.png png-original-inputs/comparison-texture-1024.png

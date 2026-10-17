@@ -1,0 +1,368 @@
+{
+  "source_commit": "448be5f00eacbcaae72c912e1866d8671f080b47",
+  "candidate_patch_sha256": "6c596da9e49e08131dcd698e78680c502ef188ee11210ed9e9824bd7e18e50b4",
+  "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "host": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "method": "four sequential processes per input in baseline/combined/combined/baseline order; each process uses seven rotated benchmark batches; no concurrent timing work",
+  "timing_order": [
+    "ours_decode",
+    "reference_decode",
+    "ours_stored_encode",
+    "reference_none_encode",
+    "reference_fast_encode",
+    "reference_balanced_encode",
+    "ours_compressed_encode"
+  ],
+  "measurements": [
+    {
+      "width": 64,
+      "height": 64,
+      "input_bytes": 340,
+      "iterations": 1000,
+      "us": [
+        8.8163,
+        9.0344,
+        12.1444,
+        2.9685,
+        5.8688,
+        149.9012,
+        10.0467
+      ],
+      "bytes": {
+        "ours": 16540,
+        "none": 16516,
+        "fast": 470,
+        "default": 301,
+        "compressed": 479
+      },
+      "name": "icon-64",
+      "variant": "baseline",
+      "round": 0,
+      "sha256": {
+        "ours": "58ece1207d873ff189dbb689ba216bf9ddf31aec8014c4d429b6de84dc0ba09d",
+        "compressed": "e1f60351615969e7c3e5ac5b525ca27827b6945fd68c64f9a36ddb50609efc4f"
+      }
+    },
+    {
+      "width": 64,
+      "height": 64,
+      "input_bytes": 340,
+      "iterations": 1000,
+      "us": [
+        10.0097,
+        9.5834,
+        12.1314,
+        3.0181,
+        6.2718,
+        145.0683,
+        9.552
+      ],
+      "bytes": {
+        "ours": 16540,
+        "none": 16516,
+        "fast": 470,
+        "default": 301,
+        "compressed": 479
+      },
+      "name": "icon-64",
+      "variant": "combined",
+      "round": 1,
+      "sha256": {
+        "ours": "58ece1207d873ff189dbb689ba216bf9ddf31aec8014c4d429b6de84dc0ba09d",
+        "compressed": "e1f60351615969e7c3e5ac5b525ca27827b6945fd68c64f9a36ddb50609efc4f"
+      }
+    },
+    {
+      "width": 64,
+      "height": 64,
+      "input_bytes": 340,
+      "iterations": 1000,
+      "us": [
+        9.3039,
+        9.4755,
+        13.0069,
+        3.4738,
+        7.0784,
+        155.9585,
+        9.984
+      ],
+      "bytes": {
+        "ours": 16540,
+        "none": 16516,
+        "fast": 470,
+        "default": 301,
+        "compressed": 479
+      },
+      "name": "icon-64",
+      "variant": "combined",
+      "round": 2,
+      "sha256": {
+        "ours": "58ece1207d873ff189dbb689ba216bf9ddf31aec8014c4d429b6de84dc0ba09d",
+        "compressed": "e1f60351615969e7c3e5ac5b525ca27827b6945fd68c64f9a36ddb50609efc4f"
+      }
+    },
+    {
+      "width": 64,
+      "height": 64,
+      "input_bytes": 340,
+      "iterations": 1000,
+      "us": [
+        9.0087,
+        9.5824,
+        12.7264,
+        3.0103,
+        5.8573,
+        158.4531,
+        10.9404
+      ],
+      "bytes": {
+        "ours": 16540,
+        "none": 16516,
+        "fast": 470,
+        "default": 301,
+        "compressed": 479
+      },
+      "name": "icon-64",
+      "variant": "baseline",
+      "round": 3,
+      "sha256": {
+        "ours": "58ece1207d873ff189dbb689ba216bf9ddf31aec8014c4d429b6de84dc0ba09d",
+        "compressed": "e1f60351615969e7c3e5ac5b525ca27827b6945fd68c64f9a36ddb50609efc4f"
+      }
+    },
+    {
+      "width": 1024,
+      "height": 1024,
+      "input_bytes": 12203,
+      "iterations": 20,
+      "us": [
+        1702.4179,
+        909.9633,
+        3267.6005,
+        2411.9419,
+        816.3411,
+        9673.0852,
+        2237.269
+      ],
+      "bytes": {
+        "ours": 4196508,
+        "none": 4195716,
+        "fast": 53405,
+        "default": 11233,
+        "compressed": 52549
+      },
+      "name": "sheet-1024",
+      "variant": "baseline",
+      "round": 0,
+      "sha256": {
+        "ours": "39903c94668ea6c6ca375de82f28e124faf133391ba22f0329ba383db97c0970",
+        "compressed": "e4979657ab2fa46587ebc8e039fce81298899823193cfcae0337224b7569b3d7"
+      }
+    },
+    {
+      "width": 1024,
+      "height": 1024,
+      "input_bytes": 12203,
+      "iterations": 20,
+      "us": [
+        1587.7128,
+        840.7341,
+        3012.6823,
+        2285.7715,
+        794.9223,
+        9275.4726,
+        1662.5771
+      ],
+      "bytes": {
+        "ours": 4196508,
+        "none": 4195716,
+        "fast": 53405,
+        "default": 11233,
+        "compressed": 52549
+      },
+      "name": "sheet-1024",
+      "variant": "combined",
+      "round": 1,
+      "sha256": {
+        "ours": "39903c94668ea6c6ca375de82f28e124faf133391ba22f0329ba383db97c0970",
+        "compressed": "e4979657ab2fa46587ebc8e039fce81298899823193cfcae0337224b7569b3d7"
+      }
+    },
+    {
+      "width": 1024,
+      "height": 1024,
+      "input_bytes": 12203,
+      "iterations": 20,
+      "us": [
+        1670.7454,
+        908.2632,
+        3275.6709,
+        2404.7284,
+        812.943,
+        9622.4821,
+        1674.4019
+      ],
+      "bytes": {
+        "ours": 4196508,
+        "none": 4195716,
+        "fast": 53405,
+        "default": 11233,
+        "compressed": 52549
+      },
+      "name": "sheet-1024",
+      "variant": "combined",
+      "round": 2,
+      "sha256": {
+        "ours": "39903c94668ea6c6ca375de82f28e124faf133391ba22f0329ba383db97c0970",
+        "compressed": "e4979657ab2fa46587ebc8e039fce81298899823193cfcae0337224b7569b3d7"
+      }
+    },
+    {
+      "width": 1024,
+      "height": 1024,
+      "input_bytes": 12203,
+      "iterations": 20,
+      "us": [
+        1700.7386,
+        914.3258,
+        3294.3737,
+        2501.8227,
+        837.3423,
+        9857.6226,
+        2337.7078
+      ],
+      "bytes": {
+        "ours": 4196508,
+        "none": 4195716,
+        "fast": 53405,
+        "default": 11233,
+        "compressed": 52549
+      },
+      "name": "sheet-1024",
+      "variant": "baseline",
+      "round": 3,
+      "sha256": {
+        "ours": "39903c94668ea6c6ca375de82f28e124faf133391ba22f0329ba383db97c0970",
+        "compressed": "e4979657ab2fa46587ebc8e039fce81298899823193cfcae0337224b7569b3d7"
+      }
+    },
+    {
+      "width": 1024,
+      "height": 1024,
+      "input_bytes": 12551,
+      "iterations": 20,
+      "us": [
+        1089.6161,
+        2066.8916,
+        3162.4366,
+        429.4642,
+        5567.7547,
+        10432.3626,
+        2076.8016
+      ],
+      "bytes": {
+        "ours": 4196508,
+        "none": 4195716,
+        "fast": 3316027,
+        "default": 12533,
+        "compressed": 83186
+      },
+      "name": "texture-1024",
+      "variant": "baseline",
+      "round": 0,
+      "sha256": {
+        "ours": "f6c6c012a78a81c97515b051e1884cfa60459b2d06643832ab23054feddd11a0",
+        "compressed": "f142fa1b01b46ac81fd1a41b2db15582a29c7f899dee33d33f8b19c8de6841b9"
+      }
+    },
+    {
+      "width": 1024,
+      "height": 1024,
+      "input_bytes": 12551,
+      "iterations": 20,
+      "us": [
+        1146.0554,
+        2127.8698,
+        3230.1696,
+        451.3227,
+        5925.5409,
+        10787.289,
+        1935.7341
+      ],
+      "bytes": {
+        "ours": 4196508,
+        "none": 4195716,
+        "fast": 3316027,
+        "default": 12533,
+        "compressed": 83186
+      },
+      "name": "texture-1024",
+      "variant": "combined",
+      "round": 1,
+      "sha256": {
+        "ours": "f6c6c012a78a81c97515b051e1884cfa60459b2d06643832ab23054feddd11a0",
+        "compressed": "f142fa1b01b46ac81fd1a41b2db15582a29c7f899dee33d33f8b19c8de6841b9"
+      }
+    },
+    {
+      "width": 1024,
+      "height": 1024,
+      "input_bytes": 12551,
+      "iterations": 20,
+      "us": [
+        1170.5903,
+        2231.4046,
+        3338.1057,
+        459.9017,
+        5753.6874,
+        11322.8317,
+        1969.603
+      ],
+      "bytes": {
+        "ours": 4196508,
+        "none": 4195716,
+        "fast": 3316027,
+        "default": 12533,
+        "compressed": 83186
+      },
+      "name": "texture-1024",
+      "variant": "combined",
+      "round": 2,
+      "sha256": {
+        "ours": "f6c6c012a78a81c97515b051e1884cfa60459b2d06643832ab23054feddd11a0",
+        "compressed": "f142fa1b01b46ac81fd1a41b2db15582a29c7f899dee33d33f8b19c8de6841b9"
+      }
+    },
+    {
+      "width": 1024,
+      "height": 1024,
+      "input_bytes": 12551,
+      "iterations": 20,
+      "us": [
+        1187.9894,
+        2222.149,
+        3400.7016,
+        454.2067,
+        5946.629,
+        11079.0352,
+        2186.5692
+      ],
+      "bytes": {
+        "ours": 4196508,
+        "none": 4195716,
+        "fast": 3316027,
+        "default": 12533,
+        "compressed": 83186
+      },
+      "name": "texture-1024",
+      "variant": "baseline",
+      "round": 3,
+      "sha256": {
+        "ours": "f6c6c012a78a81c97515b051e1884cfa60459b2d06643832ab23054feddd11a0",
+        "compressed": "f142fa1b01b46ac81fd1a41b2db15582a29c7f899dee33d33f8b19c8de6841b9"
+      }
+    }
+  ],
+  "candidate_status": "isolated Linux prototype; not adopted in production source",
+  "candidate_encoder_source_sha256": "acd477c226e68c61b0401121c82c723900729737fe8437293c9bd52668d07da8"
+}

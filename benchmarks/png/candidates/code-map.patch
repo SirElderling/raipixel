@@ -1,0 +1,25 @@
+--- a/src/deflate/encode.rs
++++ b/src/deflate/encode.rs
+@@ -80,10 +80,20 @@
+         self.put(code.reverse_bits() >> (32 - count), count);
+     }
+     fn reference(&mut self, length: usize, distance: usize) {
+-        let index = LENGTH_BASE.partition_point(|&base| base <= length) - 1;
++        let index = if length == 258 {
++            28
++        } else {
++            LENGTH_BASE.partition_point(|&base| base <= length) - 1
++        };
+         self.symbol(257 + index as u32);
+         self.put((length - LENGTH_BASE[index]) as u32, LENGTH_EXTRA[index]);
+-        let index = DISTANCE_BASE.partition_point(|&base| base <= distance) - 1;
++        let x = distance - 1;
++        let index = if x < 4 {
++            x
++        } else {
++            let n = x.ilog2() as usize;
++            2 * n + ((x >> (n - 1)) & 1)
++        };
+         self.put((index as u32).reverse_bits() >> 27, 5);
+         self.put(
+             (distance - DISTANCE_BASE[index]) as u32,

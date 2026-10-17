@@ -1,0 +1,75 @@
+{
+  "experiment": "two_stream_adler_prior_reduction",
+  "operations": [
+    "current",
+    "narrow_prior",
+    "current_duplicate",
+    "narrow_prior_duplicate"
+  ],
+  "compiler": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "compiler_args": [
+    "--edition=2024",
+    "-O"
+  ],
+  "source_sha256": {
+    "baseline.rs": "96cf9ce209e7a661f4f4bff80d019434fdc468b5a92ed6cb9b5a3a29a4fc6568",
+    "candidate.rs": "364999c37e6c2d9afc67fbcc51c1a5009969ff0e328bf3eb48a54b69615ab7de",
+    "driver.rs": "68dc96b2d9ca3c70a70a716a2be532f1adfab114430266f90aa9e5ab8b4a20fb"
+  },
+  "script_sha256": "f762bbac29a8270c8ab5f1fd2377aa3fcfa76ca24af61a4ab9818f9305b3c371",
+  "derivation": "RFC 1950: each stream has 8 words; sum of all prior byte fields <= 8*28*255=57120; no 16-bit prefix carry",
+  "bytes": 4194304,
+  "iterations": [
+    128,
+    64,
+    128,
+    64
+  ],
+  "samples_us": [
+    [
+      224.546296875,
+      222.0372421875,
+      214.5651640625,
+      219.31046093749998,
+      227.69579687499998,
+      254.64614843750002,
+      226.1310859375,
+      217.6166484375,
+      241.502921875
+    ],
+    [
+      430.01793749999996,
+      449.07015625,
+      420.804296875,
+      431.403765625,
+      447.22815625,
+      422.368703125,
+      444.866453125,
+      444.59143750000004,
+      461.74478125
+    ],
+    [
+      227.5220078125,
+      231.69284374999998,
+      219.6702265625,
+      224.57896875,
+      224.95567187499998,
+      216.7175625,
+      223.7910625,
+      238.0803984375,
+      234.4733046875
+    ],
+    [
+      440.756171875,
+      427.90270312499996,
+      425.9228125,
+      429.279765625,
+      435.62264062500003,
+      446.787953125,
+      448.62229687499996,
+      435.9825625,
+      452.37671875
+    ]
+  ]
+}

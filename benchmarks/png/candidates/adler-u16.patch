@@ -1,0 +1,54 @@
+--- a/src/checksum.rs
++++ b/src/checksum.rs
+@@ -64,32 +64,5 @@
+-        // u64 accumulation permits whole stored blocks between reductions.
+-        for block in data.chunks(65_535) {
+-            let (bulk, tail) = block.as_chunks::<128>();
+-            // Four 16-bit lanes in each word hold the even/odd byte sums.
+-            // Sixteen words give lane sums <= 16*255 = 4080 and prior sums
+-            // <= (0+...+15)*255 = 30600, so additions cannot carry across lanes.
+-            // For byte lane j, the batch contributes 8*prior + (8-j)*sum to B.
+-            // The derivation and source acknowledgment are in the algorithm notes.
+-            for group in bulk {
+-                let (mut even, mut odd, mut prior_even, mut prior_odd) = (0u64, 0u64, 0u64, 0u64);
+-                for bytes in group.as_chunks::<8>().0 {
+-                    let word = u64::from_le_bytes(*bytes);
+-                    prior_even += even;
+-                    prior_odd += odd;
+-                    even += word & 0x00ff_00ff_00ff_00ff;
+-                    odd += (word >> 8) & 0x00ff_00ff_00ff_00ff;
+-                }
+-                // Four sum lanes total at most 32640; prefix sums cannot carry between
+-                // fields in the wrapping multiply. Prior totals need 32-bit fields.
+-                let sums = even + odd;
+-                let sum_total = sums.wrapping_mul(0x0001_0001_0001_0001) >> 48;
+-                let odd_total = odd.wrapping_mul(0x0001_0001_0001_0001) >> 48;
+-                let prior = prior_even + prior_odd;
+-                let pairs =
+-                    (prior & 0x0000_ffff_0000_ffff) + ((prior >> 16) & 0x0000_ffff_0000_ffff);
+-                let prior_total = (pairs & 0xffff_ffff) + (pairs >> 32);
+-                let weighted = 4 * (sums & 65535)
+-                    + 3 * ((sums >> 16) & 65535)
+-                    + 2 * ((sums >> 32) & 65535)
+-                    + (sums >> 48);
+-                self.b += 128 * self.a + 8 * prior_total + 2 * weighted - odd_total;
+-                self.a += sum_total;
++        for block in data.chunks(4096) {
++            let (groups,tail)=block.as_chunks::<16>();
++            let (mut sums,mut prior)=([0u16;16],[0u32;16]);
++            for bytes in groups {
++                for i in 0..16 { prior[i]+=u32::from(sums[i]); sums[i]+=u16::from(bytes[i]); }
+@@ -97,6 +70,7 @@
+-            for &byte in tail {
+-                self.a += u64::from(byte);
+-                self.b += self.a;
+-            }
+-            self.a %= 65_521;
+-            self.b %= 65_521;
++            let total:u64=sums.iter().map(|&x|u64::from(x)).sum();
++            let previous:u64=prior.iter().map(|&x|u64::from(x)).sum();
++            let weighted:u64=sums.iter().enumerate().map(|(i,&x)|(16-i)as u64*u64::from(x)).sum();
++            self.b+=(groups.len()*16)as u64*self.a+16 as u64*previous+weighted;
++            self.a+=total;
++            for &x in tail {self.a+=u64::from(x);self.b+=self.a;}
++            self.a%=65521;self.b%=65521;

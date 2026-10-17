@@ -1,0 +1,55 @@
+{
+  "source_commit": "448be5f00eacbcaae72c912e1866d8671f080b47",
+  "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "host": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "method": "standalone release rustc -O; seven rotated batches of 30 calls; encoder/table/output allocation included; excludes PNG filtering, zlib wrapper, checksums and I/O; all variants asserted byte-identical before timing",
+  "variant_order": [
+    "baseline",
+    "run_first",
+    "code_map",
+    "combined"
+  ],
+  "candidate_patch_sha256": {
+    "run_first": "c15ded7d8c3b6bf6e044c4c10111be1431ad3df1e0c8a725b0847bb1149578bc",
+    "code_map": "59cf1d5b87e2343c8d62c607075c1f19b3693620de5a418632bb5663d845e57a",
+    "combined": "6c596da9e49e08131dcd698e78680c502ef188ee11210ed9e9824bd7e18e50b4"
+  },
+  "measurements": [
+    {
+      "name": "icon-64",
+      "input_bytes": 16448,
+      "input_sha256": "8aff879fc0d31bd119a414184226fa086f63ed7dc182ac19989140f97fe78585",
+      "deflate_bytes": 392,
+      "median_us": [
+        6.527866666666667,
+        6.174033333333333,
+        5.501633333333333,
+        5.5714
+      ]
+    },
+    {
+      "name": "sheet-1024",
+      "input_bytes": 4195328,
+      "input_sha256": "ad46164831986eb06a5db288abd34fe4b0743f54b50b142d10fe4f29d665e759",
+      "deflate_bytes": 51694,
+      "median_us": [
+        1625.4071333333334,
+        1156.0623666666668,
+        1285.7058666666667,
+        951.6053666666667
+      ]
+    },
+    {
+      "name": "texture-1024",
+      "input_bytes": 4195328,
+      "input_sha256": "65020e0ea7cf56255904d2c39915c762e5dad5e5cb6fa3dd321281fb7c52156a",
+      "deflate_bytes": 82331,
+      "median_us": [
+        1292.4947666666667,
+        1283.1072666666666,
+        1095.6129,
+        1099.0014
+      ]
+    }
+  ]
+}

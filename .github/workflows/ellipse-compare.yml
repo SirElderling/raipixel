@@ -1,0 +1,43 @@
+name: Exact ellipse A/B
+
+on:
+  push:
+    branches: ['feat/**']
+    paths:
+      - 'src/ellipse.rs'
+      - 'examples/bench_ellipse.rs'
+      - 'tests/ellipse.rs'
+      - 'tests/cli_ellipse.rs'
+      - '.github/workflows/ellipse-compare.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    name: Ellipse / ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Linux x86_64
+            runner: ubuntu-24.04
+          - os: macOS ARM64
+            runner: macos-15
+          - os: Windows MSVC
+            runner: windows-2022
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt
+      - name: Format check
+        run: cargo +1.99.1 fmt --all -- --check
+      - name: Exact native ellipse tests
+        run: cargo +1.99.1 test --locked --offline --test ellipse
+      - name: Compare matched pixel and PNG outputs, include full export
+        run: cargo +1.99.1 run --release --locked --offline --example bench_ellipse

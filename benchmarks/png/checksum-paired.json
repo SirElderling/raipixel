@@ -1,0 +1,50 @@
+{
+  "source_commit": "90120b449b9fa11ad347ba0f5d162350516463b8",
+  "checksum_source_sha256": "7bb256aeadd77da7319d2b07523e4c892e48849a99d41aa332012dd40e50eaee",
+  "benchmark_source_sha256": "f37c0d21b57e6d1775a1f931ba7f1cee40ca318d9c11ef71a7d05e5b1d225ab2",
+  "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "host": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "input": "4 MiB, byte i = (17*i+3) mod 256",
+  "method": "release rustc -O; seven rotating batches; black_box input and output; previous implementation retained as control",
+  "input_bytes": 4194304,
+  "iterations_per_batch": 100,
+  "timing_order": [
+    "crc32",
+    "adler32_previous",
+    "adler32"
+  ],
+  "samples_us": [
+    [
+      3616.49453,
+      3659.89548,
+      3440.86983,
+      3446.24577,
+      3420.26145,
+      3591.43671,
+      3539.1325899999997
+    ],
+    [
+      1592.2393200000001,
+      1704.65239,
+      1611.94979,
+      1568.9651199999998,
+      1617.4640900000002,
+      1583.86245,
+      1570.72408
+    ],
+    [
+      528.41762,
+      560.88564,
+      541.44363,
+      505.24245,
+      771.6784,
+      518.58765,
+      519.40518
+    ]
+  ],
+  "median_us": [
+    3539.1325899999997,
+    1592.2393200000001,
+    528.41762
+  ]
+}

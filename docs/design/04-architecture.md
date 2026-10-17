@@ -2,7 +2,7 @@
 
 ## Implementation boundaries
 
-One Cargo package, reusable library and thin CLI; edition 2024, proposed minimum Rust 1.85 using stable APIs (a design floor, not the latest-version claim). Both crate roots MUST forbid unsafe code. No dependencies, dev-dependencies, build-dependencies or build.rs. Cargo.lock MUST contain no third-party package. Std's OS implementation and the normal compiler/linker remain permitted.
+One Cargo package, reusable library and thin CLI; edition 2024, minimum Rust 1.99 using stable APIs; CI follows the latest stable release. Both crate roots MUST forbid unsafe code. No dependencies, dev-dependencies, build-dependencies or build.rs. Cargo.lock MUST contain no third-party package. Std's OS implementation and the normal compiler/linker remain permitted.
 
 | Module boundary | Responsibility |
 |---|---|

@@ -1,6 +1,6 @@
 # 7. Capability-driven implementation roadmap
 
-No application implementation is included. Deliver accepted workflows, not a broad feature-count commitment. Unsupported operations/fields report E_CAPABILITY with the actual supported set. Foundation is a usable static slice; **the first useful toolkit requires Foundation plus Core and scenarios A–E**, including animation. Advanced work is selected one workflow at a time.
+S1 implementation has started; see [implementation status](../implementation.md) for delivered library functions. No milestone is accepted until its workflow gates pass. Deliver accepted workflows, not a broad feature-count commitment. Unsupported operations/fields report E_CAPABILITY with the actual supported set. Foundation is a usable static slice; **the first useful toolkit requires Foundation plus Core and scenarios A–E**, including animation. Advanced work is selected one workflow at a time.
 
 | Slice | End-to-end usable result | Dependencies and acceptance gate |
 |---|---|---|
@@ -23,6 +23,14 @@ Use std-only `#[test]` and integration tests. Tests may invoke the built CLI wit
 - Exports: exact fixed-grid coordinates, scaled pivots/anchors/component offsets, timing/playback/repeat, clipping/padding/extrusion, independently decoded samples and consumer placement.
 
 Run native stable tests on aarch64-apple-darwin, x86_64-unknown-linux-gnu and x86_64-pc-windows-msvc; broaden target support based on demand. Compare canonical fixture bytes directly, not only CRCs. Record skipped OS capabilities honestly. Normal OS/CRT/toolchain facilities do not violate independence; test clean environments instead of promising universal static linking.
+
+## Mandatory two-implementation acceptance rule (PR #2)
+
+Follow [the two-implementation measurement protocol](../two-implementation-rule.md)
+for every substantive implementation choice. Compare at least two genuine
+approaches on identical workloads, verify exact outputs and limits, benchmark
+native release runtime and memory, select the overall best design and record
+both accepted and rejected evidence. Do not declare an unmeasured winner.
 
 ## Measure before committing
 
