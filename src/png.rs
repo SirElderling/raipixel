@@ -89,6 +89,8 @@ pub struct Decoded {
 }
 
 #[cfg(feature = "experimental-quality")]
+#[rustfmt::skip]
+#[allow(dead_code)]
 #[path = "png/quality.rs"]
 mod quality;
 #[cfg(feature = "experimental-quality")]
