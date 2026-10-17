@@ -818,27 +818,35 @@ fn build_outputs(
 }
 /// Validate only visible pixels against the asset palette. Hidden RGB is
 /// deliberately unconstrained, so transparent source fidelity is retained.
-fn enforce_visible_palette(document: &Document, work: &mut Work) -> Result<()> {
+fn visible_palette_violation(
+    document: &Document,
+    work: &mut Work,
+) -> Result<Option<([u32; 2], [u8; 3])>> {
     let Some(selected) = document.palette_ref.as_ref() else {
-        return Ok(());
+        return Ok(None);
     };
     let entries = document.palettes.get(selected).ok_or_else(|| Fault {
         code: "E_REFERENCE",
         message: "asset refers to a missing palette".into(),
     })?;
-    let mut colors = Vec::new();
-    colors.try_reserve_exact(entries.len()).map_err(|_| Fault {
-        code: "E_ALLOC",
-        message: "palette validation allocation".into(),
-    })?;
-    colors.extend(entries.iter().map(|(_, rgb)| *rgb));
+    let mut colors = [[0u8; 3]; 256];
+    for (slot, (_, color)) in colors.iter_mut().zip(entries) {
+        *slot = *color;
+    }
     let image = document.image.as_ref().ok_or_else(|| Fault {
         code: "E_ARGUMENT",
         message: "missing editable cel".into(),
     })?;
-    if let Some((at, rgb)) =
-        raster(image.first_visible_color_outside_palette(&colors, work))?
-    {
+    raster(image.first_visible_color_outside_palette(
+        &colors[..entries.len()],
+        work,
+    ))
+}
+
+/// Export and explicitly requested palette checks must not publish invalid
+/// visible colors. Fully transparent RGB remains unconstrained.
+fn enforce_visible_palette(document: &Document, work: &mut Work) -> Result<()> {
+    if let Some((at, rgb)) = visible_palette_violation(document, work)? {
         return fail(
             "E_PROJECT",
             format!(
@@ -1246,24 +1254,11 @@ fn validate_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
         code: "E_PROJECT",
         message: "missing cel".into(),
     })?;
-    let mut palette_invalid = None;
-    if requested.contains(&"palette")
-        && let Some(palette_name) = document.palette_ref.as_ref()
-    {
-        let entries = document.palettes.get(palette_name).ok_or_else(|| Fault {
-            code: "E_REFERENCE",
-            message: "asset refers to unknown palette".into(),
-        })?;
-        let mut allowed_rgb: Vec<[u8; 3]> = entries.iter().map(|(_, rgb)| *rgb).collect();
-        allowed_rgb.sort_unstable();
-        allowed_rgb.dedup();
-        for (index, pixel) in image.pixels().iter().enumerate() {
-            if pixel[3] != 0 && allowed_rgb.binary_search(&[pixel[0], pixel[1], pixel[2]]).is_err() {
-                palette_invalid = Some([(index % width as usize) as u32, (index / width as usize) as u32]);
-                break;
-            }
-        }
-    }
+    let palette_invalid = if requested.contains(&"palette") {
+        visible_palette_violation(&document, &mut work)?.map(|(at, _)| at)
+    } else {
+        None
+    };
     let dimensions_valid = image.size() == [width, height];
     let mut checks_json = String::from("[");
     for (index, check) in requested.iter().enumerate() {
