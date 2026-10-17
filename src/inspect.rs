@@ -80,9 +80,7 @@ impl Image {
         let extra = count
             .checked_mul(if include_pixels { 8 } else { 4 })
             .and_then(|size| {
-                size.checked_add(
-                    (heap_slots as u64) * std::mem::size_of::<Worst>() as u64,
-                )
+                size.checked_add((heap_slots as u64) * std::mem::size_of::<Worst>() as u64)
             })
             .and_then(|size| size.checked_add((self.pixels().len() as u64) * 4))
             .ok_or(Error::Limit(Resource::Bytes))?;
@@ -109,10 +107,7 @@ impl Image {
 
         for y in y0..y1 {
             let row = self.index(x0, y);
-            for (offset, &pixel) in self.pixels()[row..row + width as usize]
-                .iter()
-                .enumerate()
-            {
+            for (offset, &pixel) in self.pixels()[row..row + width as usize].iter().enumerate() {
                 sorted.push(pixel);
                 if let Some(out) = &mut original {
                     out.push(pixel);
@@ -171,9 +166,7 @@ impl Image {
             }
         }
         let mut histogram: Vec<_> = best.into_iter().map(|item| item.0).collect();
-        histogram.sort_unstable_by(|a, b| {
-            b.count.cmp(&a.count).then_with(|| a.rgba.cmp(&b.rgba))
-        });
+        histogram.sort_unstable_by(|a, b| b.count.cmp(&a.count).then_with(|| a.rgba.cmp(&b.rgba)));
         Ok(ImageStats {
             size: self.size(),
             region: [x0, y0, width, height],

@@ -86,7 +86,9 @@ fn empty_visible_bbox_when_all_pixels_are_transparent_but_rgb_differs() {
         &mut Work::default(),
     )
     .unwrap();
-    let stats = image.inspect(None, 16, false, &mut Work::default()).unwrap();
+    let stats = image
+        .inspect(None, 16, false, &mut Work::default())
+        .unwrap();
     assert_eq!(stats.visible_bbox, None);
     assert_eq!(stats.unique_colors, 2);
     assert_eq!(stats.zero_alpha, 2);
@@ -126,15 +128,11 @@ fn invalid_region_histogram_bounds_and_raw_sample_limit_charge_no_work() {
 #[test]
 fn all_256_histogram_entries_are_supported() {
     let pixels: Vec<_> = (0..256u16).map(|i| [i as u8, 0, 0, 0]).collect();
-    let image = Image::from_pixels(
-        256,
-        1,
-        &pixels,
-        Limits::default(),
-        &mut Work::default(),
-    )
-    .unwrap();
-    let stats = image.inspect(None, 256, false, &mut Work::default()).unwrap();
+    let image =
+        Image::from_pixels(256, 1, &pixels, Limits::default(), &mut Work::default()).unwrap();
+    let stats = image
+        .inspect(None, 256, false, &mut Work::default())
+        .unwrap();
     assert_eq!(stats.unique_colors, 256);
     assert!(!stats.histogram_truncated);
     assert_eq!(stats.histogram.len(), 256);
@@ -145,14 +143,7 @@ fn all_256_histogram_entries_are_supported() {
 #[test]
 fn inspection_respects_aggregate_logical_scratch_limit_before_work() {
     let limits = Limits::new(2, 4, 16).unwrap();
-    let image = Image::from_pixels(
-        2,
-        2,
-        &[[1, 2, 3, 0]; 4],
-        limits,
-        &mut Work::default(),
-    )
-    .unwrap();
+    let image = Image::from_pixels(2, 2, &[[1, 2, 3, 0]; 4], limits, &mut Work::default()).unwrap();
     let mut budget = Work::new(1_000).unwrap();
     assert_eq!(
         image.inspect(None, 16, false, &mut budget),

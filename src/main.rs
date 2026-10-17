@@ -963,24 +963,34 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
     let mut work = Work::default();
     let document = load_snapshot(project, &mut work)?;
     let parsed = if let Some(path) = query_file {
-        let base = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
-        let filename = path.file_name().and_then(|s| s.to_str()).ok_or_else(|| Fault {
-            code: "E_ARGUMENT",
-            message: "invalid query filename".into(),
-        })?;
+        let base = path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        let filename = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| Fault {
+                code: "E_ARGUMENT",
+                message: "invalid query filename".into(),
+            })?;
         let bytes = read_input(base, filename, 8 * 1024 * 1024)?;
         parse_json(&bytes, &mut work)?
     } else {
         json::Value::Object(Map::new())
     };
     let query = obj(&parsed)?;
-    allowed(query, &["target", "region", "pixels", "symbols", "histogram_limit"])?;
+    allowed(
+        query,
+        &["target", "region", "pixels", "symbols", "histogram_limit"],
+    )?;
     if boolean(query, "symbols", false)? {
         return capability("symbol-grid inspection is not supported in this slice");
     }
     let target = query.get("target").map(string).transpose()?;
     if target.is_none() {
-        if query.contains_key("region") || query.contains_key("pixels")
+        if query.contains_key("region")
+            || query.contains_key("pixels")
             || query.contains_key("histogram_limit")
         {
             return argument("inspection region and pixel options require a target");
@@ -1010,8 +1020,7 @@ fn inspect_snapshot(project: &Path, query_file: Option<&Path>) -> Result<()> {
         }
         println!(
             r#"{{"schema":1,"ok":true,"action":"inspect","result":{{"assets":["{asset}"],"layers":["{layer}"],"frames":["{frame}"],"palettes":[{palettes}],"size":[{w},{h}],"pivot":[{},{}]}}}}"#,
-            document.pivot[0],
-            document.pivot[1]
+            document.pivot[0], document.pivot[1]
         );
         return Ok(());
     }
