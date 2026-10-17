@@ -41,8 +41,6 @@ fn ellipse_matches_independent_integer_oracle_for_small_shapes_and_outlines() {
                 assert_eq!(work.remaining(), 0);
                 for y in 0..20 {
                     for x in 0..19 {
-                        let x = x as i32;
-                        let y = y as i32;
                         let expected = oracle([2, 3, width as i32, height as i32], x, y)
                             && (filled
                                 || ![
